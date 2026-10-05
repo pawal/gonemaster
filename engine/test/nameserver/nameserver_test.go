@@ -327,6 +327,45 @@ func TestNameserver02EDNS0Support(t *testing.T) {
 	tctest.RequireTags(t, entries, "EDNS0_SUPPORT")
 }
 
+func TestNameserver02EDNS0SupportSkipsSilentServer(t *testing.T) {
+	answer := func(q tctest.Query) packet.Packet { return soaPacketWithEdns("example", 0, 0, nil) }
+	silent := func(q tctest.Query) packet.Packet { return packet.Packet{} }
+
+	tests := []struct {
+		name  string
+		first tctest.Handler
+		want  []string
+	}{
+		{"one server silent", answer, []string{"ns1.example/192.0.2.3"}},
+		{"every server silent", silent, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.3", tt.first)
+			ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.4", silent)
+			tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+				return []ens.Nameserver{ns1, ns2}, nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := Nameserver02(ctx, &z)
+			if err != nil {
+				t.Fatalf("nameserver02: %v", err)
+			}
+			tctest.RequireTags(t, entries, "NO_RESPONSE")
+			if tt.want == nil {
+				tctest.RequireNoTag(t, entries, "EDNS0_SUPPORT")
+				return
+			}
+			entry := tctest.RequireTag(t, entries, "EDNS0_SUPPORT")
+			if got := tctest.ServerEndpoints(t, entry.Args); !slices.Equal(got, tt.want) {
+				t.Fatalf("EDNS0_SUPPORT servers = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNameserver03AXFRAvailable(t *testing.T) {
 	ctx := tctest.Context(t)
 

@@ -31,7 +31,7 @@ Status: Final
    - If response is missing or query failed:
      - Send fallback SOA query without EDNS.
      - If fallback responds, emit `BREAKS_ON_EDNS`.
-     - Else emit `NO_RESPONSE`.
+     - Else emit `NO_RESPONSE` and mark the nameserver not included in summary.
 4. Count included nameservers and included nameservers with errors.
 5. If at least one nameserver was included and none had errors, emit `EDNS0_SUPPORT` with sorted included `name/ip` list.
 6. Emit `TEST_CASE_END`.
@@ -62,7 +62,7 @@ For each nameserver (parallel; fan-out = resolver.defaults.parallel):
     +- resp missing / query error:
        fallback query SOA without EDNS
          response present         -> BREAKS_ON_EDNS (ns, domain)
-         no response              -> NO_RESPONSE (ns, domain)
+         no response              -> NO_RESPONSE (ns, domain); not included
 
 After all tasks:
   included > 0 AND no included ns had any error tag
@@ -133,7 +133,7 @@ emit TEST_CASE_END
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: outcome table focuses on per-server error findings. Gonemaster: emits additional summary tag `EDNS0_SUPPORT` when all included nameservers pass.
+  - Upstream: outcome table focuses on per-server error findings. Gonemaster: emits additional summary tag `EDNS0_SUPPORT` when all included nameservers pass; a nameserver without any response is not included.
   - Upstream: describes iterating the nameserver IP set. Gonemaster: deduplicates nameservers by `name/ip` before evaluation.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
@@ -141,5 +141,5 @@ emit TEST_CASE_END
 
 ## Edge Cases And Limitations
 - A nameserver emits at most one per-server error tag in this testcase due early-return branch logic.
-- `EDNS0_SUPPORT` is not emitted if all nameservers are skipped due disabled transport.
+- `EDNS0_SUPPORT` is not emitted if every nameserver is skipped for a disabled transport or returns no response.
 - The testcase relies on generic query defaults for EDNS payload size and DO bit when those fields are not explicitly set in testcase logic.

@@ -610,7 +610,7 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						})); err != nil {
 							return err
 						}
-						outcome.hasError = true
+						outcome.included = false
 					}
 				}
 

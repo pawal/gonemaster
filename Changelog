@@ -13,6 +13,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Fixed
 
+- nameserver02: a nameserver without a response no longer suppresses `EDNS0_SUPPORT`
 - nameserver03: a transfer that ends without a record is an `AXFR_FAILURE`
 - dnssec14: `KEY_SIZE_OK` is emitted when no key finding fires; it was unreachable
 - zone05, zone10: transport tags and an unresponsive server no longer suppress `EXPIRE_MINIMUM_VALUE_OK` and `ONE_SOA`

@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Bootstrapbewijs niet beveiligd",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "Een zone op het pad van de root naar het bootstrapbewijs van uw DNS-operator heeft geen DS-record in haar bovenliggende zone, dus het bewijs kan niet worden gevalideerd. De operator moet die zone met DNSSEC beveiligen voordat het bewijs kan worden gebruikt.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrapbewijs onbereikbaar",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "De naamservers van een zone op het pad naar het bootstrapbewijs van uw DNS-operator gaven geen bruikbaar antwoord, dus een bovenliggende zone kan het bewijs niet ophalen. Een oorzaak is een naamserver die voor de zone vermeld staat maar haar niet bedient."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "De naamservers van een zone op het pad naar het bootstrapbewijs van uw DNS-operator gaven geen bruikbaar antwoord, dus een bovenliggende zone kan het bewijs niet ophalen. Een oorzaak is een naamserver die voor de zone vermeld staat maar haar niet bedient.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-doel niet gecontroleerd op alias",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Een van uw MX-records verwijst naar een hostnaam waarvoor geen van uw naamservers autoritatief antwoordt; dat is het geval wanneer een andere aanbieder uw e-mail verzorgt. Deze controle leest alleen de antwoorden van uw eigen naamservers en kan dus niet vaststellen of die hostnaam een alias (CNAME) is. RFC 2181 sectie 10.3 verbiedt een alias als MX-doel; de zone die de hostnaam bevat, moet zich daaraan houden."
 }

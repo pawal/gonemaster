@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Bootstrapping-Nachweis nicht gesichert",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "Eine Zone auf dem Weg von der Root zum Bootstrapping-Nachweis Ihres DNS-Betreibers hat keinen DS-Record in ihrer übergeordneten Zone, daher lässt sich der Nachweis nicht validieren. Der Betreiber muss diese Zone mit DNSSEC sichern, bevor der Nachweis verwendet werden kann.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrapping-Nachweis nicht erreichbar",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Die Nameserver einer Zone auf dem Weg zum Bootstrapping-Nachweis Ihres DNS-Betreibers gaben keine verwertbare Antwort, daher kann eine übergeordnete Zone den Nachweis nicht abrufen. Eine Ursache ist ein Nameserver, der für die Zone eingetragen ist, sie aber nicht bedient."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Die Nameserver einer Zone auf dem Weg zum Bootstrapping-Nachweis Ihres DNS-Betreibers gaben keine verwertbare Antwort, daher kann eine übergeordnete Zone den Nachweis nicht abrufen. Eine Ursache ist ein Nameserver, der für die Zone eingetragen ist, sie aber nicht bedient.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-Ziel nicht auf Alias geprüft",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Einer der MX-Records zeigt auf einen Hostnamen, für den keiner Ihrer Nameserver autoritativ antwortet; das ist der Fall, wenn ein anderer Anbieter Ihren E-Mail-Dienst betreibt. Diese Prüfung liest nur die Antworten Ihrer eigenen Nameserver und kann daher nicht feststellen, ob dieser Hostname ein Alias (CNAME) ist. RFC 2181 Abschnitt 10.3 verbietet einen Alias als MX-Ziel; die Zone, die den Hostnamen enthält, muss dies einhalten."
 }

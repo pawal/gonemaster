@@ -3881,6 +3881,10 @@ msgstr ""
 "L'enregistrement de type \"MX\" pour le domaine pointe sur \"{mx}\", qui "
 "n'est pas un alias (CNAME)."
 
+msgctxt "ZONE:MX_RECORD_NOT_CHECKED"
+msgid "MX record for the domain is pointing to \"{mx}\"; no name server of the zone answered authoritatively for that name."
+msgstr "L'enregistrement MX du domaine pointe vers \"{mx}\" ; aucun serveur de noms de la zone n'a répondu en faisant autorité pour ce nom."
+
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""
 "Nameserver {ns}/{address} responds with multiple ({count}) SOA records on SOA queries."

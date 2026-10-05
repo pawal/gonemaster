@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Bootstrapping-beviset er ikke sikret",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "En sone på veien fra roten til DNS-operatørens bootstrapping-bevis har ingen DS-post i sin foreldresone, så beviset kan ikke valideres. Operatøren må sikre den sonen med DNSSEC før beviset kan brukes.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrapping-beviset kan ikke nås",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Navnetjenerne for en sone på veien til DNS-operatørens bootstrapping-bevis ga ikke noe brukbart svar, så en foreldresone kan ikke hente beviset. En årsak er en navnetjener som er oppført for sonen, men ikke betjener den."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Navnetjenerne for en sone på veien til DNS-operatørens bootstrapping-bevis ga ikke noe brukbart svar, så en foreldresone kan ikke hente beviset. En årsak er en navnetjener som er oppført for sonen, men ikke betjener den.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-mål ikke kontrollert for alias",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "En av MX-postene dine peker på et vertsnavn som ingen av navnetjenerne dine svarer autoritativt for; slik er det når en annen leverandør håndterer e-posten din. Denne kontrollen leser bare svarene fra dine egne navnetjenere og kan derfor ikke avgjøre om vertsnavnet er et alias (CNAME). RFC 2181 avsnitt 10.3 forbyr et alias som MX-mål; sonen som inneholder vertsnavnet, må overholde dette."
 }

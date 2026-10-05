@@ -146,6 +146,14 @@ Description:
 
 One of your MX records points at a hostname that turns out to be defined as a CNAME (alias). RFC 2181 section 10.3 forbids an alias as an MX target, and RFC 5321 section 5.1 requires that target to answer with an address record, so a sending mail server may refuse to deliver mail. The target of an MX must be a real hostname with its own A or AAAA records.
 
+## Tag MX_RECORD_NOT_CHECKED
+
+Header: MX target not checked for an alias
+
+Description:
+
+One of your MX records points at a hostname that none of your nameservers answers for authoritatively, which is the case when another provider hosts your mail. This check reads only the answers of your own nameservers, so it cannot tell whether that hostname is an alias (CNAME). RFC 2181 section 10.3 forbids an alias as an MX target; the zone that holds the hostname must comply.
+
 ## Tag Z09_INCONSISTENT_MX
 
 Header: Inconsistent MX sets across nameservers

@@ -3294,6 +3294,10 @@ msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
 msgid "MX record for the domain is pointing to \"{mx}\", which is not a CNAME."
 msgstr "MX-post for domenet peker på \"{mx}\", som ikke er et CNAME."
 
+msgctxt "ZONE:MX_RECORD_NOT_CHECKED"
+msgid "MX record for the domain is pointing to \"{mx}\"; no name server of the zone answered authoritatively for that name."
+msgstr "MX-post for domenet peker på \"{mx}\"; ingen navnetjener for sonen svarte autoritativt for navnet."
+
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""
 "Nameserver {ns}/{address} responds with multiple ({count}) SOA records on SOA queries."

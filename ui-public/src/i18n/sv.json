@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Bootstrappingbeviset är inte skyddat",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "En zon på vägen från roten till din DNS-operatörs bootstrappingbevis har ingen DS-post i sin föräldrazon, så beviset kan inte valideras. Operatören måste skydda den zonen med DNSSEC innan beviset kan användas.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrappingbeviset kan inte nås",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Namnservrarna för en zon på vägen till din DNS-operatörs bootstrappingbevis gav inget användbart svar, så en föräldrazon kan inte hämta beviset. En orsak är en namnserver som är listad för zonen men inte betjänar den."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Namnservrarna för en zon på vägen till din DNS-operatörs bootstrappingbevis gav inget användbart svar, så en föräldrazon kan inte hämta beviset. En orsak är en namnserver som är listad för zonen men inte betjänar den.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-mål inte kontrollerat för alias",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "En av dina MX-poster pekar på ett värdnamn som ingen av dina namnservrar svarar auktoritativt för; så är det när en annan leverantör sköter din e-post. Den här kontrollen läser bara svaren från dina egna namnservrar och kan därför inte avgöra om värdnamnet är ett alias (CNAME). RFC 2181 avsnitt 10.3 förbjuder ett alias som MX-mål; zonen som innehåller värdnamnet måste följa det."
 }

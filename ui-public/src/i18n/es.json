@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "La prueba de arranque no está protegida",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "Una zona en el camino desde la raíz hasta la prueba de arranque de su operador DNS no tiene registro DS en su zona padre, por lo que la prueba no puede validarse. El operador debe proteger esa zona con DNSSEC antes de que la prueba pueda usarse.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "La prueba de arranque es inaccesible",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Los servidores de nombres de una zona en el camino hacia la prueba de arranque de su operador DNS no dieron ninguna respuesta útil, por lo que una zona padre no puede obtener la prueba. Una causa es un servidor de nombres que figura para la zona pero no la sirve."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Los servidores de nombres de una zona en el camino hacia la prueba de arranque de su operador DNS no dieron ninguna respuesta útil, por lo que una zona padre no puede obtener la prueba. Una causa es un servidor de nombres que figura para la zona pero no la sirve.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "No se comprobó si el destino MX es un alias",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Uno de sus registros MX apunta a un nombre de host para el que ninguno de sus servidores de nombres responde de forma autoritativa, como ocurre cuando otro proveedor gestiona su correo. Esta comprobación solo lee las respuestas de sus propios servidores de nombres, por lo que no puede determinar si ese nombre de host es un alias (CNAME). El RFC 2181 sección 10.3 prohíbe un alias como destino MX; la zona que contiene el nombre de host debe cumplirlo."
 }

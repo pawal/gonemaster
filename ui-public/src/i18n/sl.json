@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Dokaz za zagon ni zaščiten",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "Cona na poti od korena do dokaza za zagon vašega operaterja DNS nima zapisa DS v svoji nadrejeni coni, zato dokaza ni mogoče preveriti. Operater mora to cono zaščititi z DNSSEC, preden je dokaz mogoče uporabiti.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Dokaz za zagon ni dosegljiv",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Imenski strežniki cone na poti do dokaza za zagon vašega operaterja DNS niso dali uporabnega odgovora, zato nadrejena cona dokaza ne more pridobiti. Eden od vzrokov je imenski strežnik, ki je naveden za cono, vendar je ne streže."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Imenski strežniki cone na poti do dokaza za zagon vašega operaterja DNS niso dali uporabnega odgovora, zato nadrejena cona dokaza ne more pridobiti. Eden od vzrokov je imenski strežnik, ki je naveden za cono, vendar je ne streže.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "Cilj MX ni preverjen glede aliasa",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Eden od vaših zapisov MX kaže na ime gostitelja, za katerega noben od vaših imenskih strežnikov ne odgovarja avtoritativno; tako je, kadar vašo pošto upravlja drug ponudnik. Ta preverba bere samo odgovore vaših lastnih imenskih strežnikov, zato ne more ugotoviti, ali je to ime gostitelja alias (CNAME). RFC 2181 razdelek 10.3 prepoveduje alias kot cilj MX; cona, ki vsebuje ime gostitelja, mora to upoštevati."
 }

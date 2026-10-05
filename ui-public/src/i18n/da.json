@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Bootstrapping-beviset er ikke sikret",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "En zone på vejen fra roden til din DNS-operatørs bootstrapping-bevis har ingen DS-record i sin forældrezone, så beviset kan ikke valideres. Operatøren skal sikre den zone med DNSSEC, før beviset kan bruges.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrapping-beviset kan ikke nås",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Navneserverne for en zone på vejen til din DNS-operatørs bootstrapping-bevis gav intet brugbart svar, så en forældrezone kan ikke hente beviset. En årsag er en navneserver, der er angivet for zonen, men ikke betjener den."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Navneserverne for en zone på vejen til din DNS-operatørs bootstrapping-bevis gav intet brugbart svar, så en forældrezone kan ikke hente beviset. En årsag er en navneserver, der er angivet for zonen, men ikke betjener den.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-mål ikke kontrolleret for alias",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "En af dine MX-records peger på et værtsnavn, som ingen af dine navneservere svarer autoritativt for; sådan er det, når en anden udbyder håndterer din mail. Denne kontrol læser kun svarene fra dine egne navneservere og kan derfor ikke afgøre, om værtsnavnet er et alias (CNAME). RFC 2181 afsnit 10.3 forbyder et alias som MX-mål; den zone, der indeholder værtsnavnet, skal overholde det."
 }

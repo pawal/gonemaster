@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Käynnistystodiste ei ole suojattu",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "Juuresta DNS-operaattorisi käynnistystodisteeseen johtavalla polulla olevalla vyöhykkeellä ei ole DS-tietuetta ylemmällä vyöhykkeellään, joten todistetta ei voida validoida. Operaattorin on suojattava kyseinen vyöhyke DNSSEC:llä, ennen kuin todistetta voidaan käyttää.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Käynnistystodiste ei ole tavoitettavissa",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "DNS-operaattorisi käynnistystodisteeseen johtavalla polulla olevan vyöhykkeen nimipalvelimet eivät antaneet käyttökelpoista vastausta, joten ylempi vyöhyke ei voi noutaa todistetta. Yksi syy on nimipalvelin, joka on merkitty vyöhykkeelle mutta ei palvele sitä."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "DNS-operaattorisi käynnistystodisteeseen johtavalla polulla olevan vyöhykkeen nimipalvelimet eivät antaneet käyttökelpoista vastausta, joten ylempi vyöhyke ei voi noutaa todistetta. Yksi syy on nimipalvelin, joka on merkitty vyöhykkeelle mutta ei palvele sitä.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-kohdetta ei tarkistettu aliaksen osalta",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Yksi MX-tietueistasi osoittaa isäntänimeen, josta yksikään nimipalvelimistasi ei vastaa autoritatiivisesti; näin on, kun toinen palveluntarjoaja hoitaa sähköpostisi. Tämä tarkistus lukee vain omien nimipalvelimiesi vastaukset, joten se ei voi selvittää, onko isäntänimi alias (CNAME). RFC 2181 kohta 10.3 kieltää aliaksen MX:n kohteena; isäntänimen sisältävän vyöhykkeen on noudatettava sitä."
 }

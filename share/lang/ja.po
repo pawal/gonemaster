@@ -2018,6 +2018,10 @@ msgstr ""
 "このドメインの MX レコードは \"{mx}\" を指しており、これは CNAME ではありませ"
 "ん。"
 
+msgctxt "ZONE:MX_RECORD_NOT_CHECKED"
+msgid "MX record for the domain is pointing to \"{mx}\"; no name server of the zone answered authoritatively for that name."
+msgstr "このドメインの MX レコードは \"{mx}\" を指していますが、ゾーンのどのネームサーバーもこの名前に権威応答を返しませんでした。"
+
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""
 "Nameserver {ns}/{address} responds with multiple ({count}) SOA records on SOA queries."

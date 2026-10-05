@@ -3274,6 +3274,10 @@ msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
 msgid "MX record for the domain is pointing to \"{mx}\", which is not a CNAME."
 msgstr "MX zapis za domeno kaže na \"{mx}\", kar ni alias (CNAME)."
 
+msgctxt "ZONE:MX_RECORD_NOT_CHECKED"
+msgid "MX record for the domain is pointing to \"{mx}\"; no name server of the zone answered authoritatively for that name."
+msgstr "MX zapis za domeno kaže na \"{mx}\"; noben domenski strežnik cone ni za to ime odgovoril avtoritativno."
+
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""
 "Nameserver {ns}/{address} responds with multiple ({count}) SOA records on SOA queries."

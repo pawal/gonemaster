@@ -6,6 +6,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Changed
 
+- zone08: an exchange without an authoritative answer from the zone yields `MX_RECORD_NOT_CHECKED` at INFO
 - nameserver05: `AAAA_WELL_PROCESSED` also covers a zone without apex AAAA records
 - zone01, dnssec24: `Z01_MNAME_IS_MASTER`, `DS24_DELEGATION_SECURE`, `DS24_NO_CDS_CDNSKEY` and `DS24_DELETE_REQUESTED` are INFO
 

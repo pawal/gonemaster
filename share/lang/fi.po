@@ -3403,6 +3403,10 @@ msgstr ""
 "Verkkotunnuksen MX-tietue osoittaa kohteeseen \"{mx}\", joka ei ole CNAME-"
 "tietue."
 
+msgctxt "ZONE:MX_RECORD_NOT_CHECKED"
+msgid "MX record for the domain is pointing to \"{mx}\"; no name server of the zone answered authoritatively for that name."
+msgstr "Verkkotunnuksen MX-tietue osoittaa kohteeseen \"{mx}\"; mikään vyöhykkeen nimipalvelin ei vastannut autoritatiivisesti kyselyyn tälle nimelle."
+
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""
 "Nameserver {ns}/{address} responds with multiple ({count}) SOA records on SOA queries."

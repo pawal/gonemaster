@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Bootstrapping proof not secured",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "A zone on the path from the root to your DNS operator's bootstrapping proof has no DS record at its parent, so the proof cannot be validated. The operator must secure that zone with DNSSEC before the proof can be used.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrapping proof unreachable",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "The nameservers of a zone on the path to your DNS operator's bootstrapping proof gave no usable answer, so a parent cannot retrieve the proof. One cause is a nameserver that is listed for the zone but does not serve it."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "The nameservers of a zone on the path to your DNS operator's bootstrapping proof gave no usable answer, so a parent cannot retrieve the proof. One cause is a nameserver that is listed for the zone but does not serve it.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX target not checked for an alias",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "One of your MX records points at a hostname that none of your nameservers answers for authoritatively, which is the case when another provider hosts your mail. This check reads only the answers of your own nameservers, so it cannot tell whether that hostname is an alias (CNAME). RFC 2181 section 10.3 forbids an alias as an MX target; the zone that holds the hostname must comply."
 }

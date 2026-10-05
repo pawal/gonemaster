@@ -1111,5 +1111,7 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.header": "Zaváděcí důkaz není zabezpečen",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_INSECURE.desc": "Zóna na cestě od kořene k zaváděcímu důkazu vašeho provozovatele DNS nemá záznam DS ve své nadřazené zóně, takže důkaz nelze ověřit. Provozovatel musí tuto zónu zabezpečit pomocí DNSSEC, než bude možné důkaz použít.",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Zaváděcí důkaz je nedostupný",
-  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Jmenné servery zóny na cestě k zaváděcímu důkazu vašeho provozovatele DNS nedaly žádnou použitelnou odpověď, takže nadřazená zóna nemůže důkaz získat. Jednou z příčin je jmenný server, který je pro zónu uveden, ale neobsluhuje ji."
+  "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Jmenné servery zóny na cestě k zaváděcímu důkazu vašeho provozovatele DNS nedaly žádnou použitelnou odpověď, takže nadřazená zóna nemůže důkaz získat. Jednou z příčin je jmenný server, který je pro zónu uveden, ale neobsluhuje ji.",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "Cíl MX nebyl ověřen na alias",
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Jeden z vašich záznamů MX odkazuje na hostname, pro který žádný z vašich jmenných serverů neodpovídá autoritativně; tak je tomu, když vaši poštu provozuje jiný poskytovatel. Tato kontrola čte pouze odpovědi vašich vlastních jmenných serverů, a proto nemůže zjistit, zda je tento hostname alias (CNAME). RFC 2181 část 10.3 zakazuje alias jako cíl MX; požadavek musí splnit zóna, která tento hostname obsahuje."
 }

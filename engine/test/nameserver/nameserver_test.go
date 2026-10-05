@@ -499,6 +499,43 @@ func TestNameserver05AAAAWellProcessed(t *testing.T) {
 	tctest.RequireTags(t, entries, "AAAA_WELL_PROCESSED")
 }
 
+func TestNameserver05AAAAWellProcessedWithoutAAAA(t *testing.T) {
+	tests := []struct {
+		name string
+		a    func(name string) packet.Packet
+		want bool
+	}{
+		{"nodata", func(name string) packet.Packet { return aPacket(name, "192.0.2.10") }, true},
+		{"a dropped", func(string) packet.Packet { return packet.Packet{} }, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.6", func(q tctest.Query) packet.Packet {
+				switch strings.ToUpper(q.Type) {
+				case "A":
+					return tt.a(q.Name)
+				case "AAAA":
+					return tctest.Response(tctest.Question(q.Name, dns.TypeAAAA))
+				}
+				return packet.Packet{}
+			})
+			tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+				return []ens.Nameserver{ns1}, nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := Nameserver05(ctx, &z)
+			if err != nil {
+				t.Fatalf("nameserver05: %v", err)
+			}
+			if got := tctest.Has(entries, "AAAA_WELL_PROCESSED"); got != tt.want {
+				t.Fatalf("AAAA_WELL_PROCESSED emitted = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNameserver05ParallelQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)

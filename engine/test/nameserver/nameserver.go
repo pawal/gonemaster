@@ -837,7 +837,7 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		key       string
 		included  bool
 		aaaaIssue int
-		aaaaOK    int
+		answered  bool
 	}
 
 	ordered := uniqueServersByKey(nss)
@@ -898,6 +898,7 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcomes[i] = outcome
 					return nil
 				}
+				outcome.answered = true
 
 				for _, rr := range resp.GetRecords("AAAA", "answer") {
 					if aaaa, ok := rr.(*dns.AAAA); ok {
@@ -908,8 +909,6 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								return err
 							}
 							outcome.aaaaIssue++
-						} else {
-							outcome.aaaaOK++
 						}
 					}
 				}
@@ -928,7 +927,7 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	aaaaIssue := 0
-	aaaaOK := 0
+	answered := false
 	included := map[string]bool{}
 	for _, outcome := range outcomes {
 		if !outcome.included {
@@ -936,10 +935,10 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		included[outcome.key] = true
 		aaaaIssue += outcome.aaaaIssue
-		aaaaOK += outcome.aaaaOK
+		answered = answered || outcome.answered
 	}
 
-	if aaaaOK > 0 && aaaaIssue == 0 {
+	if answered && aaaaIssue == 0 {
 		args := map[string]any{}
 		setTypedServersFromNames(args, sortedKeys(included))
 		if err := appendLog(ctx, &results, testcase, "AAAA_WELL_PROCESSED", args); err != nil {

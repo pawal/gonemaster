@@ -27,11 +27,10 @@ Status: Final
    - Send apex `AAAA` query over UDP (`UseVC=false`).
    - If no DNS message is returned, emit `AAAA_QUERY_DROPPED`, increment AAAA-issue counter for this nameserver, and stop processing this nameserver.
    - If `AAAA` response `RCODE != NOERROR`, emit `AAAA_UNEXPECTED_RCODE`, increment AAAA-issue counter, and stop processing this nameserver.
-   - For each `AAAA` RR in answer:
-     - If RDATA length is not 16 bytes, emit `AAAA_BAD_RDATA` and increment AAAA-issue counter.
-     - Else increment AAAA-ok counter.
+   - Mark the nameserver as having answered AAAA.
+   - For each `AAAA` RR in answer whose RDATA length is not 16 bytes, emit `AAAA_BAD_RDATA` and increment AAAA-issue counter.
 4. Aggregate counters over included nameservers.
-5. If total AAAA-ok count is greater than zero and total AAAA-issue count is zero, emit `AAAA_WELL_PROCESSED`.
+5. If at least one nameserver answered AAAA and the total AAAA-issue count is zero, emit `AAAA_WELL_PROCESSED`.
 6. Emit `TEST_CASE_END`.
 
 ### Per-NS A Baseline and AAAA Probe (steps 2-6)
@@ -55,12 +54,12 @@ For each nameserver (parallel; fan-out = resolver.defaults.parallel):
     |                              aaaaIssue += 1; stop ns
     +- RCODE != NOERROR         -> AAAA_UNEXPECTED_RCODE (ns, rcode)
     |                              aaaaIssue += 1; stop ns
-    +- for each AAAA RR in answer:
+    +- NOERROR                  -> answered += 1
+         for each AAAA RR in answer:
          len(RDATA) != 16       -> AAAA_BAD_RDATA (ns, length); aaaaIssue += 1
-         len(RDATA) == 16       -> aaaaOk += 1
 
 After all tasks:
-   aaaaOk > 0 AND aaaaIssue == 0
+   answered > 0 AND aaaaIssue == 0
       -> AAAA_WELL_PROCESSED (servers = sorted included)
 
 emit TEST_CASE_END
@@ -73,7 +72,7 @@ emit TEST_CASE_END
 | `AAAA_BAD_RDATA` | A returned AAAA RR had invalid RDATA length. |
 | `AAAA_QUERY_DROPPED` | AAAA query returned no DNS message after successful A-query baseline. |
 | `AAAA_UNEXPECTED_RCODE` | AAAA query returned non-`NOERROR` RCODE after successful A-query baseline. |
-| `AAAA_WELL_PROCESSED` | At least one valid AAAA RR was observed and no AAAA-issue tags were triggered across included nameservers. |
+| `AAAA_WELL_PROCESSED` | At least one included nameserver answered the AAAA query with `NOERROR`, and no AAAA-issue tag was triggered. |
 | `A_UNEXPECTED_RCODE` | Initial A-query baseline returned non-`NOERROR` RCODE. |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
@@ -125,12 +124,13 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
   - Upstream: models an `AAAA OK` set of nameserver IPs and uses that set for the final positive condition. Gonemaster: final `AAAA_WELL_PROCESSED` condition is also global (no AAAA issues anywhere), but emitted `servers` contains all included nameservers, not only nameservers with successful AAAA records.
+  - Upstream: requires a nameserver with an AAAA record for the positive result. Gonemaster: a `NOERROR` AAAA response without AAAA RRs also satisfies it.
   - Upstream: describes iterating nameserver IP set. Gonemaster: deduplicates nameservers by `name/ip` before evaluation.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`
 
 ## Edge Cases And Limitations
-- If AAAA responses are `NOERROR` but contain no AAAA RRs, they contribute neither AAAA-ok nor AAAA-issue counts.
+- A `NOERROR` AAAA response without AAAA RRs counts as answered.
 - Any AAAA issue on any included nameserver suppresses `AAAA_WELL_PROCESSED` for the whole testcase.
 - Nameservers with failing A-query baseline are excluded from AAAA evaluation for that nameserver.

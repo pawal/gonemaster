@@ -675,6 +675,7 @@
             "MULTIPLE_SOA": "ERROR",
             "MX_RECORD_IS_CNAME": "ERROR",
             "MX_RECORD_IS_NOT_CNAME": "INFO",
+            "MX_RECORD_NOT_CHECKED": "INFO",
             "NO_RESPONSE": "DEBUG",
             "NO_RESPONSE_MX_QUERY": "DEBUG",
             "NO_RESPONSE_SOA_QUERY": "DEBUG",

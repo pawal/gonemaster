@@ -296,6 +296,7 @@ func Metadata() map[string][]string {
 		"zone08": {
 			"MX_RECORD_IS_CNAME",
 			"MX_RECORD_IS_NOT_CNAME",
+			"MX_RECORD_NOT_CHECKED",
 			"NO_RESPONSE_MX_QUERY",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
@@ -1008,17 +1009,18 @@ func Zone08(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			if err != nil {
 				return results, err
 			}
-			if p2.Msg == nil {
-				continue
-			}
 			args := map[string]any{"mx": exchange.String()}
 			switch {
 			case p2.HasRRsOfTypeForName("CNAME", exchange, "answer"):
 				if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_CNAME", args); err != nil {
 					return results, err
 				}
-			case p2.Rcode() == "NOERROR" || p2.Rcode() == "NXDOMAIN":
+			case p2.Msg != nil && (p2.Rcode() == "NOERROR" || p2.Rcode() == "NXDOMAIN"):
 				if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_NOT_CNAME", args); err != nil {
+					return results, err
+				}
+			default:
+				if err := appendLog(ctx, &results, testcase, "MX_RECORD_NOT_CHECKED", args); err != nil {
 					return results, err
 				}
 			}

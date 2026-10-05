@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 87,
-    "unique_tag_count": 618
+    "unique_tag_count": 619
   },
   "modules": {
     "address": {
@@ -1046,6 +1046,7 @@
       "zone08": [
         "MX_RECORD_IS_CNAME",
         "MX_RECORD_IS_NOT_CNAME",
+        "MX_RECORD_NOT_CHECKED",
         "NO_RESPONSE_MX_QUERY",
         "TEST_CASE_END",
         "TEST_CASE_START"

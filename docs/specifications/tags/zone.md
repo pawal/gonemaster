@@ -23,6 +23,7 @@ _Do not edit by hand - regenerate with the command above._
 | `MULTIPLE_SOA` | `ERROR` | [zone10](../tests/zone/zone10.md) | yes |
 | `MX_RECORD_IS_CNAME` | `ERROR` | [zone08](../tests/zone/zone08.md) | yes |
 | `MX_RECORD_IS_NOT_CNAME` | `INFO` | [zone08](../tests/zone/zone08.md) | yes |
+| `MX_RECORD_NOT_CHECKED` | `INFO` | [zone08](../tests/zone/zone08.md) | yes |
 | `NO_RESPONSE` | `DEBUG` | [zone10](../tests/zone/zone10.md) | yes |
 | `NO_RESPONSE_MX_QUERY` | `DEBUG` | [zone08](../tests/zone/zone08.md) | yes |
 | `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md) | yes |

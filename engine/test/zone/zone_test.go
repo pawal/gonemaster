@@ -2108,9 +2108,9 @@ func TestZone08VerdictByResponse(t *testing.T) {
 		{"nxdomain", tctest.Response(question, tctest.NXDOMAIN()), "MX_RECORD_IS_NOT_CNAME"},
 		{"alias", aliasResponse(exchange, "host.example.net."), "MX_RECORD_IS_CNAME"},
 		{"alias to missing name", tctest.Response(question, tctest.NXDOMAIN(), tctest.Answers(tctest.CNAMERR(exchange, "gone.example.com."))), "MX_RECORD_IS_CNAME"},
-		{"servfail", tctest.Response(question, tctest.Rcode(dns.RcodeServerFailure)), ""},
-		{"refused", tctest.Response(question, tctest.Rcode(dns.RcodeRefused)), ""},
-		{"no response", packet.Packet{}, ""},
+		{"servfail", tctest.Response(question, tctest.Rcode(dns.RcodeServerFailure)), "MX_RECORD_NOT_CHECKED"},
+		{"refused", tctest.Response(question, tctest.Rcode(dns.RcodeRefused)), "MX_RECORD_NOT_CHECKED"},
+		{"no response", packet.Packet{}, "MX_RECORD_NOT_CHECKED"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2118,16 +2118,12 @@ func TestZone08VerdictByResponse(t *testing.T) {
 				mxPacket("example.com", 300, mxRR{10, exchange}),
 				map[string]packet.Packet{exchange: tc.response})
 
-			if tc.want == "" {
-				tctest.RequireNoTag(t, entries, "MX_RECORD_IS_CNAME", "MX_RECORD_IS_NOT_CNAME")
-				return
-			}
-			other := "MX_RECORD_IS_NOT_CNAME"
-			if tc.want == other {
-				other = "MX_RECORD_IS_CNAME"
-			}
 			tctest.RequireCount(t, entries, tc.want, 1)
-			tctest.RequireNoTag(t, entries, other)
+			for _, tag := range []string{"MX_RECORD_IS_CNAME", "MX_RECORD_IS_NOT_CNAME", "MX_RECORD_NOT_CHECKED"} {
+				if tag != tc.want {
+					tctest.RequireNoTag(t, entries, tag)
+				}
+			}
 			if got, want := tctest.ArgValues(entries, tc.want, "mx"), []string{"mail.example.com"}; !slices.Equal(got, want) {
 				t.Fatalf("expected %s for %v, got %v", tc.want, want, got)
 			}

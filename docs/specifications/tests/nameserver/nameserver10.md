@@ -21,6 +21,7 @@ Status: Final
    - `No Response EDNS1 Query` (IP list)
    - `Unexpected RCODE` (rcode -> IP list)
    - `EDNS Response Error` (IP list)
+   - `EDNS Version OK` (IP list)
 3. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 4. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip this nameserver.
@@ -32,12 +33,13 @@ Status: Final
      - DNS header RCODE `BADVERS`, or
      - header low 4 bits `NOERROR` and EDNS extended rcode `1`.
    - If not BADVERS, mark nameserver IP under response `rcode` for `N10_UNEXPECTED_RCODE`.
-   - Else if response has EDNS version `0` and empty answer section, treat as expected and do not mark issues.
+   - Else if response has EDNS version `0` and empty answer section, mark nameserver IP for `N10_EDNS_VERSION_OK`.
    - Else mark nameserver IP for `N10_EDNS_RESPONSE_ERROR`.
 5. Emit aggregate tags for non-empty collectors:
    - `N10_NO_RESPONSE_EDNS1_QUERY` with sorted unique `addresses`.
    - For each sorted `rcode`, `N10_UNEXPECTED_RCODE` with sorted unique `addresses`.
    - `N10_EDNS_RESPONSE_ERROR` with sorted unique `addresses`.
+   - `N10_EDNS_VERSION_OK` with sorted unique `addresses`.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -46,6 +48,7 @@ Status: Final
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `N10_EDNS_RESPONSE_ERROR` | BADVERS condition is met but response does not match expected EDNSv1 error-shape check. |
+| `N10_EDNS_VERSION_OK` | EDNSv1 probe returned BADVERS with EDNS version `0` and an empty answer section. |
 | `N10_NO_RESPONSE_EDNS1_QUERY` | Nameserver responded to EDNSv0 probe but not to EDNSv1 probe. |
 | `N10_UNEXPECTED_RCODE` | EDNSv1 probe returned response with RCODE not interpreted as BADVERS. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -61,6 +64,7 @@ Status: Final
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `N10_EDNS_RESPONSE_ERROR` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
+| `N10_EDNS_VERSION_OK` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `N10_NO_RESPONSE_EDNS1_QUERY` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `N10_UNEXPECTED_RCODE` | `rcode` | `string` | Unexpected response code for EDNSv1 query. |
 | `N10_UNEXPECTED_RCODE` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs for that rcode. |
@@ -73,6 +77,7 @@ Status: Final
 | `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N10_EDNS_RESPONSE_ERROR` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `N10_EDNS_VERSION_OK` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N10_NO_RESPONSE_EDNS1_QUERY` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N10_UNEXPECTED_RCODE` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
@@ -83,6 +88,7 @@ Status: Final
   - Upstream: says input is nameserver IP set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output, but aggregate `addresses` values are sorted and deduplicated by IP.
   - Upstream: summary assumes this testcase is relevant only after EDNSv0 success. Gonemaster: implements that gating explicitly by only evaluating EDNSv1 when EDNSv0 response exists and has `NOERROR`.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: emits no tag for a nameserver that answers as expected. Gonemaster: emits `N10_EDNS_VERSION_OK`.
 - Potential upstream report:
   - `no`
 

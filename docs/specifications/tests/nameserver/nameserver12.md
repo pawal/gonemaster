@@ -24,9 +24,10 @@ Status: Final
    - If no response, emit `NO_RESPONSE` (`ns`, `domain`).
    - Else if `RCODE=FORMERR` and EDNS extended rcode is `0`, emit `NO_EDNS_SUPPORT`.
    - Else if response EDNS Z value is non-zero, emit `Z_FLAGS_NOTCLEAR`.
-   - Else if response matches success shape (`RCODE=NOERROR`, `EdnsRcode=0`, `EdnsVersion=0`, `EdnsZ=0`, and SOA answer present), emit no finding.
+   - Else if response matches success shape (`RCODE=NOERROR`, `EdnsRcode=0`, `EdnsVersion=0`, `EdnsZ=0`, and SOA answer present), mark the nameserver for `Z_FLAGS_CLEAR`.
    - Else emit `NS_ERROR`.
-4. Emit `TEST_CASE_END`.
+4. If at least one nameserver is marked, emit `Z_FLAGS_CLEAR` with the marked nameservers in `servers`.
+5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
@@ -38,6 +39,7 @@ Status: Final
 | `NS_ERROR` | Response did not fit expected success or explicit failure branches. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
+| `Z_FLAGS_CLEAR` | At least one nameserver returned the success shape of step 3. |
 | `Z_FLAGS_NOTCLEAR` | Response EDNS Z flags were not cleared to zero. |
 
 ## Tag Arguments
@@ -58,6 +60,7 @@ Status: Final
 | `NS_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver12`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver12`). |
+| `Z_FLAGS_CLEAR` | `servers` | `array<object>` | Structured sorted nameservers (`{ns,address}`) that returned the success shape. |
 | `Z_FLAGS_NOTCLEAR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning non-zero EDNS Z flags. |
 | `Z_FLAGS_NOTCLEAR` | `address` | `string` | Nameserver IP address for the same endpoint. |
 
@@ -71,6 +74,7 @@ Status: Final
 | `NS_ERROR` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `Z_FLAGS_CLEAR` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `Z_FLAGS_NOTCLEAR` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
@@ -78,6 +82,7 @@ Status: Final
   - Upstream: describes iterating nameserver IP set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output (no testcase-local deduplication).
   - Upstream: describes ignored disabled transports in prose. Gonemaster: emits explicit `IPV4_DISABLED` / `IPV6_DISABLED` tags.
   - Upstream: does not explicitly describe testcase boundary markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
+  - Upstream: emits no tag for a nameserver that answers as expected. Gonemaster: emits `Z_FLAGS_CLEAR`.
 - Potential upstream report:
   - `no`
 

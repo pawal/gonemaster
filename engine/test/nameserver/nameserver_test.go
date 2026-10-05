@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -863,6 +864,72 @@ func TestNameserver12ZFlags(t *testing.T) {
 			entry := tctest.RequireTag(t, entries, "Z_FLAGS_NOTCLEAR")
 			if entry.Level() != "WARNING" {
 				t.Fatalf("Z_FLAGS_NOTCLEAR level = %q, want WARNING", entry.Level())
+			}
+		})
+	}
+}
+
+func TestNameserverEDNSPassTags(t *testing.T) {
+	ednsSOA := func(t *testing.T) tctest.Handler {
+		resp := tctest.Wire(t, soaPacketWithEdns("example", 0, 0, nil))
+		return func(q tctest.Query) packet.Packet { return resp }
+	}
+	badvers := func(t *testing.T) tctest.Handler {
+		ok := tctest.Wire(t, soaPacketWithEdns("example", 0, 0, nil))
+		bad := tctest.Wire(t, tctest.Response(tctest.Secure(), tctest.Rcode(dns.RcodeBadVers)))
+		return func(q tctest.Query) packet.Packet {
+			if q.Opts != nil && q.Opts.EDNSDetails != nil && q.Opts.EDNSDetails.Version != nil && *q.Opts.EDNSDetails.Version == 1 {
+				return bad
+			}
+			return ok
+		}
+	}
+	dnskey := func(t *testing.T) tctest.Handler {
+		resp := tctest.Wire(t, tctest.Response(tctest.Secure(), tctest.Question("example", dns.TypeDNSKEY)))
+		return func(q tctest.Query) packet.Packet { return resp }
+	}
+
+	cases := []struct {
+		name    string
+		run     func(context.Context, *zone.Zone) ([]*logger.Entry, error)
+		handler func(*testing.T) tctest.Handler
+		tag     string
+		servers bool
+	}{
+		{"nameserver10", Nameserver10, badvers, "N10_EDNS_VERSION_OK", false},
+		{"nameserver11", Nameserver11, ednsSOA, "N11_UNKNOWN_OPTION_OK", false},
+		{"nameserver12", Nameserver12, ednsSOA, "Z_FLAGS_CLEAR", true},
+		{"nameserver13", Nameserver13, dnskey, "N13_EDNS_RESPONSE_OK", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			log := logger.New()
+			log.SetProfile(profile.Effective())
+			ctx = logger.WithContext(ctx, log)
+
+			ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.20", tc.handler(t))
+			tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+				return []ens.Nameserver{ns1}, nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := tc.run(ctx, &z)
+			if err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+			entry := tctest.RequireTag(t, entries, tc.tag)
+			if entry.Level() != "INFO" {
+				t.Fatalf("%s level = %q, want INFO", tc.tag, entry.Level())
+			}
+			if tc.servers {
+				if got, want := tctest.ServerEndpoints(t, entry.Args), []string{"ns1.example/192.0.2.20"}; !slices.Equal(got, want) {
+					t.Fatalf("%s servers = %v, want %v", tc.tag, got, want)
+				}
+				return
+			}
+			if got, want := tctest.Strings(t, entry.Args, "addresses"), []string{"192.0.2.20"}; !slices.Equal(got, want) {
+				t.Fatalf("%s addresses = %v, want %v", tc.tag, got, want)
 			}
 		})
 	}

@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 87,
-    "unique_tag_count": 619
+    "unique_tag_count": 623
   },
   "modules": {
     "address": {
@@ -831,6 +831,7 @@
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "N10_EDNS_RESPONSE_ERROR",
+        "N10_EDNS_VERSION_OK",
         "N10_NO_RESPONSE_EDNS1_QUERY",
         "N10_UNEXPECTED_RCODE",
         "TEST_CASE_END",
@@ -844,6 +845,7 @@
         "N11_RETURNS_UNKNOWN_OPTION_CODE",
         "N11_UNEXPECTED_ANSWER_SECTION",
         "N11_UNEXPECTED_RCODE",
+        "N11_UNKNOWN_OPTION_OK",
         "N11_UNSET_AA",
         "TEST_CASE_END",
         "TEST_CASE_START"
@@ -856,12 +858,14 @@
         "NS_ERROR",
         "TEST_CASE_END",
         "TEST_CASE_START",
+        "Z_FLAGS_CLEAR",
         "Z_FLAGS_NOTCLEAR"
       ],
       "nameserver13": [
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "MISSING_OPT_IN_TRUNCATED",
+        "N13_EDNS_RESPONSE_OK",
         "NO_EDNS_SUPPORT",
         "NO_RESPONSE",
         "NS_ERROR",

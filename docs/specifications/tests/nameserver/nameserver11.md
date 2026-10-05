@@ -36,7 +36,7 @@ Status: Final
      - `N11_UNEXPECTED_ANSWER_SECTION` when SOA answer for zone name is absent.
      - `N11_UNSET_AA` when `AA=false`.
      - `N11_RETURNS_UNKNOWN_OPTION_CODE` when response EDNS data still includes option code `137`.
-     - no finding when none of the above applies.
+     - `N11_UNKNOWN_OPTION_OK` when none of the above applies.
 4. Emit aggregate tags for non-empty collectors (sorted unique `addresses` values; `N11_UNEXPECTED_RCODE` emitted per sorted `rcode`).
 5. Emit `TEST_CASE_END`.
 
@@ -50,6 +50,7 @@ Status: Final
 | `N11_RETURNS_UNKNOWN_OPTION_CODE` | Unknown EDNS option code `137` was echoed back in response EDNS options. |
 | `N11_UNEXPECTED_ANSWER_SECTION` | Unknown-option query response did not include expected zone SOA answer. |
 | `N11_UNEXPECTED_RCODE` | Unknown-option query response had non-`NOERROR` RCODE. |
+| `N11_UNKNOWN_OPTION_OK` | Unknown-option query response passed every check above and did not echo option code `137`. |
 | `N11_UNSET_AA` | Unknown-option query response was not authoritative. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
@@ -69,6 +70,7 @@ Status: Final
 | `N11_UNEXPECTED_ANSWER_SECTION` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `N11_UNEXPECTED_RCODE` | `rcode` | `string` | Unexpected response code name. |
 | `N11_UNEXPECTED_RCODE` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs for that rcode. |
+| `N11_UNKNOWN_OPTION_OK` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `N11_UNSET_AA` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver11`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver11`). |
@@ -83,6 +85,7 @@ Status: Final
 | `N11_RETURNS_UNKNOWN_OPTION_CODE` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N11_UNEXPECTED_ANSWER_SECTION` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N11_UNEXPECTED_RCODE` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `N11_UNKNOWN_OPTION_OK` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N11_UNSET_AA` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
@@ -92,6 +95,7 @@ Status: Final
   - Upstream: assumes nameserver IP evaluation set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output, then emits deduplicated/sorted `addresses` aggregates.
   - Upstream: defines baseline gate before unknown-option probe. Gonemaster: implements this gate exactly and silently skips nameservers failing baseline checks.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: emits no tag for a nameserver that answers as expected. Gonemaster: emits `N11_UNKNOWN_OPTION_OK`.
 - Potential upstream report:
   - `no`
 

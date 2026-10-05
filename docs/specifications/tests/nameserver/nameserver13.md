@@ -29,9 +29,10 @@ Status: Final
    - If no response, emit `NO_RESPONSE` (`ns`, `domain`).
    - Else if `RCODE=FORMERR` and response has no EDNS OPT record, emit `NO_EDNS_SUPPORT`.
    - Else if response is truncated (`TC=1`) and has no EDNS OPT, emit `MISSING_OPT_IN_TRUNCATED`.
-   - Else if response shape is (`RCODE=NOERROR`, `EdnsVersion=0`), emit no finding.
+   - Else if response shape is (`RCODE=NOERROR`, `EdnsVersion=0`), mark the nameserver for `N13_EDNS_RESPONSE_OK`.
    - Else emit `NS_ERROR`.
-4. Emit `TEST_CASE_END`.
+4. If at least one nameserver is marked, emit `N13_EDNS_RESPONSE_OK` with the marked nameservers in `servers`.
+5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
@@ -39,6 +40,7 @@ Status: Final
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `MISSING_OPT_IN_TRUNCATED` | Response was truncated but lacked EDNS OPT record. |
+| `N13_EDNS_RESPONSE_OK` | At least one nameserver returned the success shape of step 3. |
 | `NO_EDNS_SUPPORT` | Response indicates FORMERR with no EDNS OPT record. |
 | `NO_RESPONSE` | Query produced no DNS response. |
 | `NS_ERROR` | Response did not fit expected success or explicit failure branches. |
@@ -56,6 +58,7 @@ Status: Final
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
 | `MISSING_OPT_IN_TRUNCATED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning truncated response without OPT. |
 | `MISSING_OPT_IN_TRUNCATED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `N13_EDNS_RESPONSE_OK` | `servers` | `array<object>` | Structured sorted nameservers (`{ns,address}`) that returned the success shape. |
 | `NO_EDNS_SUPPORT` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) treated as no-EDNS support path. |
 | `NO_EDNS_SUPPORT` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
@@ -72,6 +75,7 @@ Status: Final
 | `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `MISSING_OPT_IN_TRUNCATED` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `N13_EDNS_RESPONSE_OK` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `NO_EDNS_SUPPORT` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `NS_ERROR` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
@@ -82,6 +86,7 @@ Status: Final
 - Differences (Upstream vs Gonemaster):
   - Upstream: iterates nameserver IP set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output (no testcase-local deduplication).
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: emits no tag for a nameserver that answers as expected. Gonemaster: emits `N13_EDNS_RESPONSE_OK`.
 - Resolved upstream issues:
   - Upstream engine bug ([zonemaster-engine#1503](https://github.com/zonemaster/zonemaster-engine/issues/1503)): upstream engine queried `SOA` instead of `DNSKEY` as specified. Gonemaster now queries `DNSKEY` matching the specification. Upstream has since fixed this in their engine.
   - Upstream engine bug: `NO_EDNS_SUPPORT` was emitted on any `FORMERR`; now requires `FORMERR` with no EDNS OPT record in the response (`!HasEdns()`).

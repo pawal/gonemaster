@@ -314,6 +314,7 @@ func Metadata() map[string][]string {
 			"N10_NO_RESPONSE_EDNS1_QUERY",
 			"N10_UNEXPECTED_RCODE",
 			"N10_EDNS_RESPONSE_ERROR",
+			"N10_EDNS_VERSION_OK",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -326,6 +327,7 @@ func Metadata() map[string][]string {
 			"N11_UNEXPECTED_ANSWER_SECTION",
 			"N11_UNEXPECTED_RCODE",
 			"N11_UNSET_AA",
+			"N11_UNKNOWN_OPTION_OK",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -335,6 +337,7 @@ func Metadata() map[string][]string {
 			"NO_RESPONSE",
 			"NO_EDNS_SUPPORT",
 			"Z_FLAGS_NOTCLEAR",
+			"Z_FLAGS_CLEAR",
 			"NS_ERROR",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
@@ -346,6 +349,7 @@ func Metadata() map[string][]string {
 			"NO_EDNS_SUPPORT",
 			"NS_ERROR",
 			"MISSING_OPT_IN_TRUNCATED",
+			"N13_EDNS_RESPONSE_OK",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -1355,6 +1359,7 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var noResponseEDNS1 []string
 	unexpectedRcode := map[string][]string{}
 	var ednsResponseError []string
+	var ednsVersionOK []string
 
 	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
@@ -1366,6 +1371,7 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		noResponseEDNS1    bool
 		unexpectedRcode    string
 		ednsResponseErrors bool
+		versionOK          bool
 	}
 
 	var outcomes []n10Outcome
@@ -1395,7 +1401,7 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						if !isBadvers {
 							outcome.unexpectedRcode = resp2.Rcode()
 						} else if resp2.EdnsVersion() == 0 && len(resp2.Answer()) == 0 {
-							// expected: no logs
+							outcome.versionOK = true
 						} else {
 							outcome.ednsResponseErrors = true
 						}
@@ -1426,6 +1432,9 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		if outcome.ednsResponseErrors {
 			ednsResponseError = append(ednsResponseError, outcome.ip)
+		}
+		if outcome.versionOK {
+			ednsVersionOK = append(ednsVersionOK, outcome.ip)
 		}
 	}
 
@@ -1458,6 +1467,14 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if len(ednsVersionOK) > 0 {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, ednsVersionOK)
+		if err := appendLog(ctx, &results, testcase, "N10_EDNS_VERSION_OK", args); err != nil {
+			return results, err
+		}
+	}
+
 	return appendTestCaseEnd(ctx, results, testcase)
 }
 
@@ -1476,6 +1493,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var unexpectedAnswer []string
 	var unsetAA []string
 	var unknownOpt []string
+	var unknownOptOK []string
 
 	optCode := uint16(137)
 	unknownOptData := &dns.ERFC3597{EDNS0Code: optCode, Code: ""}
@@ -1493,6 +1511,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		unexpectedAns   bool
 		unsetAA         bool
 		unknownOpt      bool
+		passed          bool
 	}
 
 	var outcomes []n11Outcome
@@ -1551,6 +1570,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						break
 					}
 				}
+				outcome.passed = !outcome.unknownOpt
 				outcomes[i] = outcome
 				return nil
 			}
@@ -1582,6 +1602,9 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		if outcome.unknownOpt {
 			unknownOpt = append(unknownOpt, outcome.ip)
+		}
+		if outcome.passed {
+			unknownOptOK = append(unknownOptOK, outcome.ip)
 		}
 	}
 
@@ -1638,6 +1661,14 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if len(unknownOptOK) > 0 {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, unknownOptOK)
+		if err := appendLog(ctx, &results, testcase, "N11_UNKNOWN_OPTION_OK", args); err != nil {
+			return results, err
+		}
+	}
+
 	return appendTestCaseEnd(ctx, results, testcase)
 }
 
@@ -1655,6 +1686,7 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	passed := make([]string, len(nss))
 	if len(nss) > 0 {
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
@@ -1679,6 +1711,7 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							return err
 						}
 					} else if resp.Rcode() == "NOERROR" && resp.EdnsRcode() == 0 && resp.EdnsVersion() == 0 && resp.EdnsZ() == 0 && len(resp.GetRecords("SOA", "answer")) > 0 {
+						passed[i] = server.String()
 						return nil
 					} else {
 						if _, err := buf.Add("NS_ERROR", withNameserverArgs(server, nil)); err != nil {
@@ -1704,6 +1737,14 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
+	if servers := slices.DeleteFunc(passed, func(v string) bool { return v == "" }); len(servers) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, servers)
+		if err := appendLog(ctx, &results, testcase, "Z_FLAGS_CLEAR", args); err != nil {
+			return results, err
+		}
+	}
+
 	return appendTestCaseEnd(ctx, results, testcase)
 }
 
@@ -1721,6 +1762,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	passed := make([]string, len(nss))
 	if len(nss) > 0 {
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
@@ -1743,6 +1785,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							return err
 						}
 					} else if resp.Rcode() == "NOERROR" && resp.EdnsVersion() == 0 {
+						passed[i] = server.String()
 						return nil
 					} else {
 						if _, err := buf.Add("NS_ERROR", withNameserverArgs(server, nil)); err != nil {
@@ -1766,6 +1809,14 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		results = append(results, entries...)
+	}
+
+	if servers := slices.DeleteFunc(passed, func(v string) bool { return v == "" }); len(servers) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, servers)
+		if err := appendLog(ctx, &results, testcase, "N13_EDNS_RESPONSE_OK", args); err != nil {
+			return results, err
+		}
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)

@@ -240,8 +240,8 @@ emit TEST_CASE_END
 | `DS01_PARENT_ZONE_NO_DS` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS01_ROOT_N_NO_UNDEL_DS` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS01_UNDEL_N_NO_UNDEL_DS` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

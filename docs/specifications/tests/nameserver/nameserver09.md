@@ -147,8 +147,8 @@ emit TEST_CASE_END
 | `CASE_QUERY_NO_ANSWER` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `CASE_QUERY_SAME_ANSWER` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `CASE_QUERY_SAME_RC` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 

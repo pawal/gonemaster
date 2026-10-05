@@ -114,8 +114,8 @@ per nameserver (parallel):
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N17_COOKIE_CLIENT_ONLY` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N17_COOKIE_ENFORCED` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N17_COOKIE_MALFORMED` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |

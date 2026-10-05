@@ -77,8 +77,8 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 | `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 | `NO_RESPONSE_SOA_QUERY` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 | `RNAME_MAIL_DOMAIN_INVALID` | `NOTICE` | Default from `share/profile.json` (`test_levels.SYNTAX`). |

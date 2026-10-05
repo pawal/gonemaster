@@ -152,8 +152,8 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN02_WRONG_NS_RECORD_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN02_WRONG_SOA_RECORD_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 

@@ -123,8 +123,8 @@ emit TEST_CASE_END
 | `EDNS0_SUPPORT` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `EDNS_RESPONSE_WITHOUT_EDNS` | `ERROR` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `EDNS_VERSION_ERROR` | `ERROR` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `NO_EDNS_SUPPORT` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `NS_ERROR` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |

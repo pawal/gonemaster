@@ -15,8 +15,8 @@ _Do not edit by hand - regenerate with the command above._
 | `EXPIRE_LOWER_THAN_REFRESH` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
 | `EXPIRE_MINIMUM_VALUE_LOWER` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
 | `EXPIRE_MINIMUM_VALUE_OK` | `INFO` | [zone05](../tests/zone/zone05.md) | yes |
-| `IPV4_DISABLED` | `-` | [zone12](../tests/zone/zone12.md), [zone14](../tests/zone/zone14.md), [zone15](../tests/zone/zone15.md) | yes |
-| `IPV6_DISABLED` | `-` | [zone12](../tests/zone/zone12.md), [zone14](../tests/zone/zone14.md), [zone15](../tests/zone/zone15.md) | yes |
+| `IPV4_DISABLED` | `DEBUG2` | [zone12](../tests/zone/zone12.md), [zone14](../tests/zone/zone14.md), [zone15](../tests/zone/zone15.md) | yes |
+| `IPV6_DISABLED` | `DEBUG2` | [zone12](../tests/zone/zone12.md), [zone14](../tests/zone/zone14.md), [zone15](../tests/zone/zone15.md) | yes |
 | `MNAME_HAS_NO_ADDRESS` | `WARNING` | [zone07](../tests/zone/zone07.md) | yes |
 | `MNAME_IS_CNAME` | `NOTICE` | [zone07](../tests/zone/zone07.md) | yes |
 | `MNAME_IS_NOT_CNAME` | `INFO` | [zone07](../tests/zone/zone07.md) | yes |

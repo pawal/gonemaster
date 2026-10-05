@@ -193,8 +193,8 @@ emit TEST_CASE_END
 | `DS19_BLOCKLIST_NOT_FOUND` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`); carries zero score penalty (`scoring` `TagPenalties`). |
 | `DS19_NO_DNSKEY` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS19_NO_RESPONSE` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

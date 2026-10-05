@@ -143,10 +143,10 @@ emit TEST_CASE_END
 | `B02_NS_NO_IP_ADDR` | `ERROR` | Default from `share/profile.json`. |
 | `B02_NS_NO_RESPONSE` | `WARNING` | Default from `share/profile.json`. |
 | `B02_UNEXPECTED_RCODE` | `ERROR` | Default from `share/profile.json`. |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json`. |
-| `IPV4_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json`. |
-| `IPV6_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json`. |
+| `IPV4_ENABLED` | `DEBUG2` | Default from `share/profile.json`. |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json`. |
+| `IPV6_ENABLED` | `DEBUG2` | Default from `share/profile.json`. |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json`. |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json`. |
 

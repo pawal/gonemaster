@@ -132,8 +132,8 @@ emit TEST_CASE_END
 | `DS20_NO_DNSSEC` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS20_NSEC_BITMAP_MISMATCHES_RRTYPE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

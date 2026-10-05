@@ -248,8 +248,8 @@ The bonus criterion `cds_cdnskey_published` in `scoring/bonus.go` treats `DS18_N
 | `DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS18_ROLLOVER_EVIDENCE_MULTI_KSK` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

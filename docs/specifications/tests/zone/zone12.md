@@ -121,8 +121,8 @@ emit TEST_CASE_END
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z12_CSYNC_FOUND` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z12_INCONSISTENT_CSYNC` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z12_MIXED_PRESENCE` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |

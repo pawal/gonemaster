@@ -76,8 +76,8 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N15_ERROR_ON_VERSION_QUERY` | `NOTICE` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N15_NO_VERSION_REVEALED` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N15_SOFTWARE_VERSION` | `NOTICE` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |

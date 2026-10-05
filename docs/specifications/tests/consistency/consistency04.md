@@ -73,8 +73,8 @@ Status: Final
 | Tag | Level | Notes |
 | --- | --- | --- |
 | `INCONSISTENT_NS_TTL` | `NOTICE` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `MULTIPLE_NS_SET` | `NOTICE` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `NO_RESPONSE_NS_QUERY` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |

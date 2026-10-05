@@ -81,8 +81,8 @@ emit TEST_CASE_END
 | --- | --- | --- |
 | `AXFR_AVAILABLE` | `NOTICE` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `AXFR_FAILURE` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 

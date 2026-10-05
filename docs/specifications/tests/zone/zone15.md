@@ -189,8 +189,8 @@ emit TEST_CASE_END
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z15_CAA_FOUND` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z15_INCONSISTENT_CAA` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z15_INVALID_IODEF_VALUE` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |

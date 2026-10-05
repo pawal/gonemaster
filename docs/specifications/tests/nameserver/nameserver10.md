@@ -70,8 +70,8 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N10_EDNS_RESPONSE_ERROR` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N10_NO_RESPONSE_EDNS1_QUERY` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N10_UNEXPECTED_RCODE` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |

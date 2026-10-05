@@ -176,8 +176,8 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `CNAME_CHAIN_TOO_LONG` | `ERROR` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CNAME_TARGET_UNRESOLVED` | `ERROR` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CNAME_TOO_MANY_RECORDS` | `ERROR` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 

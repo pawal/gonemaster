@@ -71,8 +71,8 @@ Status: Final
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS13_ALGO_NOT_SIGNED_NS` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS13_ALGO_NOT_SIGNED_SOA` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

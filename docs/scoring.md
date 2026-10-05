@@ -61,7 +61,7 @@ Some tags warrant a penalty disproportionate to their log level. The
 | `NO_IPV6_NS_DEL`            | NOTICE  | **20**   | Delegation has no IPv6 addresses   |
 | `CN05_ANSWER_NEEDS_TCP`      | NOTICE  | **0**    | Correct behaviour, reported only   |
 | `N15_SOFTWARE_VERSION`       | NOTICE  | **0**    | Cosmetic - zone works correctly    |
-| `N16_HAS_NSID`               | NOTICE  | **0**    | Informational - explicit NSID reply|
+| `N16_HAS_NSID`               | INFO    | **0**    | Informational - explicit NSID reply|
 | `DS19_BLOCKLIST_NOT_FOUND`   | NOTICE  | **0**    | Blocklist missing on the test host |
 | `N18_NO_EXTENDED_ERROR`      | INFO    | **0**    | Diagnostic - EDE enrichment (RFC 8914)|
 | `N18_EXTENDED_ERROR_REPORTED`| NOTICE  | **0**    | Diagnostic - EDE enrichment (RFC 8914)|

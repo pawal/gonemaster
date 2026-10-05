@@ -145,8 +145,8 @@ emit TEST_CASE_END
 | `DS08_NO_MATCHING_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_RSA_EXPONENT_UNSUPPORTED` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`); carries zero score penalty (`scoring` `TagPenalties`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

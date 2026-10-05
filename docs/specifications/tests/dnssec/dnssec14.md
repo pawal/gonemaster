@@ -101,8 +101,8 @@ Status: Final
 | `DNSKEY_SMALLER_THAN_REC` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DNSKEY_TOO_LARGE_FOR_ALGO` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `KEY_SIZE_OK` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `NO_RESPONSE_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

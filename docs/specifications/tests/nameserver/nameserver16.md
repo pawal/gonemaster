@@ -69,9 +69,9 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `N16_HAS_NSID` | `NOTICE` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `N16_HAS_NSID` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N16_NO_NSID_REVEALED` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N16_NO_RESPONSE` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N16_UNEXPECTED_RCODE` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |

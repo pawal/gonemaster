@@ -163,8 +163,8 @@ The child zone operator cannot fix a parent-zone signing failure, so DNSSEC21 re
 | `DS21_NO_DS_RRSIG` | `WARNING` | Parent answered the DS query without a covering RRSIG. |
 | `DS21_NO_PARENT_ZONE` | `DEBUG` | Root-zone runs cannot test parent DS signing. |
 | `DS21_PARENT_DNSKEY_MISSING` | `WARNING` | Parent did not authoritatively answer DNSKEY at its apex. |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

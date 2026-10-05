@@ -110,8 +110,8 @@ emit TEST_CASE_END
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `NO_NS_CNAME` | `INFO` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `NS_IS_CNAME` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |

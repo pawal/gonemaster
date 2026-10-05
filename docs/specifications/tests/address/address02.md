@@ -93,7 +93,7 @@ emit TEST_CASE_END
 | `CNAME_CHAIN_TOO_LONG` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `CNAME_TARGET_UNRESOLVED` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `CNAME_TOO_MANY_RECORDS` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
-| `NAMESERVER_IP_WITHOUT_REVERSE` | `WARNING` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
+| `NAMESERVER_IP_WITHOUT_REVERSE` | `NOTICE` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `NAMESERVERS_IP_WITH_REVERSE` | `INFO` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `NO_RESPONSE_PTR_QUERY` | `WARNING` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.ADDRESS`). |

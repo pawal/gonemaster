@@ -212,8 +212,8 @@ no ERROR DS23 tag and a consistent proof  -> DS23_DENIAL_PROOF_CONSISTENT
 | `DS23_NSEC3_MIXED_PARAMETERS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS23_NSEC3_RANGES_OVERLAP` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS23_NSEC_RANGES_OVERLAP` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

@@ -90,8 +90,8 @@ Each observed info-code maps to exactly one class tag. Coverage is complete and 
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N18_EXTENDED_ERROR_REPORTED` | `NOTICE` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N18_FILTERED_RESPONSE` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `N18_NO_EXTENDED_ERROR` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |

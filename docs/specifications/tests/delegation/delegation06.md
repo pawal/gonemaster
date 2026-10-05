@@ -60,8 +60,8 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `SOA_EXISTS` | `INFO` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `SOA_NOT_EXISTS` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |

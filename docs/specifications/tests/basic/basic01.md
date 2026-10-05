@@ -249,10 +249,10 @@ For each remaining label (BFS from "." down toward child):
 | `CNAME_CHAIN_TOO_LONG` | `ERROR` | Default from `share/profile.json`. |
 | `CNAME_TARGET_UNRESOLVED` | `ERROR` | Default from `share/profile.json`. |
 | `CNAME_TOO_MANY_RECORDS` | `ERROR` | Default from `share/profile.json`. |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json`. |
-| `IPV4_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json`. |
-| `IPV6_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json`. |
+| `IPV4_ENABLED` | `DEBUG2` | Default from `share/profile.json`. |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json`. |
+| `IPV6_ENABLED` | `DEBUG2` | Default from `share/profile.json`. |
 | `LOOP_PROTECTION` | `DEBUG2` | Default from `share/profile.json`. |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json`. |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json`. |

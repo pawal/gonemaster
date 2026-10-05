@@ -340,8 +340,8 @@ After the per-nameserver phase, with:
 | `DS10_NSEC_RRSIG_VERIFY_ERROR` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS10_SERVER_NO_DNSSEC` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS10_ZONE_NO_DNSSEC` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

@@ -145,8 +145,8 @@ emit TEST_CASE_END
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z14_DUPLICATE_SCHEME_HASH` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z14_INCONSISTENT_ZONEMD` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z14_MIXED_PRESENCE` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |

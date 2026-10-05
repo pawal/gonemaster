@@ -57,8 +57,8 @@ Status: Final
 | Tag | Level | Notes |
 | --- | --- | --- |
 | `DIFFERENT_SOURCE_IP` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `SAME_SOURCE_IP` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |

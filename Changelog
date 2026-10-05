@@ -15,6 +15,8 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Fixed
 
+- engine: `SOA_MNAME` is INFO and the zone `IPV4_DISABLED` and `IPV6_DISABLED` tags are DEBUG2; both lacked a profile level
+- docs: testcase spec severity tables match `share/profile.json`
 - zone08: probe each MX exchange with an `A` query, skip the null MX exchange, and give no verdict on an error RCODE
 
 ## [v1.7.17] - 2026-10-04

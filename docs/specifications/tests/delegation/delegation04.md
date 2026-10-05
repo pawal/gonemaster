@@ -95,8 +95,8 @@ emit TEST_CASE_END
 | Tag | Level | Notes |
 | --- | --- | --- |
 | `ARE_AUTHORITATIVE` | `INFO` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
-| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
-| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `IS_NOT_AUTHORITATIVE` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |

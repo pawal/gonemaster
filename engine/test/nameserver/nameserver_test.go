@@ -16,7 +16,6 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
-	"codeberg.org/pawal/gonemaster/engine/ednsopt"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -771,22 +770,45 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 	}
 }
 
-func TestNameserver12ZFlagsNotClear(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.13", func(q tctest.Query) packet.Packet {
-		return soaPacketWithEdns("example", 0, 3, nil)
-	})
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1}, nil
-	})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Nameserver12(ctx, &z)
-	if err != nil {
-		t.Fatalf("nameserver12: %v", err)
+func TestNameserver12ZFlags(t *testing.T) {
+	cases := []struct {
+		name string
+		z    uint16
+		want bool
+	}{
+		{"echoed", 3, true},
+		{"cleared", 0, false},
 	}
-	tctest.RequireTags(t, entries, "Z_FLAGS_NOTCLEAR")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			log := logger.New()
+			log.SetProfile(profile.Effective())
+			ctx = logger.WithContext(ctx, log)
+
+			resp := tctest.Wire(t, soaPacketWithEdns("example", 0, tc.z, nil))
+			ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.13", func(q tctest.Query) packet.Packet {
+				return resp
+			})
+			tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+				return []ens.Nameserver{ns1}, nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := Nameserver12(ctx, &z)
+			if err != nil {
+				t.Fatalf("nameserver12: %v", err)
+			}
+			if !tc.want {
+				tctest.RequireNoTag(t, entries, "Z_FLAGS_NOTCLEAR", "NS_ERROR")
+				return
+			}
+			entry := tctest.RequireTag(t, entries, "Z_FLAGS_NOTCLEAR")
+			if entry.Level() != "WARNING" {
+				t.Fatalf("Z_FLAGS_NOTCLEAR level = %q, want WARNING", entry.Level())
+			}
+		})
+	}
 }
 
 func TestNameserver13MissingOptInTruncated(t *testing.T) {
@@ -903,12 +925,7 @@ func soaPacketWithEdns(owner string, version uint8, z uint16, options []dns.EDNS
 	for _, opt := range options {
 		msg.Pseudo = append(msg.Pseudo, opt)
 	}
-	if z != 0 {
-		optRR := &dns.OPT{}
-		optRR.Hdr = dns.Header{Name: "."}
-		ednsopt.SetZ(optRR, z)
-		msg.Extra = append(msg.Extra, optRR)
-	}
+	msg.Z = z
 	return packet.Packet{Msg: msg}
 }
 

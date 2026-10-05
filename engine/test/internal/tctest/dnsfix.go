@@ -77,6 +77,21 @@ func Secure() MsgOpt {
 	}
 }
 
+// Wire returns the packet as a client receives it, packed and unpacked.
+func Wire(t TB, p packet.Packet) packet.Packet {
+	t.Helper()
+	sent := p.Msg.Copy()
+	if err := sent.Pack(); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	wire := &dns.Msg{Data: sent.Data}
+	if err := wire.Unpack(); err != nil {
+		t.Fatalf("unpack: %v", err)
+	}
+	p.Msg = wire
+	return p
+}
+
 // TTL returns the records with their TTL set.
 func TTL(ttl uint32, rrs ...dns.RR) []dns.RR {
 	for _, rr := range rrs {

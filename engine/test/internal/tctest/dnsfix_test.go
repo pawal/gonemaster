@@ -6,6 +6,8 @@ import (
 	"time"
 
 	dns "codeberg.org/miekg/dns"
+
+	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/internal/tbtest"
 )
 
@@ -28,6 +30,43 @@ func TestResponseDefaultsAndSections(t *testing.T) {
 	}
 	if len(p.Msg.Answer) != 1 || len(p.Msg.Ns) != 1 || len(p.Msg.Extra) != 1 {
 		t.Fatalf("unexpected sections: %#v", p.Msg)
+	}
+}
+
+func TestWireMovesEDNSIntoTheHeader(t *testing.T) {
+	p := Response(Answers(SOARR("example")), func(msg *dns.Msg) {
+		msg.UDPSize = 1232
+		msg.Z = 3
+	})
+
+	got := Wire(t, p)
+	if got.Msg.UDPSize != 1232 || got.Msg.Z != 3 {
+		t.Fatalf("EDNS header = size %d, Z %d; want 1232, 3", got.Msg.UDPSize, got.Msg.Z)
+	}
+	if len(got.Msg.Answer) != 1 || len(got.Msg.Extra) != 0 {
+		t.Fatalf("sections = %d answer, %d additional; want 1, 0", len(got.Msg.Answer), len(got.Msg.Extra))
+	}
+	if p.Msg.Data != nil {
+		t.Fatalf("Wire packed the caller's message")
+	}
+}
+
+func TestWireFailsOnAShapeTheWireCannotCarry(t *testing.T) {
+	cases := []struct {
+		name string
+		p    packet.Packet
+		want string
+	}{
+		{"bad name", Response(Question("bad..name", dns.TypeA)), "pack"},
+		{"two OPTs", Response(func(msg *dns.Msg) {
+			msg.UDPSize = 1232
+			msg.Extra = append(msg.Extra, &dns.OPT{Hdr: dns.Header{Name: "."}})
+		}), "multiple OPT"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tbtest.MustFail(t, tc.want, func(tb *tbtest.TB) { Wire(tb, tc.p) })
+		})
 	}
 }
 

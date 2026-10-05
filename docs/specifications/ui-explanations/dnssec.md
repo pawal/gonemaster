@@ -124,7 +124,7 @@ The nameservers of a zone are often named inside the zone itself, and then their
 
 Description:
 
-When a name does not exist, a signed zone proves it with NSEC or NSEC3 records that each cover a range of names. This check asks every nameserver for a name that cannot exist and verifies that the records in the answer agree with each other and with the NSEC3 parameters published at the zone apex. Records that contradict each other make some validating resolvers reject the answer even though every signature is correct.
+When a name does not exist, a signed zone proves it with NSEC or NSEC3 records that each cover a range of names. This check asks every nameserver for a name that cannot exist and verifies that the records in the answer agree with each other and with the NSEC3 parameters published at the zone apex. Records that contradict each other still carry correct signatures, so resolvers accept them, and a resolver that reuses them from its cache answers that existing names do not exist.
 ## Testcase dnssec24
 
 Description:
@@ -1337,7 +1337,7 @@ Header: Two NSEC3 records share a next name
 
 Description:
 
-Two NSEC3 records in one answer point to the same next hashed name, so the range of one includes the other. The chain was not rebuilt after a name was added or removed, which points to a signer or dynamic update fault. Some validating resolvers reject the answer even though every signature is correct. Re-sign the zone so that the chain is rebuilt.
+Two NSEC3 records in one answer point to the same next hashed name, so the range of one includes the other. The chain was not rebuilt after a name was added or removed, which points to a signer or dynamic update fault. Every signature is correct, so validating resolvers accept the records. A resolver that reuses NSEC3 records from its cache (RFC 8198) then answers that names in the wider range do not exist, including names that do. Re-sign the zone so that the chain is rebuilt.
 
 ## Tag DS23_NSEC3_MIXED_PARAMETERS
 
@@ -1353,7 +1353,7 @@ Header: NSEC3 ranges overlap
 
 Description:
 
-One NSEC3 record claims that no name exists in a range that contains the name of another NSEC3 record in the same answer, so the answer says that a name both exists and does not exist. The chain is broken and some validating resolvers reject the answer. Re-sign the zone so that the chain is rebuilt.
+One NSEC3 record claims that no name exists in a range that contains the name of another NSEC3 record in the same answer, so the answer says that a name both exists and does not exist. The chain is broken, but every signature is correct, so validating resolvers accept the record. A resolver that reuses NSEC3 records from its cache (RFC 8198) then answers that names in that range do not exist, including names that do. Re-sign the zone so that the chain is rebuilt.
 
 ## Tag DS23_NSEC_RANGES_OVERLAP
 
@@ -1361,7 +1361,7 @@ Header: NSEC ranges overlap
 
 Description:
 
-One NSEC record claims that no name exists between two names, yet another NSEC record in the same answer is owned by a name in that gap, so the answer says that a name both exists and does not exist. The chain is broken and some validating resolvers reject the answer. Re-sign the zone so that the chain is rebuilt.
+One NSEC record claims that no name exists between two names, yet another NSEC record in the same answer is owned by a name in that gap, so the answer says that a name both exists and does not exist. The chain is broken, but every signature is correct, so validating resolvers accept the record. A resolver that reuses NSEC records from its cache (RFC 8198) then answers that names in that gap do not exist, including names that do. Re-sign the zone so that the chain is rebuilt.
 
 ## Tag DS24_APEX_UNAVAILABLE
 

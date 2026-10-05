@@ -9,8 +9,9 @@ Status: Final
 - A chain in which the interval of one record covers the owner name of
   another record asserts that a name both does not exist and exists. Every
   signature verifies and every record is well formed, so the zone passes the
-  signature checks of DNSSEC10 while a validator that evaluates the proof
-  rejects the response.
+  signature checks of DNSSEC10 and a validator accepts each record. A
+  resolver that synthesizes negative answers from cached records (RFC 8198,
+  RFC 9077) returns NXDOMAIN for existing names inside the interval.
 - DNSSEC10 checks the apex NODATA proof returned for `NSEC` and `NSEC3PARAM`
   queries, which carries exactly one NSEC3 record. DNSSEC23 checks the denial
   of a name that does not exist, which is the only response in a run that

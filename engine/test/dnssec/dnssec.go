@@ -5054,6 +5054,7 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	investigatedKeys := map[string]bool{}
+	flagged := false
 	for _, key := range dnskeyRRs {
 		algo := key.Algorithm
 		details, ok := rsaKeySizeByAlgo[algo]
@@ -5083,18 +5084,21 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if err := appendLog(ctx, &results, testcase, "DNSKEY_TOO_SMALL_FOR_ALGO", args); err != nil {
 				return results, err
 			}
+			flagged = true
 		}
 
 		if keysize < details.recSize {
 			if err := appendLog(ctx, &results, testcase, "DNSKEY_SMALLER_THAN_REC", args); err != nil {
 				return results, err
 			}
+			flagged = true
 		}
 
 		if keysize > details.maxSize {
 			if err := appendLog(ctx, &results, testcase, "DNSKEY_TOO_LARGE_FOR_ALGO", args); err != nil {
 				return results, err
 			}
+			flagged = true
 		}
 
 		// crypto/rsa and other libraries take public exponents up to 2^31-1 only.
@@ -5108,25 +5112,15 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if err := appendLog(ctx, &results, testcase, "DNSKEY_RSA_EXPONENT_LARGE", args); err != nil {
 				return results, err
 			}
+			flagged = true
 		}
 
 		investigatedKeys[keyRef] = true
 	}
 
-	if len(dnskeyRRs) > 0 {
-		noResponseCount := 0
-		for _, entry := range results {
-			if entry == nil {
-				continue
-			}
-			if entry.Tag == "NO_RESPONSE" {
-				noResponseCount++
-			}
-		}
-		if len(results) == noResponseCount {
-			if err := appendLog(ctx, &results, testcase, "KEY_SIZE_OK", map[string]any{}); err != nil {
-				return results, err
-			}
+	if len(dnskeyRRs) > 0 && !flagged {
+		if err := appendLog(ctx, &results, testcase, "KEY_SIZE_OK", map[string]any{}); err != nil {
+			return results, err
 		}
 	}
 

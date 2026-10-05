@@ -4279,6 +4279,46 @@ func TestDNSSEC14RSAExponentLarge(t *testing.T) {
 	}
 }
 
+func TestDNSSEC14KeySizeOK(t *testing.T) {
+	ecdsa := tctest.DNSKEYRR("example", 13)
+	if _, err := ecdsa.Generate(256); err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	for _, tc := range []struct {
+		name string
+		key  *dns.DNSKEY
+		want bool
+	}{
+		{"rsa 2048", tctest.DNSKEYRR("example", 8, tctest.PublicKey(dnstest.LBKSK3842)), true},
+		{"ecdsa p256", ecdsa, true},
+		{"rsa exponent large", lvLargeExponentKSK("example"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			ns := tctest.NS(t, ctx, "ns1.example", "198.51.100.9", func(q tctest.Query) packet.Packet {
+				if q.Type == "DNSKEY" {
+					return dnskeyPacket(q.Name, tc.key)
+				}
+				return packet.Packet{}
+			})
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns}, nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nil, nil
+			})
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := DNSSEC14(ctx, &z)
+			if err != nil {
+				t.Fatalf("dnssec14: %v", err)
+			}
+			if got := tctest.Has(entries, "KEY_SIZE_OK"); got != tc.want {
+				t.Fatalf("KEY_SIZE_OK emitted = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)

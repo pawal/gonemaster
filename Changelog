@@ -10,6 +10,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Fixed
 
+- dnssec14: `KEY_SIZE_OK` is emitted when no key finding fires; it was unreachable
 - zone05, zone10: transport tags and an unresponsive server no longer suppress `EXPIRE_MINIMUM_VALUE_OK` and `ONE_SOA`
 - syntax07: MNAME findings carry their profile level instead of DEBUG; a malformed MNAME now lowers the score
 - ui-public: dnssec22, dnssec23 and dnssec24 show their titles instead of the testcase id

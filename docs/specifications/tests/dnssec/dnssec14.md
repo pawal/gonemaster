@@ -34,7 +34,7 @@ Status: Final
      - `DNSKEY_SMALLER_THAN_REC` when key size `< keysizerec`.
      - `DNSKEY_TOO_LARGE_FOR_ALGO` when key size `> keysizemax`.
      - `DNSKEY_RSA_EXPONENT_LARGE` when the public exponent is longer than 31 bits.
-5. If at least one DNSKEY was collected and internal `KEY_SIZE_OK` condition is met, emit `KEY_SIZE_OK`.
+5. If at least one DNSKEY was collected and step 4 emitted no tag, emit `KEY_SIZE_OK`. A DNSKEY whose algorithm is outside the RSA key-size table has a size fixed by its algorithm and counts as correctly sized.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -46,7 +46,7 @@ Status: Final
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | RSA DNSKEY size is below allowed minimum for algorithm. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |
-| `KEY_SIZE_OK` | DNSKEY key-size checks are considered OK by current implementation condition. |
+| `KEY_SIZE_OK` | At least one DNSKEY was collected and step 4 emitted no tag. |
 | `NO_RESPONSE` | DNSKEY query returned no DNS message. |
 | `NO_RESPONSE_DNSKEY` | DNS response did not contain DNSKEY records in answer. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -113,7 +113,7 @@ Status: Final
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes mutually exclusive key-size outcomes (ordered `else if`). Gonemaster: evaluates size checks with independent `if` branches, so a single key can emit both `DNSKEY_TOO_SMALL_FOR_ALGO` and `DNSKEY_SMALLER_THAN_REC`.
   - Upstream: default level table lists `NO_RESPONSE_DNSKEY` as `WARNING`. Gonemaster: default level is `ERROR` in `share/profile.json`.
-  - Upstream: describes emitting `KEY_SIZE_OK` when no non-`NO_RESPONSE` issues occur. Gonemaster: current condition compares total result count (including testcase boundary tags) against `NO_RESPONSE` count, which makes `KEY_SIZE_OK` effectively unreachable.
+  - Upstream: describes emitting `KEY_SIZE_OK` when no non-`NO_RESPONSE` issues occur. Gonemaster: emits `KEY_SIZE_OK` when step 4 emitted no tag; `NO_RESPONSE_DNSKEY` from a nameserver does not suppress it.
   - Upstream: does not explicitly specify testcase boundary and transport-disabled debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
   - Upstream: has no public exponent check. Gonemaster: emits `DNSKEY_RSA_EXPONENT_LARGE` (`NOTICE`, no score penalty) for an RSA public exponent above 2^31-1, the limit of Go's `crypto/rsa` and of other validators. RFC 3110 permits such exponents and gonemaster verifies the key itself, so this is an interoperability note, not a failure.
 - Potential upstream report:
@@ -123,4 +123,4 @@ Status: Final
 - Non-RSA algorithms are ignored in key-size checks.
 - Nameservers are not deduplicated by IP in this testcase; duplicate IPs under different names are queried separately.
 - Invalid/undecodable RSA public keys produce key size `0`, which can trigger small-key findings.
-- **`KEY_SIZE_OK` is effectively unreachable in the current implementation.** The gate condition compares the total result-entry count (which always includes at least the `TEST_CASE_START` and `TEST_CASE_END` boundary entries) against the `NO_RESPONSE` count. Because boundary entries are always present, the two counts can never be equal, so `KEY_SIZE_OK` is never emitted. This is a known gonemaster implementation defect (see Differences From Upstream).
+- A zone signed only with algorithms outside the RSA key-size table, such as ECDSA and EdDSA, receives `KEY_SIZE_OK` once a DNSKEY was collected.

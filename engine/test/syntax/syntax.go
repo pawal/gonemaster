@@ -686,7 +686,7 @@ func Syntax07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if resp.Msg != nil {
 		for _, rr := range resp.GetRecords("SOA", "answer") {
 			if soa, ok := rr.(*dns.SOA); ok {
-				entries, err := checkNameSyntax("MNAME", dnsname.New(soa.Ns), testcase)
+				entries, err := checkNameSyntax(ctx, "MNAME", dnsname.New(soa.Ns), testcase)
 				if err != nil {
 					return results, err
 				}
@@ -848,9 +848,12 @@ func labelNotACEHasDoubleHyphen(label string) bool {
 	return label[2:4] == "--"
 }
 
-func checkNameSyntax(prefix string, name dnsname.Name, testcase string) ([]*logger.Entry, error) {
-	buf := testlogger.New(moduleName, testcase)
-	if err := checkNameSyntaxWithLogger(buf, prefix, name); err != nil {
+func checkNameSyntax(ctx context.Context, prefix string, name dnsname.Name, testcase string) ([]*logger.Entry, error) {
+	parent := util.LoggerFromContext(ctx)
+	buf := logger.New()
+	buf.CopyConfigFrom(parent)
+	buf.CopyStartTimeFrom(parent)
+	if err := checkNameSyntaxWithLogger(testlogger.Wrap(buf, moduleName, testcase), prefix, name); err != nil {
 		return buf.Entries(), err
 	}
 	return buf.Entries(), nil

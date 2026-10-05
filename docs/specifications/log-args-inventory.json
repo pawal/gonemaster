@@ -1816,7 +1816,7 @@
         {
           "tag": "prefix + \"_DISCOURAGED_DOUBLE_DASH\"",
           "file": "engine/test/syntax/syntax.go",
-          "line": 873,
+          "line": 876,
           "shape": "unknown"
         }
       ]
@@ -3482,7 +3482,7 @@
         {
           "tag": "prefix + \"_NUMERIC_TLD\"",
           "file": "engine/test/syntax/syntax.go",
-          "line": 887,
+          "line": 890,
           "shape": "unknown"
         }
       ]

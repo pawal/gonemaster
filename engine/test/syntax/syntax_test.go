@@ -308,6 +308,35 @@ func TestSyntax07MNameSyntaxOK(t *testing.T) {
 	tctest.RequireTags(t, entries, "MNAME_SYNTAX_OK")
 }
 
+func TestSyntax07UsesProfileLevel(t *testing.T) {
+	tests := []struct {
+		name, mname, tag, level string
+	}{
+		{"syntax ok", "ns1.example.", "MNAME_SYNTAX_OK", "INFO"},
+		{"numeric tld", "ns1.123.", "MNAME_NUMERIC_TLD", "WARNING"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, prof, log := testhelpers.Context(t)
+			log.SetProfile(prof)
+			z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+				if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "SOA") {
+					return soaPacket(".", tt.mname, "hostmaster.example.")
+				}
+				return packet.Packet{}
+			})
+
+			entries, err := Syntax07(ctx, z)
+			if err != nil {
+				t.Fatalf("syntax07: %v", err)
+			}
+			if got := tctest.RequireTag(t, entries, tt.tag).Level(); got != tt.level {
+				t.Fatalf("%s level=%s, want %s", tt.tag, got, tt.level)
+			}
+		})
+	}
+}
+
 func TestSyntax08MxSyntaxOK(t *testing.T) {
 	ctx := testContext(t)
 	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
@@ -338,7 +367,7 @@ func TestSyntax08NoResponseMXQuery(t *testing.T) {
 }
 
 func TestCheckNameSyntaxNumericTLD(t *testing.T) {
-	entries, err := checkNameSyntax("NAMESERVER", dnsname.New("ns1.123"), "Syntax04")
+	entries, err := checkNameSyntax(testContext(t), "NAMESERVER", dnsname.New("ns1.123"), "Syntax04")
 	if err != nil {
 		t.Fatalf("check name syntax: %v", err)
 	}

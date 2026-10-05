@@ -6,6 +6,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Fixed
 
+- syntax07: MNAME findings carry their profile level instead of DEBUG; a malformed MNAME now lowers the score
 - ui-public: dnssec22, dnssec23 and dnssec24 show their titles instead of the testcase id
 
 ## [v1.7.18] - 2026-10-05

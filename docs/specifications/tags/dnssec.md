@@ -249,9 +249,9 @@ _Do not edit by hand - regenerate with the command above._
 | `DS23_NSEC_RANGES_OVERLAP` | `ERROR` | [dnssec23](../tests/dnssec/dnssec23.md) | yes |
 | `DS24_APEX_UNAVAILABLE` | `WARNING` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
 | `DS24_BOOTSTRAP_READY` | `INFO` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
-| `DS24_DELEGATION_SECURE` | `DEBUG` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
-| `DS24_DELETE_REQUESTED` | `DEBUG` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
-| `DS24_NO_CDS_CDNSKEY` | `DEBUG` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
+| `DS24_DELEGATION_SECURE` | `INFO` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
+| `DS24_DELETE_REQUESTED` | `INFO` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
+| `DS24_NO_CDS_CDNSKEY` | `INFO` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
 | `DS24_NO_SIGNAL` | `NOTICE` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
 | `DS24_ONLY_IN_DOMAIN_NS` | `NOTICE` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |
 | `DS24_SIGNAL_AT_ZONE_CUT` | `WARNING` | [dnssec24](../tests/dnssec/dnssec24.md) | yes |

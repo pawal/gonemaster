@@ -309,9 +309,9 @@ acceptance delay, which `DS07_NO_DS_FOR_SIGNED_ZONE` already reports.
 | --- | --- | --- |
 | `DS24_APEX_UNAVAILABLE` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS24_BOOTSTRAP_READY` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `DS24_DELEGATION_SECURE` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `DS24_DELETE_REQUESTED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `DS24_NO_CDS_CDNSKEY` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS24_DELEGATION_SECURE` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS24_DELETE_REQUESTED` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS24_NO_CDS_CDNSKEY` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS24_NO_SIGNAL` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS24_ONLY_IN_DOMAIN_NS` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS24_SIGNAL_AT_ZONE_CUT` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

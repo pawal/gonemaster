@@ -44,7 +44,7 @@ _Do not edit by hand - regenerate with the command above._
 | `Z01_MNAME_HAS_LOCALHOST_ADDR` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_IS_DOT` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_IS_LOCALHOST` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_IS_MASTER` | `DEBUG` | [zone01](../tests/zone/zone01.md) | yes |
+| `Z01_MNAME_IS_MASTER` | `INFO` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_MISSING_SOA_RECORD` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_NOT_AUTHORITATIVE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_NOT_IN_NS_LIST` | `INFO` | [zone01](../tests/zone/zone01.md) | yes |

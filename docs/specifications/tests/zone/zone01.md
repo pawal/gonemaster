@@ -167,7 +167,7 @@ SOA MNAME is never used for authoritative nameserver discovery and is not part o
 | `Z01_MNAME_HAS_LOCALHOST_ADDR` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z01_MNAME_IS_DOT` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z01_MNAME_IS_LOCALHOST` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
-| `Z01_MNAME_IS_MASTER` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `Z01_MNAME_IS_MASTER` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z01_MNAME_MISSING_SOA_RECORD` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z01_MNAME_NOT_AUTHORITATIVE` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z01_MNAME_NOT_IN_NS_LIST` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
@@ -181,6 +181,7 @@ SOA MNAME is never used for authoritative nameserver discovery and is not part o
   - Upstream: does not describe testcase boundary debug markers in testcase outputs. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
   - Upstream: describes MNAME non-resolve handling per MNAME name. Gonemaster: uses a cumulative `foundIP` counter across all MNAME names, which can suppress `Z01_MNAME_NOT_RESOLVE` for later unresolved MNAME values after any earlier MNAME resolved.
   - Upstream: describes processing a name server IP set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output (no testcase-local IP deduplication before initial SOA probing).
+  - Upstream: emits `Z01_MNAME_IS_MASTER` at `DEBUG`. Gonemaster: at `INFO`.
 - Potential upstream report:
   - `no`
 

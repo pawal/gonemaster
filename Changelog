@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Changed
+
+- zone01, dnssec24: `Z01_MNAME_IS_MASTER`, `DS24_DELEGATION_SECURE`, `DS24_NO_CDS_CDNSKEY` and `DS24_DELETE_REQUESTED` are INFO
+
 ### Fixed
 
 - syntax07: MNAME findings carry their profile level instead of DEBUG; a malformed MNAME now lowers the score

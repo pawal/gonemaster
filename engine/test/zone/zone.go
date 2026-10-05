@@ -801,6 +801,7 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			if soa, ok := records[0].(*dns.SOA); ok {
 				expire := int(soa.Expire)
 				refresh := int(soa.Refresh)
+				flagged := false
 				if expire < threshold {
 					if err := appendLog(ctx, &results, testcase, "EXPIRE_MINIMUM_VALUE_LOWER", map[string]any{
 						"expire":          expire,
@@ -808,6 +809,7 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					}); err != nil {
 						return results, err
 					}
+					flagged = true
 				}
 				if expire < refresh {
 					if err := appendLog(ctx, &results, testcase, "EXPIRE_LOWER_THAN_REFRESH", map[string]any{
@@ -816,8 +818,9 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					}); err != nil {
 						return results, err
 					}
+					flagged = true
 				}
-				if !hasNonStartEntry(results) {
+				if !flagged {
 					if err := appendLog(ctx, &results, testcase, "EXPIRE_MINIMUM_VALUE_OK", map[string]any{
 						"expire":          expire,
 						"refresh":         refresh,
@@ -1323,6 +1326,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	answered := make([]bool, len(nss))
 	if len(nss) > 0 {
 		tasks := make([]runner.Task, len(nss))
 		for i, ns := range nss {
@@ -1341,6 +1345,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					}
 					return nil
 				}
+				answered[i] = true
 
 				records := resp.GetRecords("SOA", "answer")
 				if len(records) > 0 {
@@ -1393,7 +1398,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	if !hasNonStartEntry(results) {
+	if slices.Contains(answered, true) && !hasFindingOtherThan(results, "NO_RESPONSE", "IPV4_DISABLED", "IPV6_DISABLED") {
 		if err := appendLog(ctx, &results, testcase, "ONE_SOA", map[string]any{}); err != nil {
 			return results, err
 		}
@@ -2679,12 +2684,10 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 	return false
 }
 
-func hasNonStartEntry(entries []*logger.Entry) bool {
+// hasFindingOtherThan reports an entry other than TEST_CASE_START and the ignored tags.
+func hasFindingOtherThan(entries []*logger.Entry, ignored ...string) bool {
 	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag != "TEST_CASE_START" {
+		if entry != nil && entry.Tag != "TEST_CASE_START" && !slices.Contains(ignored, entry.Tag) {
 			return true
 		}
 	}

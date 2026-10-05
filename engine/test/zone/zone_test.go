@@ -62,6 +62,29 @@ func TestZone05ExpireLowerThanRefreshAndMinimum(t *testing.T) {
 	tctest.RequireTags(t, entries, "EXPIRE_MINIMUM_VALUE_LOWER", "EXPIRE_LOWER_THAN_REFRESH")
 }
 
+func TestZone05ExpireOKWithTransportDisabled(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	profile.Effective().Net.IPv6 = false
+	profile.Effective().TestCasesVars.Zone05.SOAExpireMinimumValue = 2000
+
+	answer := func(q tctest.Query) packet.Packet {
+		return soaPacket("example", 1, 1000, 100, 3000, 60)
+	}
+	ns6 := tctest.NS(t, ctx, "ns1.example", "2001:db8::1", answer)
+	ns4 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", answer)
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns6, ns4}, nil
+	})
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone05(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone05: %v", err)
+	}
+	tctest.RequireTags(t, entries, "IPV6_DISABLED", "EXPIRE_MINIMUM_VALUE_OK")
+}
+
 func TestZone10ParallelQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)
@@ -301,6 +324,51 @@ func TestZone10CleanApex(t *testing.T) {
 	}
 	tctest.RequireNoTag(t, entries, "SOA_AND_CNAME", "APEX_DNAME")
 	tctest.RequireTags(t, entries, "ONE_SOA")
+}
+
+func TestZone10OneSOAIgnoresTransportTags(t *testing.T) {
+	answer := func(q tctest.Query) packet.Packet {
+		if q.Type == "SOA" {
+			return soaPacket("example", 1, 1, 1, 1, 1)
+		}
+		return packet.Packet{}
+	}
+	silent := func(q tctest.Query) packet.Packet { return packet.Packet{} }
+
+	tests := []struct {
+		name       string
+		first      tctest.Handler
+		second     tctest.Handler
+		firstIP    string
+		wantTag    string
+		wantOneSOA bool
+	}{
+		{"one server silent", answer, silent, "192.0.2.1", "NO_RESPONSE", true},
+		{"every server silent", silent, silent, "192.0.2.1", "NO_RESPONSE", false},
+		{"ipv6 disabled", answer, answer, "2001:db8::1", "IPV6_DISABLED", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			profile.Effective().Net.IPv6 = false
+
+			ns1 := tctest.NS(t, ctx, "ns1.example", tt.firstIP, tt.first)
+			ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", tt.second)
+			tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+				return []ens.Nameserver{ns1, ns2}, nil
+			})
+
+			z := zonepkg.Zone{Name: dnsname.New("example")}
+			entries, err := Zone10(ctx, &z)
+			if err != nil {
+				t.Fatalf("zone10: %v", err)
+			}
+			tctest.RequireTags(t, entries, tt.wantTag)
+			if got := tctest.Has(entries, "ONE_SOA"); got != tt.wantOneSOA {
+				t.Fatalf("ONE_SOA emitted = %t, want %t", got, tt.wantOneSOA)
+			}
+		})
+	}
 }
 
 func TestZone09MXQueryDisablesFallback(t *testing.T) {

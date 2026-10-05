@@ -27,7 +27,7 @@ Status: Final
 4. Else read SOA `expire` and `refresh` and evaluate:
    - if `expire < required_expire`, emit `EXPIRE_MINIMUM_VALUE_LOWER`;
    - if `expire < refresh`, emit `EXPIRE_LOWER_THAN_REFRESH`;
-   - if no non-start tag has been emitted in testcase state so far, emit `EXPIRE_MINIMUM_VALUE_OK`.
+   - if neither tag above was emitted, emit `EXPIRE_MINIMUM_VALUE_OK`.
 5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -35,7 +35,7 @@ Status: Final
 | --- | --- |
 | `EXPIRE_LOWER_THAN_REFRESH` | SOA `expire` is lower than SOA `refresh`. |
 | `EXPIRE_MINIMUM_VALUE_LOWER` | SOA `expire` is below configured minimum. |
-| `EXPIRE_MINIMUM_VALUE_OK` | No non-start tag was emitted during the testcase (gating condition): `expire` is not below the configured minimum, not below `refresh`, and no shared-helper debug tag was emitted. |
+| `EXPIRE_MINIMUM_VALUE_OK` | `expire` is not below the configured minimum and not below `refresh`. |
 | `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
@@ -68,7 +68,7 @@ Status: Final
 - Differences (Upstream vs Gonemaster):
   - Upstream: specifies a fixed minimum of `604800` seconds. Gonemaster: uses profile-configurable minimum (`Zone05.SOAExpireMinimumValue`).
   - Upstream: describes below-threshold or lower-than-refresh cases as testcase failure. Gonemaster: emits warning-level findings (`EXPIRE_MINIMUM_VALUE_LOWER`, `EXPIRE_LOWER_THAN_REFRESH`) under default profile.
-  - Upstream: does not define an explicit positive-result tag. Gonemaster: emits `EXPIRE_MINIMUM_VALUE_OK` when no non-start findings were emitted in current testcase state.
+  - Upstream: does not define an explicit positive-result tag. Gonemaster: emits `EXPIRE_MINIMUM_VALUE_OK` when neither `EXPIRE_MINIMUM_VALUE_LOWER` nor `EXPIRE_LOWER_THAN_REFRESH` was emitted.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
 - Potential upstream report:
   - `yes`
@@ -80,4 +80,3 @@ Status: Final
 
 ## Edge Cases And Limitations
 - The shared retrieval helper emits `IPV4_DISABLED` or `IPV6_DISABLED` when the corresponding transport is disabled; these tags are not declared in this testcase's `Metadata()` function.
-- Because `EXPIRE_MINIMUM_VALUE_OK` uses a generic “no non-start entry yet” gate, helper-emitted non-metadata entries can suppress the OK tag even when numeric checks are satisfied.

@@ -28,7 +28,7 @@ Status: Final
      - If single SOA owner name differs from expected zone FQDN, emit `WRONG_SOA`.
      - Query apex `CNAME`; if a CNAME record for the apex name is in the answer, emit `SOA_AND_CNAME`.
      - Query apex `DNAME`; if a DNAME record for the apex name is in the answer, emit `APEX_DNAME`.
-4. After all nameservers, if no non-start tag has been emitted, emit `ONE_SOA`.
+4. After all nameservers, if at least one nameserver returned a response and no tag other than `NO_RESPONSE`, `IPV4_DISABLED` and `IPV6_DISABLED` was emitted, emit `ONE_SOA`.
 5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -38,7 +38,7 @@ Status: Final
 | `MULTIPLE_SOA` | SOA response contains more than one SOA RR in answer section. |
 | `NO_RESPONSE` | Nameserver did not return a DNS response to SOA query. |
 | `NO_SOA_IN_RESPONSE` | Nameserver returned response without SOA in answer section. |
-| `ONE_SOA` | No non-start finding was emitted for any evaluated nameserver. |
+| `ONE_SOA` | At least one nameserver answered, and no answer produced a finding. |
 | `SOA_AND_CNAME` | Single SOA present and nameserver returns a CNAME at the zone apex alongside the SOA (illegal per RFC 1034 s3.6.2). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
@@ -101,7 +101,7 @@ For each nameserver (parallel; fan-out = resolver.defaults.parallel):
           +- DNAME in answer  -> APEX_DNAME (ns, address)
 
 After all nameservers:
-   no non-start entry emitted -> ONE_SOA
+   a response, no finding     -> ONE_SOA
 
 emit TEST_CASE_END
 ```
@@ -111,11 +111,10 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: checks wrong-owner condition before multiplicity wording in procedure. Gonemaster: emits `MULTIPLE_SOA` first when SOA answer count is greater than one, and only checks `WRONG_SOA` in single-SOA branch.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
-  - Upstream: defines `ONE_SOA` as no message output for any server. Gonemaster: uses a generic non-start-entry gate (`hasNonStartEntry`) that can also be affected by shared helper emissions.
+  - Upstream: defines `ONE_SOA` as no message output for any server. Gonemaster: emits `ONE_SOA` when at least one nameserver answered and no tag other than `NO_RESPONSE`, `IPV4_DISABLED` and `IPV6_DISABLED` was emitted.
   - Upstream `zone10` never queries CNAME or DNAME at the apex. Gonemaster adds `SOA_AND_CNAME` and `APEX_DNAME` checks in the single-SOA branch.
 - Potential upstream report:
   - `no`
 
 ## Edge Cases And Limitations
 - Query-shape checks do not require authoritative flag or specific RCODE in this testcase path.
-- Shared helper transport-disabled debug tags can suppress `ONE_SOA` because they count as non-start entries.

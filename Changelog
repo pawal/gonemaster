@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- ui-public: dnssec22, dnssec23 and dnssec24 show their titles instead of the testcase id
+
 ## [v1.7.18] - 2026-10-05
 
 zone08 probes MX exchanges with an `A` query, and spec-check verifies testcase severity levels against the profile.

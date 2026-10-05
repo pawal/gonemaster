@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -24,6 +27,67 @@ func TestEveryImplementedTestcaseHasDescription(t *testing.T) {
 			t.Errorf("testcase %q has no entry in testcaseDescriptions", tc)
 		}
 	}
+}
+
+// TestEveryImplementedTestcaseHasUITitle pins a title per testcase in every UI catalog.
+func TestEveryImplementedTestcaseHasUITitle(t *testing.T) {
+	var ids []string
+	for _, item := range engine.AvailableTestcases() {
+		if _, tc, ok := splitTestcaseItem(item); ok {
+			ids = append(ids, tc)
+		}
+	}
+	if len(ids) == 0 {
+		t.Fatal("engine.AvailableTestcases returned no testcases")
+	}
+
+	catalogs := []struct{ dir, prefix string }{
+		{filepath.Join("..", "ui", "src", "i18n"), "tc."},
+		{filepath.Join("..", "ui-public", "src", "i18n"), "pub.tc."},
+	}
+	for _, c := range catalogs {
+		files, err := filepath.Glob(filepath.Join(c.dir, "*.json"))
+		if err != nil {
+			t.Fatalf("glob %s: %v", c.dir, err)
+		}
+		if len(files) != 12 {
+			t.Fatalf("%s holds %d catalogs, want 12", c.dir, len(files))
+		}
+		for _, file := range files {
+			t.Run(file, func(t *testing.T) {
+				data, err := os.ReadFile(file)
+				if err != nil {
+					t.Fatalf("read %s: %v", file, err)
+				}
+				var keys map[string]string
+				if err := json.Unmarshal(data, &keys); err != nil {
+					t.Fatalf("decode %s: %v", file, err)
+				}
+				for _, id := range ids {
+					if keys[c.prefix+id] == "" {
+						t.Errorf("no %s%s", c.prefix, id)
+					}
+				}
+			})
+		}
+	}
+
+	t.Run("analysis-ui", func(t *testing.T) {
+		path := filepath.Join("..", "analysis-ui", "src", "lib", "testcaseTitles.ts")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		have := map[string]bool{}
+		for _, m := range regexp.MustCompile(`(?m)^\s+([a-z]+[0-9]+): "`).FindAllSubmatch(data, -1) {
+			have[string(m[1])] = true
+		}
+		for _, id := range ids {
+			if !have[id] {
+				t.Errorf("no title for %s in %s", id, path)
+			}
+		}
+	})
 }
 
 func getSpec(t *testing.T, srv *Server, path string, out any) *httptest.ResponseRecorder {

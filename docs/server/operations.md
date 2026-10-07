@@ -140,6 +140,21 @@ Database contention is retried and does not appear here. A steady stream of
 `job graduation failed` points at the database; on MariaDB see
 [database-setup.md](database-setup.md).
 
+## Jobs that panic
+
+A panic in the engine, or in the server code that prepares its run, fails
+that job only. The job ends `failed` with an error beginning `panic:`, the
+worker takes the next job, and the server logs `engine panic` at ERROR with
+`job_id`, `domain`, `value` and `stack`, the stack of the goroutine that
+panicked. The public API does not expose the error. Resubmitting the domain
+repeats the panic; the log line is the material for a bug report.
+
+A panic in the worker outside the run, while it records the job's status,
+stores the result or projects it into analysis cohorts, is logged as
+`job panic` at ERROR with `job_id`, `value` and `stack`. A job whose result
+was not yet stored ends `failed` with `panic: <value>`; a stored result is
+kept. The worker takes the next job in both cases.
+
 ## Logging
 
 The server writes operational logs (lifecycle, access log, warnings, errors) to

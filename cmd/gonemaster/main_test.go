@@ -283,6 +283,21 @@ func TestRunDumpProfileWithoutDomain(t *testing.T) {
 	}
 }
 
+// An engine panic writes its message and stack to stderr, nothing to stdout, and exits 2.
+func TestRunReportsEnginePanic(t *testing.T) {
+	enginetest.Stub(t, &runEngine, func(engine.RunRequest) ([]engine.LogEntry, error) {
+		return nil, &engine.PanicError{Value: "boom\x1b[31m", Stack: []byte("goroutine 7 [running]:\n")}
+	})
+	for _, mode := range []string{"--json", "--json-stream", "--raw"} {
+		t.Run(mode, func(t *testing.T) {
+			res := clitest.Run(t, run, mode, "example.com")
+			res.RequireCode(t, 2)
+			res.RequireOutEmpty(t)
+			res.RequireErrContains(t, `panic: boom\x1b[31m`, "goroutine 7 [running]:")
+		})
+	}
+}
+
 func TestRunWritesJSONAndError(t *testing.T) {
 	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json")
 	res.RequireCode(t, 0)

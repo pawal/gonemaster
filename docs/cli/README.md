@@ -44,6 +44,10 @@ Notes:
 - `2`: usage or runtime error
 - `130`: interrupted by signal
 
+A panic inside the engine exits `2`. Standard error carries `panic: <value>`
+followed by the stack of the goroutine that panicked; standard output and
+the `--save` file are not written.
+
 ## Output Modes
 
 Default output is translated human-readable text on stdout. Progress goes to

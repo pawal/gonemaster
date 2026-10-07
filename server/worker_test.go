@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/netip"
@@ -719,5 +720,124 @@ func TestRunJobExcludedTestFails(t *testing.T) {
 	}
 	if got.Status != JobFailed || !strings.Contains(got.Error, `testcase "dnssec10" is excluded`) {
 		t.Fatalf("status %q error %q, want failed with the exclusion message", got.Status, got.Error)
+	}
+}
+
+// The first job's engine panics; that job fails and the worker runs the next.
+func TestQueueContinuesAfterEnginePanic(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var logged bytes.Buffer
+		srv := newTestServer(t, withWorkers(1, 1), withLogTo(&logged, "error"),
+			withEngineRunner(func(req engine.RunRequest) ([]engine.LogEntry, error) {
+				if req.Domain == "panic.example" {
+					panic("boom")
+				}
+				return nil, nil
+			}))
+		for _, job := range []Job{
+			{ID: "job-panic", Domain: "panic.example", Status: JobQueued, CreatedAt: time.Now().UTC()},
+			{ID: "job-next", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()},
+		} {
+			if _, err := srv.store.Create(job); err != nil {
+				t.Fatalf("create %s: %v", job.ID, err)
+			}
+			if err := srv.queue.Enqueue(job.ID, PriorityNormal); err != nil {
+				t.Fatalf("enqueue %s: %v", job.ID, err)
+			}
+		}
+		srv.Start()
+		defer srv.Stop(t.Context())
+		synctest.Wait()
+
+		if run, ok := srv.store.GetRun("job-panic"); !ok || run.Status != JobFailed || run.Error != "panic: boom" {
+			t.Fatalf("job-panic = %s %q (stored %t), want failed with panic: boom", run.Status, run.Error, ok)
+		}
+		if run, ok := srv.store.GetRun("job-next"); !ok || run.Status != JobSucceeded {
+			t.Fatalf("job-next = %s (stored %t), want succeeded", run.Status, ok)
+		}
+		if log := logged.String(); !strings.Contains(log, `"msg":"engine panic"`) || !strings.Contains(log, "worker_test.go") {
+			t.Fatalf("log %q, want engine panic with the stub's stack", log)
+		}
+	})
+}
+
+// panicProjector panics when projecting runID.
+type panicProjector struct {
+	*spyAnalysisController
+	runID string
+}
+
+func (p panicProjector) ProjectRun(runID string) error {
+	if runID == p.runID {
+		panic("boom")
+	}
+	return nil
+}
+
+// jobOutcome reads a job's status and error from its run, or from the job row.
+func jobOutcome(srv *Server, id string) (JobStatus, string) {
+	if run, ok := srv.store.GetRun(id); ok {
+		return run.Status, run.Error
+	}
+	job, _ := srv.store.Get(id)
+	return job.Status, job.Error
+}
+
+// A panic in server code around the run fails or keeps that job; the worker runs the next.
+func TestQueueContinuesAfterJobPanic(t *testing.T) {
+	cases := []struct {
+		name      string
+		arm       func(t *testing.T, srv *Server)
+		wantState JobStatus
+		wantError string
+		// wantFailed is whether the worker logs the job as failed.
+		wantFailed bool
+	}{
+		{"before graduation", func(t *testing.T, srv *Server) {
+			wrapStore(t, srv).updateHook = func(job Job) error {
+				if job.ID == "job-panic" && job.Status == JobRunning {
+					panic("boom")
+				}
+				return nil
+			}
+		}, JobFailed, "panic: boom", true},
+		{"after graduation", func(t *testing.T, srv *Server) {
+			srv.SetAnalysisController(panicProjector{newSpyAnalysisController(), "job-panic"})
+		}, JobSucceeded, "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var logged bytes.Buffer
+				srv := newTestServer(t, withWorkers(1, 1), withLogTo(&logged, "error"),
+					withEngineRunner(func(engine.RunRequest) ([]engine.LogEntry, error) { return nil, nil }))
+				tc.arm(t, srv)
+				for _, id := range []string{"job-panic", "job-next"} {
+					if _, err := srv.store.Create(Job{ID: id, Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()}); err != nil {
+						t.Fatalf("create %s: %v", id, err)
+					}
+					if err := srv.queue.Enqueue(id, PriorityNormal); err != nil {
+						t.Fatalf("enqueue %s: %v", id, err)
+					}
+				}
+				srv.Start()
+				defer srv.Stop(t.Context())
+				synctest.Wait()
+
+				if state, msg := jobOutcome(srv, "job-panic"); state != tc.wantState || msg != tc.wantError {
+					t.Fatalf("job-panic = %s %q, want %s %q", state, msg, tc.wantState, tc.wantError)
+				}
+				if state, _ := jobOutcome(srv, "job-next"); state != JobSucceeded {
+					t.Fatalf("job-next = %s, want succeeded", state)
+				}
+				log := logged.String()
+				if !strings.Contains(log, `"msg":"job panic"`) || !strings.Contains(log, "worker_test.go") {
+					t.Fatalf("log %q, want job panic with the stack", log)
+				}
+				if got := strings.Contains(log, `"msg":"job failed"`); got != tc.wantFailed {
+					t.Fatalf("job failed logged = %t, want %t", got, tc.wantFailed)
+				}
+			})
+		})
 	}
 }

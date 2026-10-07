@@ -438,6 +438,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	entries, err := runEngine(req)
 	timedOut := timeoutSet && (errors.Is(err, context.DeadlineExceeded) || (runCtx != nil && errors.Is(runCtx.Err(), context.DeadlineExceeded)))
 	if err != nil {
+		var pe *engine.PanicError
+		if errors.As(err, &pe) {
+			fmt.Fprintf(out, "ZONE UNKNOWN - %s\n", cliterm.Sanitize(pe.Error()))
+			fmt.Fprintf(errOut, "%s", pe.Stack)
+			return 3
+		}
 		if timedOut {
 			fmt.Fprintf(out, "ZONE UNKNOWN - plugin timed out after %ds\n", timeoutSeconds)
 			return 3

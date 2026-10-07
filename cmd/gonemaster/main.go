@@ -15,6 +15,7 @@ import (
 	"strings"
 	"syscall"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/cliterm"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
@@ -832,6 +833,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	entries, err := runEngine(req)
 	if progress != nil {
 		progress.Finish()
+	}
+	var pe *engine.PanicError
+	if errors.As(err, &pe) {
+		fmt.Fprintf(errOut, "%s\n%s", cliterm.Sanitize(pe.Error()), pe.Stack)
+		return 2
 	}
 	if stopController != nil && stopCapture != nil && stopController.Triggered() && req.Context != nil && errors.Is(context.Cause(req.Context), errStopLevelReached) {
 		if err != nil && errors.Is(err, context.Canceled) {

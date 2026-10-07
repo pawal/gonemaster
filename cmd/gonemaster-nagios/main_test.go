@@ -116,6 +116,20 @@ func TestRunVerboseSanitizesAttackerControlChars(t *testing.T) {
 	}
 }
 
+// An engine panic is UNKNOWN on one status line, with the stack on stderr.
+func TestRunEnginePanicIsUnknown(t *testing.T) {
+	enginetest.Stub(t, &runEngine, func(engine.RunRequest) ([]engine.LogEntry, error) {
+		return nil, &engine.PanicError{Value: "boom\nfake", Stack: []byte("goroutine 7 [running]:\n")}
+	})
+
+	res := clitest.Run(t, run, "-H", "example.com")
+	res.RequireCode(t, 3)
+	if want := "ZONE UNKNOWN - panic: boom\\x0afake\n"; res.Out != want {
+		t.Fatalf("stdout = %q, want %q", res.Out, want)
+	}
+	res.RequireErrContains(t, "goroutine 7 [running]:")
+}
+
 // TestRunVerbosePreservesSafeMessages is the negative case: benign
 // Unicode in a verbose entry must reach stdout unchanged.
 func TestRunVerbosePreservesSafeMessages(t *testing.T) {

@@ -116,7 +116,9 @@ use with Nagios, Icinga, Sensu, and similar monitoring systems.
 : Highest severity reached **--critical**.
 
 **3** (UNKNOWN)
-: Runtime error, timeout, or missing/invalid required options.
+: Runtime error, timeout, or missing/invalid required options. A panic
+  inside the engine prints `ZONE UNKNOWN - panic: <value>` and writes the
+  panicking goroutine's stack to standard error.
 
 ## VERBOSITY LEVELS
 

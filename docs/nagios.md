@@ -182,6 +182,10 @@ apply Service "dns-rrsig-expiry" {
 - `2` CRITICAL, highest severity reached `--critical`
 - `3` UNKNOWN, runtime error, timeout, or invalid required options
 
+A panic inside the engine is `UNKNOWN` with the status line
+`ZONE UNKNOWN - panic: <value>`; the stack of the goroutine that panicked
+goes to standard error.
+
 Note: `--warning` and `--critical` only control how the plugin maps Gonemaster
 severity to Nagios states. To change Gonemaster's own severity assignments,
 resolver settings, or performance behavior, adjust the profile and pass

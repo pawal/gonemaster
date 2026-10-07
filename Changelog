@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- engine, server: a panic in a run fails that run, not the process
+
 ## [v1.7.19] - 2026-10-05
 
 More passing checks report at INFO, and package `dsboot` exports the RFC 9615 signaling helpers of dnssec24.

@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"net/netip"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -186,7 +188,21 @@ func (s *Server) workerLoop(ctx context.Context) {
 	}
 }
 
-func (s *Server) runJob(jobID string) error {
+func (s *Server) runJob(jobID string) (err error) {
+	var job Job
+	graduated := false
+	defer func() {
+		v := recover()
+		if v == nil {
+			return
+		}
+		s.logger.Error("job panic", "job_id", jobID, "value", fmt.Sprint(v), "stack", string(debug.Stack()))
+		if graduated || job.ID == "" {
+			return
+		}
+		err = fmt.Errorf("panic: %v", v)
+		s.failUngraduatedJob(job, err.Error())
+	}()
 	job, ok := s.store.Get(jobID)
 	if !ok {
 		return nil
@@ -217,6 +233,10 @@ func (s *Server) runJob(jobID string) error {
 	defer s.clearProgressWriteState(job.ID)
 
 	art, runErr := s.runEngineForJob(job, jobCtx)
+	var pe *engine.PanicError
+	if errors.As(runErr, &pe) {
+		s.logger.Error("engine panic", "job_id", job.ID, "domain", job.Domain, "value", fmt.Sprint(pe.Value), "stack", string(pe.Stack))
+	}
 	s.metrics.ObserveDNSQueries(art.stats.ipv4, art.stats.ipv6)
 	s.metrics.ObserveCacheMetrics(art.stats.cacheHits, art.stats.cacheMisses, art.stats.cacheEvictions)
 	finishedAt := time.Now().UTC()
@@ -242,9 +262,10 @@ func (s *Server) runJob(jobID string) error {
 
 	if err := s.store.GraduateJob(job, art.entries); err != nil {
 		s.logger.Error("job graduation failed", "job_id", job.ID, "err", err)
-		s.failUngraduatedJob(job, err)
+		s.failUngraduatedJob(job, fmt.Sprintf("graduation failed: %v", err))
 		return err
 	}
+	graduated = true
 
 	fromStatus := JobStatus("")
 	if prevOK {
@@ -272,15 +293,15 @@ func (s *Server) runJob(jobID string) error {
 // failUngraduatedJob parks a job the worker has stopped running at a
 // terminal status. Left at "running" it would wedge: callers poll
 // forever and batch snapshot capture never completes.
-func (s *Server) failUngraduatedJob(job Job, cause error) {
+func (s *Server) failUngraduatedJob(job Job, reason string) {
 	job.Status = JobFailed
-	job.Error = fmt.Sprintf("graduation failed: %v", cause)
+	job.Error = reason
 	if job.FinishedAt.IsZero() {
 		job.FinishedAt = time.Now().UTC()
 	}
 	if _, _, _, err := s.updateJobWithMetricsTransition(job); err != nil {
 		s.logger.Error("marking ungraduated job failed did not persist",
-			"job_id", job.ID, "err", err, "cause", cause)
+			"job_id", job.ID, "err", err, "cause", reason)
 	}
 }
 
@@ -305,7 +326,12 @@ type jobArtifacts struct {
 // TEXT limit; oversized summaries are dropped rather than truncated.
 const maxDNSSECChainBytes = 60 * 1024
 
-func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, error) {
+func (s *Server) runEngineForJob(job Job, ctx context.Context) (_ jobArtifacts, err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			err = &engine.PanicError{Value: v, Stack: debug.Stack()}
+		}
+	}()
 	if lim := s.engineLimiter.Load(); lim != nil {
 		if err := lim.Acquire(ctx); err != nil {
 			return jobArtifacts{}, err

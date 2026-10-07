@@ -182,7 +182,9 @@ Results are printed with severity levels and can be output in several formats.
 : All tests passed.
 
 **2**
-: Usage or runtime error.
+: Usage or runtime error. A panic inside the engine also exits 2, with
+  `panic: <value>` and the panicking goroutine's stack on standard error and
+  nothing on standard output.
 
 **130**
 : Interrupted (SIGINT/SIGTERM).

@@ -13,6 +13,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -202,10 +203,12 @@ func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string
 		results := make([]orderedQueryResult, len(batch))
 		done := make([]chan struct{}, len(batch))
 		ctxBatch, cancelBatch := context.WithCancelCause(ctx)
+		var caught parallel.Catcher
 		for i, ns := range batch {
 			done[i] = make(chan struct{})
 			go func(i int, ns queryer) {
 				defer close(done[i])
+				defer caught.Capture()
 				queryCtx := ctxBatch
 				var taskLogger *logger.Logger
 				if parentLogger != nil {
@@ -237,6 +240,10 @@ func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string
 		for i := 0; i < len(batch); i++ {
 			<-done[i]
 			processed = i + 1
+			if caught.Caught() {
+				cancelBatch(ErrRaceLost)
+				break
+			}
 
 			if parentLogger != nil && len(results[i].logs) > 0 {
 				_ = parentLogger.Append(results[i].logs...)
@@ -267,6 +274,7 @@ func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string
 			<-done[i]
 		}
 		cancelBatch(ErrRaceLost)
+		caught.Rethrow()
 
 		if returnErr != nil {
 			return packet.Packet{}, state, returnErr
@@ -417,11 +425,13 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		ctxBatch = withUnorderedContext(ctxBatch)
 		ctxBatch = withUnorderedDepth(ctxBatch, depth+1)
 		ctxBatch = withUnorderedContext(ctxBatch)
+		var caught parallel.Catcher
 		var wg sync.WaitGroup
 		wg.Add(workers)
 		for range workers {
 			go func() {
 				defer wg.Done()
+				defer caught.Capture()
 				for ns := range jobs {
 					logRecursorSystem(ctxBatch, "RECURSE_QUERY", recurseQueryArgs(ns, nameObj, qtype, qclass))
 					resp, err := ns.QueryWithClass(ctxBatch, name, qtype, qclass)
@@ -531,6 +541,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 
 		cancel()
 		<-done
+		caught.Rethrow()
 
 		if decided {
 			if needsCNAME {

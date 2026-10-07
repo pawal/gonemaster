@@ -2,7 +2,9 @@ package parallel
 
 import (
 	"context"
+	"runtime/debug"
 	"sync"
+	"sync/atomic"
 )
 
 // Task defines a unit of work that should honor the provided context.
@@ -27,7 +29,8 @@ type Options struct {
 // RunOrdered executes tasks with a bounded worker pool and returns results in input order.
 //
 // When CancelOnError is true, the context is canceled after the first error and
-// remaining unscheduled tasks are marked with the context error.
+// remaining unscheduled tasks are marked with the context error. A task's panic
+// cancels the rest and is raised again in the caller as a *Panic.
 func RunOrdered[T any](ctx context.Context, tasks []Task[T], opts Options) []Result[T] {
 	results := make([]Result[T], len(tasks))
 	if len(tasks) == 0 {
@@ -42,12 +45,10 @@ func RunOrdered[T any](ctx context.Context, tasks []Task[T], opts Options) []Res
 		limit = len(tasks)
 	}
 
-	cancel := func() {}
-	if opts.CancelOnError {
-		ctx, cancel = context.WithCancel(ctx)
-	}
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	var caught Catcher
 	idxCh := make(chan int)
 	var wg sync.WaitGroup
 	wg.Add(limit)
@@ -59,9 +60,12 @@ func RunOrdered[T any](ctx context.Context, tasks []Task[T], opts Options) []Res
 				// for honoring ctx cancellation. Skipping here would race with
 				// the dispatcher and could drop tasks that already passed the
 				// dispatcher's gate.
-				value, err := tasks[idx](ctx)
-				results[idx] = Result[T]{Value: value, Err: err}
-				if err != nil && opts.CancelOnError {
+				func() {
+					defer caught.Capture()
+					value, err := tasks[idx](ctx)
+					results[idx] = Result[T]{Value: value, Err: err}
+				}()
+				if caught.Caught() || (results[idx].Err != nil && opts.CancelOnError) {
 					cancel()
 				}
 			}
@@ -79,6 +83,7 @@ func RunOrdered[T any](ctx context.Context, tasks []Task[T], opts Options) []Res
 	}
 	close(idxCh)
 	wg.Wait()
+	caught.Rethrow()
 
 	return results
 }
@@ -107,4 +112,36 @@ func runSequential[T any](ctx context.Context, tasks []Task[T], opts Options) []
 		}
 	}
 	return results
+}
+
+// Panic carries a goroutine's panic to the goroutine that waits for it.
+type Panic struct {
+	Value any
+	Stack []byte
+}
+
+// Catcher keeps the first panic of a group of goroutines.
+type Catcher struct{ first atomic.Pointer[Panic] }
+
+// Capture recovers a panic and keeps the first; defer it in each goroutine.
+func (c *Catcher) Capture() {
+	v := recover()
+	if v == nil {
+		return
+	}
+	p, ok := v.(*Panic)
+	if !ok {
+		p = &Panic{Value: v, Stack: debug.Stack()}
+	}
+	c.first.CompareAndSwap(nil, p)
+}
+
+// Caught reports whether a panic was kept.
+func (c *Catcher) Caught() bool { return c.first.Load() != nil }
+
+// Rethrow panics with the kept panic, if any; call it after the group ends.
+func (c *Catcher) Rethrow() {
+	if p := c.first.Load(); p != nil {
+		panic(p)
+	}
 }

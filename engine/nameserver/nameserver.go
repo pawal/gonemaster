@@ -237,35 +237,33 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	nameserverConcurrencyLimit := resolveNameserverConcurrencyLimit(prof)
 
 	var inflight *inflightQuery
-	if ns.state != nil && ns.state.cache != nil {
-		if existing, wait := ns.state.cache.waitOrRegister(cacheKey); wait {
-			if ctx == nil {
-				<-existing.done
-				if existing.resp == nil {
-					logCachedReturnWithLogger(runLog, packet.Packet{})
-					return packet.Packet{}, existing.err
-				}
-				copyResp := *existing.resp
-				copyResp.Log = runLog
-				logCachedReturnWithLogger(runLog, copyResp)
-				return copyResp, existing.err
-			}
+	for ns.state != nil && ns.state.cache != nil {
+		existing, wait := ns.state.cache.waitOrRegister(cacheKey)
+		if !wait {
+			inflight = existing
+			defer ns.state.cache.abandon(cacheKey, inflight)
+			break
+		}
+		if ctx == nil {
+			<-existing.done
+		} else {
 			select {
 			case <-existing.done:
-				if existing.resp == nil {
-					logCachedReturnWithLogger(runLog, packet.Packet{})
-					return packet.Packet{}, existing.err
-				}
-				copyResp := *existing.resp
-				copyResp.Log = runLog
-				logCachedReturnWithLogger(runLog, copyResp)
-				return copyResp, existing.err
 			case <-ctx.Done():
 				return packet.Packet{}, ctx.Err()
 			}
-		} else {
-			inflight = existing
 		}
+		if existing.abandoned {
+			continue
+		}
+		if existing.resp == nil {
+			logCachedReturnWithLogger(runLog, packet.Packet{})
+			return packet.Packet{}, existing.err
+		}
+		copyResp := *existing.resp
+		copyResp.Log = runLog
+		logCachedReturnWithLogger(runLog, copyResp)
+		return copyResp, existing.err
 	}
 
 	if ns.state != nil && ns.state.concurrencyCap != nil && nameserverConcurrencyLimit > 0 {

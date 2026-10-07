@@ -1,6 +1,7 @@
 package parallel
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"reflect"
@@ -112,5 +113,80 @@ func TestRunOrderedCancelOnErrorSkipsRemainingTasks(t *testing.T) {
 	}
 	if !errors.Is(results[2].Err, context.Canceled) {
 		t.Fatalf("expected task 2 error to be context cancellation, got %v", results[2].Err)
+	}
+}
+
+// panicTask panics in the task's own frame.
+func panicTask(context.Context) (int, error) { panic("boom") }
+
+// rethrown runs fn and returns the *Panic it raises.
+func rethrown(t *testing.T, fn func()) (p *Panic) {
+	t.Helper()
+	defer func() {
+		v := recover()
+		got, ok := v.(*Panic)
+		if !ok {
+			t.Fatalf("recovered %#v, want *Panic", v)
+		}
+		p = got
+	}()
+	fn()
+	return nil
+}
+
+func TestRunOrderedTaskPanicReachesCaller(t *testing.T) {
+	ok := func(context.Context) (int, error) { return 1, nil }
+	cases := []struct {
+		name  string
+		limit int
+		tasks []Task[int]
+	}{
+		{"one of four", 2, []Task[int]{ok, panicTask, ok, ok}},
+		{"one of four, a worker each", 4, []Task[int]{ok, panicTask, ok, ok}},
+		{"every task", 2, []Task[int]{panicTask, panicTask, panicTask, panicTask, panicTask, panicTask}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := rethrown(t, func() { RunOrdered(t.Context(), tc.tasks, Options{Limit: tc.limit}) })
+			if p.Value != "boom" {
+				t.Fatalf("value = %v, want boom", p.Value)
+			}
+			if !bytes.Contains(p.Stack, []byte("panicTask")) {
+				t.Fatalf("stack does not name panicTask:\n%s", p.Stack)
+			}
+		})
+	}
+}
+
+func TestCatcherKeepsFirstPanic(t *testing.T) {
+	var c Catcher
+	for _, v := range []string{"first", "second"} {
+		func() {
+			defer c.Capture()
+			panic(v)
+		}()
+	}
+	if p := rethrown(t, c.Rethrow); p.Value != "first" {
+		t.Fatalf("value = %v, want first", p.Value)
+	}
+}
+
+func TestCatcherKeepsCarriedPanic(t *testing.T) {
+	var c Catcher
+	inner := &Panic{Value: "inner", Stack: []byte("inner stack")}
+	func() {
+		defer c.Capture()
+		panic(inner)
+	}()
+	if p := rethrown(t, c.Rethrow); p != inner {
+		t.Fatalf("rethrown %#v, want the carried panic", p)
+	}
+}
+
+func TestCatcherRethrowWithoutPanic(t *testing.T) {
+	var c Catcher
+	c.Rethrow()
+	if c.Caught() {
+		t.Fatal("Caught = true, want false")
 	}
 }

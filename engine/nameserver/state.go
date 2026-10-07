@@ -322,9 +322,10 @@ func (c *errorCache) observeEvictLocked(n int) {
 }
 
 type inflightQuery struct {
-	done chan struct{}
-	resp *packet.Packet
-	err  error
+	done      chan struct{}
+	resp      *packet.Packet
+	err       error
+	abandoned bool
 }
 
 func (c *queryCache) waitOrRegister(key string) (*inflightQuery, bool) {
@@ -362,6 +363,18 @@ func (c *queryCache) finish(key string, resp *packet.Packet, err error) {
 		delete(c.inflight, key)
 	}
 	c.mu.Unlock()
+}
+
+// abandon wakes the waiters of a leader that ended without finish, so they retry.
+func (c *queryCache) abandon(key string, inflight *inflightQuery) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.inflight[key] != inflight {
+		return
+	}
+	inflight.abandoned = true
+	close(inflight.done)
+	delete(c.inflight, key)
 }
 
 type delegation struct {

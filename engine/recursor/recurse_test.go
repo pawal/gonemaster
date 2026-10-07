@@ -1,6 +1,7 @@
 package recursor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
+	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -61,6 +63,13 @@ func (q *observingQueryer) wasCalled() bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.called
+}
+
+// panickingQueryer panics on every query.
+type panickingQueryer struct{}
+
+func (panickingQueryer) QueryWithClass(context.Context, string, string, string) (packet.Packet, error) {
+	panic("boom")
 }
 
 // refusedPacket returns an authoritative REFUSED response from answerFrom.
@@ -148,6 +157,43 @@ func TestRecurseUnorderedRaceLossSetsCause(t *testing.T) {
 			t.Fatalf("loser observed cause = %v, want ErrRaceLost", cause)
 		}
 	})
+}
+
+// A server's panic reaches the caller of recurse, also when another server answers.
+func TestRecurseServerPanicReachesCaller(t *testing.T) {
+	boom := panickingQueryer{}
+	noise := fakeQueryer{resp: refusedPacket("203.0.113.70")}
+	winner := fakeQueryer{resp: answerPacket("www.example", "203.0.113.71")}
+	// state.ns is consumed from the end, so each batch runs right to left.
+	cases := []struct {
+		name      string
+		unordered bool
+		ns        []queryer
+	}{
+		{"ordered, panic first", false, []queryer{noise, winner, boom}},
+		{"ordered, answer first", false, []queryer{boom, winner}},
+		{"unordered", true, []queryer{noise, boom}},
+		{"unordered, every server", true, []queryer{boom, boom, boom}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			prof := testhelpers.DefaultProfile(t)
+			prof.Resolver.Defaults.Parallel = 3
+			prof.Resolver.Defaults.Unordered = tc.unordered
+			ctx := profile.WithContext(t.Context(), prof)
+			var got *parallel.Panic
+			func() {
+				defer func() { got, _ = recover().(*parallel.Panic) }()
+				_, _, _ = (&Recursor{}).recurse(ctx, "www.example", "A", "IN", &recurseState{ns: tc.ns})
+			}()
+			if got == nil {
+				t.Fatal("recurse returned, want a *parallel.Panic")
+			}
+			if got.Value != "boom" || !bytes.Contains(got.Stack, []byte("panickingQueryer.QueryWithClass")) {
+				t.Fatalf("panic %v with stack:\n%s\nwant boom raised in panickingQueryer", got.Value, got.Stack)
+			}
+		})
+	}
 }
 
 func TestRecurseSkipsUpwardReferral(t *testing.T) {

@@ -1,12 +1,15 @@
 package engine
 
 import (
+	"bytes"
 	"errors"
 	"sync"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
+	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
 
 func TestRunUnknownModule(t *testing.T) {
@@ -21,6 +24,60 @@ func TestRunWithRunnerUnknownModule(t *testing.T) {
 	_, err := RunWithRunner(RunRequest{Domain: "example.com", Module: "unknown"}, runner)
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
+	}
+}
+
+// panicTrace panics on the first transport attempt.
+type panicTrace struct{}
+
+func (panicTrace) AttemptDone(querytrace.AttemptEvent) { panic("boom") }
+func (panicTrace) Decision(querytrace.DecisionEvent)   {}
+
+// The run queries 127.0.0.1 over a real socket; the panic follows the first attempt.
+func TestRunReturnsPanicError(t *testing.T) {
+	retry, timeout := 1, 1
+	req := RunRequest{
+		Domain:                 "example.com",
+		Testcases:              []string{"consistency01"},
+		UndelegatedNameservers: []UndelegatedNameserver{{Name: "ns1.example.com", IP: "127.0.0.1"}},
+		SkipIPv6Detect:         true,
+		Retry:                  &retry,
+		Timeout:                &timeout,
+		QueryTrace:             panicTrace{},
+	}
+	cases := []struct {
+		name string
+		run  func() ([]LogEntry, error)
+	}{
+		{"Run", func() ([]LogEntry, error) { return Run(req) }},
+		{"RunWithRunner", func() ([]LogEntry, error) {
+			return RunWithRunner(req, newTestRunner(t, withRunLimits(2), withTestcases("consistency01")))
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, err := tc.run()
+			var pe *PanicError
+			if !errors.As(err, &pe) {
+				t.Fatalf("err = %v, want *PanicError", err)
+			}
+			if err.Error() != "panic: boom" {
+				t.Fatalf("err = %q, want %q", err.Error(), "panic: boom")
+			}
+			if !bytes.Contains(pe.Stack, []byte("panicTrace.AttemptDone")) {
+				t.Fatalf("stack does not name panicTrace.AttemptDone:\n%s", pe.Stack)
+			}
+			if entries != nil {
+				t.Fatalf("entries = %d, want nil", len(entries))
+			}
+		})
+	}
+}
+
+func TestNewPanicErrorKeepsCarriedStack(t *testing.T) {
+	got := newPanicError(&parallel.Panic{Value: "boom", Stack: []byte("goroutine 7")})
+	if got.Value != "boom" || string(got.Stack) != "goroutine 7" {
+		t.Fatalf("got %v with stack %q, want boom with the carried stack", got.Value, got.Stack)
 	}
 }
 

@@ -597,8 +597,9 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 	return p, err
 }
 
-// RunWithRunner executes an engine test run using a provided runner.
-func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
+// RunWithRunner executes an engine test run using a provided runner; a panic returns a *PanicError.
+func RunWithRunner(req RunRequest, runner *Runner) (_ []LogEntry, err error) {
+	defer recoverPanic(&err)
 	if strings.TrimSpace(req.Domain) == "" {
 		return nil, fmt.Errorf("domain is required")
 	}
@@ -716,8 +717,9 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	return convertEntries(allEntries, req.MinLevel)
 }
 
-// Run executes an engine test run.
-func Run(req RunRequest) ([]LogEntry, error) {
+// Run executes an engine test run; a panic returns a *PanicError.
+func Run(req RunRequest) (_ []LogEntry, err error) {
+	defer recoverPanic(&err)
 	if req.Runner != nil {
 		return RunWithRunner(req, req.Runner)
 	}

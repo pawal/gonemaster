@@ -166,6 +166,53 @@ func TestInflightQueryCoalescing(t *testing.T) {
 	})
 }
 
+// A leader that panics wakes its waiter, which retries as the leader.
+func TestInflightLeaderPanicWakesWaiter(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.52")
+		ctx, _ := testContext(t)
+
+		leading := make(chan struct{})
+		release := make(chan struct{})
+		var calls atomic.Int32
+		ns.SetQueryHook(func(context.Context, string, string, string, *QueryOptions) (packet.Packet, error) {
+			if calls.Add(1) == 1 {
+				close(leading)
+				<-release
+				panic("boom")
+			}
+			return dnstest.Response(dnstest.Question("example", dns.TypeA), dnstest.Reply()), nil
+		})
+
+		panicked := make(chan any, 1)
+		go func() {
+			defer func() { panicked <- recover() }()
+			_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
+		}()
+		<-leading
+
+		var waitErr error
+		waited := make(chan struct{})
+		go func() {
+			defer close(waited)
+			_, waitErr = ns.QueryWithOptions(ctx, "example", "A", nil)
+		}()
+		synctest.Wait()
+		close(release)
+		<-waited
+
+		if v := <-panicked; v != "boom" {
+			t.Fatalf("leader recovered %v, want boom", v)
+		}
+		if waitErr != nil {
+			t.Fatalf("waiter err = %v, want nil", waitErr)
+		}
+		if got := calls.Load(); got != 2 {
+			t.Fatalf("calls = %d, want 2", got)
+		}
+	})
+}
+
 func TestCacheStoreIsolation(t *testing.T) {
 	cacheA := NewCacheStore()
 	cacheB := NewCacheStore()

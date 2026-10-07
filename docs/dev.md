@@ -195,6 +195,11 @@ func main() {
 - `MinLevel` filters log entries at the engine output boundary.
 - `LogCallback` receives entries before min-level filtering, which is useful for
   live progress or streaming output.
+- `engine.Run` and `engine.RunWithRunner` MUST NOT panic. A panic in any
+  goroutine of the run, including the engine's own query workers, is returned
+  as a `*engine.PanicError` with no entries. Its `Value` is the panic value,
+  its `Stack` the stack of the goroutine that panicked, and its message
+  `panic: <value>`. A caller distinguishes it with `errors.As`.
 
 ## Caching and tuning knobs
 - Per-run nameserver caches (query cache + error cache) isolate concurrent runs.

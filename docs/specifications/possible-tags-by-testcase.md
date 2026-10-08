@@ -20,19 +20,19 @@ Primary artifact:
 
 ## Summary
 - Modules: 9
-- Testcases: 73
-- Unique tags: 447
+- Testcases: 87
+- Unique tags: 623
 
 Module testcase counts:
 - `address`: 3
 - `basic`: 3
-- `connectivity`: 4
+- `connectivity`: 5
 - `consistency`: 6
 - `delegation`: 7
-- `dnssec`: 17
-- `nameserver`: 14
+- `dnssec`: 23
+- `nameserver`: 17
 - `syntax`: 8
-- `zone`: 11
+- `zone`: 15
 
 ## Regeneration
 Run:

@@ -655,7 +655,7 @@ commit.
 | Admin and public UIs | `make ui-test`, `make ui-public-test` | `npm test` in each frontend. |
 | Analysis UI | `make ui-analysis-test` | Run separately; not bundled into `make test`. |
 | CSP regression | `make ui-csp-check` | Grep for inline `style=...` attributes and `style:` directives in admin and public UI `.svelte` sources. |
-| Spec coherency | `make spec-check` | Four substeps (see below). |
+| Spec coherency | `make spec-check` | Seven substeps (see below). |
 
 `make test` is the canonical "did I break something" target. It
 runs `ui-test`, `ui-public-test`, `test-go`, `spec-check`, and
@@ -663,25 +663,28 @@ runs `ui-test`, `ui-public-test`, `test-go`, `spec-check`, and
 
 ### Spec coherency
 
-`make spec-check` runs six substeps; any drift is a CI failure,
+`make spec-check` runs seven substeps; any drift is a CI failure,
 not a warning:
 
 1. `spec-validate` - canonical testcase specs match implementation
    metadata (name, module, severity floors).
 2. `spec-check-tags` - per-module tag catalog markdown files match
    the current tag registry.
-3. `spec-check-log-args` - the log-args inventory regenerated
+3. `spec-check-possible-tags` - the possible-tags inventory JSON
+   and its markdown summary equal a fresh export. Refresh with
+   `make spec-export-tags`.
+4. `spec-check-log-args` - the log-args inventory regenerated
    from `appendLog*` call sites equals the committed one, and the
    coherency guardrails hold. Refresh with
    `make spec-export-log-args`.
-4. `spec-check-i18n-placeholders` - i18n template placeholders are
+5. `spec-check-i18n-placeholders` - i18n template placeholders are
    on the allowlist; no legacy placeholders sneak in.
-5. `spec-check-testcase-descriptions` - the site testcase
+6. `spec-check-testcase-descriptions` - the site testcase
    description data file matches the specs.
-6. `spec-check-ui-explanations` - `ui-public` `en.json` matches the
+7. `spec-check-ui-explanations` - `ui-public` `en.json` matches the
    ui-explanations markdown.
 
-The first five need only Go and are grouped as `spec-check-go`; the
+The first six need only Go and are grouped as `spec-check-go`; the
 last needs node and is `spec-check-node`. CI runs each half in the
 image that has the toolchain, so both stay reachable from the one
 `make spec-check` definition rather than being restated in

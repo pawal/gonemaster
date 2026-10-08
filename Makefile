@@ -26,7 +26,7 @@ CMD ?= all
 	build-gonemaster-nagios build-gonemaster-mcp install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios install-gonemaster-mcp ui-check test-go test-integration vet fmt-check race race-ci \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
-	spec-export-testcase-descriptions spec-check-testcase-descriptions \
+	spec-export-testcase-descriptions spec-check-testcase-descriptions spec-check-possible-tags \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-log-args spec-check-i18n-placeholders \
 	spec-check-go spec-check-node \
 	spec-check-ui-explanations \
@@ -63,6 +63,7 @@ help:
 	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
 	@echo "  build-gonemaster-mcp          Build the MCP (Model Context Protocol) bridge"
 	@echo "  spec-export        Refresh generated specification inventories (JSON)"
+	@echo "  spec-check-possible-tags  Check the possible-tags inventory (JSON + markdown) is up to date"
 	@echo "  spec-export-testcase-descriptions  Refresh the site testcase-description data file (TOML)"
 	@echo "  spec-check-testcase-descriptions   Check the site testcase-description data file is up to date"
 	@echo "  spec-export-log-args  Refresh generated log argument inventory (JSON + markdown)"
@@ -308,7 +309,10 @@ spec-export-implemented:
 	GOOS= GOARCH= $(GO) run ./tools/specifications/export-implemented > docs/specifications/implemented-testcases.json
 
 spec-export-tags:
-	GOOS= GOARCH= $(GO) run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
+	GOOS= GOARCH= $(GO) run ./tools/specifications/export-tags
+
+spec-check-possible-tags:
+	GOOS= GOARCH= $(GO) run ./tools/specifications/export-tags --check
 
 spec-export-testcase-descriptions:
 	GOOS= GOARCH= $(GO) run ./tools/specifications/export-testcase-descriptions
@@ -346,7 +350,7 @@ spec-check-ui-explanations:
 	node tools/i18n/sync-ui-explanations.mjs --check
 
 # Split by toolchain so CI can run each half in the image that has the tools.
-spec-check-go: spec-validate spec-check-tags spec-check-log-args spec-check-i18n-placeholders spec-check-testcase-descriptions
+spec-check-go: spec-validate spec-check-tags spec-check-possible-tags spec-check-log-args spec-check-i18n-placeholders spec-check-testcase-descriptions
 
 spec-check-node: spec-check-ui-explanations
 

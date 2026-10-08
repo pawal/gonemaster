@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Changed
+
+- tools: `spec-check` fails on a stale possible-tags inventory
+
 ### Fixed
 
 - engine, server: a panic in a run fails that run, not the process

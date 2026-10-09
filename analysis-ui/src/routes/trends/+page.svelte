@@ -4,6 +4,7 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import TrendLine from "$lib/charts/TrendLine.svelte";
+  import TrendPanels, { type Panel, type PanelPoint } from "$lib/charts/TrendPanels.svelte";
   import { domainsGradeHref, domainsPostureHref, domainsSeverityHref, tagHref } from "$lib/entityLinks";
   import { downloadCSV, type ExportColumn } from "$lib/exporters";
   import { formatCount, levelTone, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
@@ -71,6 +72,14 @@
   // y-axis between absolute counts (default) and percentage share.
   const pinnedKey = $derived(page.url.searchParams.get("key") ?? "");
   const scale = $derived(page.url.searchParams.get("scale") === "share" ? "share" : "count");
+  const view = $derived(page.url.searchParams.get("view") === "stacked" ? "stacked" : "panels");
+
+  function setView(value: "panels" | "stacked") {
+    const params = new URLSearchParams(page.url.searchParams);
+    if (value === "stacked") params.set("view", "stacked");
+    else params.delete("view");
+    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+  }
 
   function setKey(key: string) {
     const params = new URLSearchParams(page.url.searchParams);
@@ -118,6 +127,8 @@
     label: string;
     slug: string;
     sourceDate: string;
+    // Epoch ms of the source date; NaN when unknown.
+    time: number;
     engineVersion: string;
     mixedEngine: boolean;
     // True when this snapshot ran a different engine than the one before
@@ -151,6 +162,7 @@
         label: snapshotDisplayLabel(snapshot),
         slug: point.slug,
         sourceDate: snapshotSourceDate(snapshot),
+        time: Date.parse(snapshot.last_run_at ?? snapshot.first_run_at ?? snapshot.captured_at ?? ""),
         engineVersion,
         mixedEngine: Boolean(point.mixed_engine_version ?? meta?.mixed_engine_version),
         // Unknown on either side means we cannot claim a boundary.
@@ -248,6 +260,37 @@
   );
   // Prefer the short source date for the x-axis; series is aligned to pinned.
   const pinnedLabels = $derived(series.map((s) => s.sourceDate || s.label));
+  const times = $derived(series.map((s) => s.time));
+  const markers = $derived(
+    series.flatMap((s, index) =>
+      s.crossesEngineBoundary ? [{ index, label: `Engine changed to ${s.engineVersion}` }] : []
+    )
+  );
+
+  const panelPoints = $derived<PanelPoint[]>(
+    series.map((s) => ({
+      label: s.sourceDate || s.label,
+      title: s.label,
+      time: s.time,
+      engineVersion: s.engineVersion,
+      crossesEngineBoundary: s.crossesEngineBoundary
+    }))
+  );
+  const panels = $derived<Panel[]>(
+    bucketKeys.map((key) => {
+      const points = pinnedSeries(series, key);
+      return {
+        key,
+        label: labelForKey(key),
+        tone: chartTone(toneForKey(key)),
+        values: points.map((p) => (scale === "share" ? p.share : p.count))
+      };
+    })
+  );
+  // Panel axes span at least 1% of the cohort and five domains.
+  const minSpan = $derived(
+    scale === "share" ? 1 : Math.max(5, Math.ceil(Math.max(0, ...series.map(totalFor)) / 100))
+  );
 
   // Biggest tag movers between the first and last snapshot, from the separate
   // top_tags series.
@@ -323,10 +366,24 @@
   <section class="card">
     <div class="list-head">
       <h3>{TREND_CATEGORIES.find((c) => c.key === data.category)?.label}</h3>
-      <div class="export-group">
-        <button type="button" class="ghost" onclick={exportSeries} disabled={series.length === 0}>
-          Export CSV
-        </button>
+      <div class="chart-controls">
+        {#if !focusActive}
+          <div class="scale-toggle" role="group" aria-label="Chart form">
+            <button type="button" class="scale-btn" class:active={view === "panels"} onclick={() => setView("panels")}>Panels</button>
+            <button type="button" class="scale-btn" class:active={view === "stacked"} onclick={() => setView("stacked")}>Stacked</button>
+          </div>
+          {#if view === "panels"}
+            <div class="scale-toggle" role="group" aria-label="Value scale">
+              <button type="button" class="scale-btn" class:active={scale === "count"} onclick={() => setScale("count")}>Count</button>
+              <button type="button" class="scale-btn" class:active={scale === "share"} onclick={() => setScale("share")}>Share</button>
+            </div>
+          {/if}
+        {/if}
+        <div class="export-group">
+          <button type="button" class="ghost" onclick={exportSeries} disabled={series.length === 0}>
+            Export CSV
+          </button>
+        </div>
       </div>
     </div>
     {#if focusActive}
@@ -346,11 +403,23 @@
       <TrendLine
         values={pinnedValues}
         labels={pinnedLabels}
+        xValues={times}
+        {markers}
         tone={chartTone(toneForKey(pinnedKey))}
         seriesLabel={scale === "share" ? "Share" : "Domains"}
         valueSuffix={scale === "share" ? "%" : ""}
         yDomain={scale === "share" ? [0, 100] : undefined}
         caption={`${labelForKey(pinnedKey)} across snapshots`}
+      />
+    {:else if view === "panels"}
+      <TrendPanels
+        points={panelPoints}
+        {panels}
+        seriesLabel={scale === "share" ? "share" : "domains"}
+        valueSuffix={scale === "share" ? "%" : ""}
+        {minSpan}
+        caption={`${TREND_CATEGORIES.find((c) => c.key === data.category)?.label} per snapshot`}
+        onselect={(key) => setKey(key)}
       />
     {:else}
     <ol class="trend-list" aria-label="Stacked distribution per snapshot">
@@ -417,6 +486,7 @@
       {/each}
     </ol>
     {/if}
+    {#if focusActive || view === "stacked"}
     <ul class="trend-legend" aria-label="Buckets - select one to focus its trend">
       {#each bucketKeys as key, i (key)}
         <li class="trend-legend-item">
@@ -433,6 +503,7 @@
         </li>
       {/each}
     </ul>
+    {/if}
   </section>
 
   {#if movers.length > 0}
@@ -642,6 +713,12 @@
     font-family: var(--mono);
   }
 
+  .chart-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
   .focus-head {
     display: flex;
     justify-content: space-between;

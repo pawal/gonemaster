@@ -45,8 +45,8 @@ testcase opens a filtered detail view.
 The UI preserves the active snapshot as visitors click through detail pages.
 Shared links should include `snapshot` when the numbers must remain stable.
 
-Some views add their own parameters: the diff `tab`, the trends focused
-bucket `key` and scale `scale`, and the domains list filters `search`,
+Some views add their own parameters: the diff `tab`, the trends form `view`,
+focused bucket `key` and scale `scale`, and the domains list filters `search`,
 `worst_level`, `grade`, and `dnssec_posture`. Back, forward, and shared links
 reproduce the same view.
 
@@ -74,14 +74,31 @@ posture column existed. Rebuilding that snapshot's views fills it in.
 
 ## Trends
 
-The trends page shows how the grade, severity, DNSSEC, and DNSKEY algorithm
-mix changes over time, one stacked bar per snapshot.
+The trends page shows how the severity, grade, DNSSEC posture, and DNSKEY
+algorithm mix of a cohort changes across its snapshots. `view` selects one of
+two forms.
 
-Click a bucket in the legend to focus it: the bars are replaced by a single
-line chart of that bucket across snapshots. `key` holds the focused bucket and
-`scale` switches between share and absolute count. Click the bucket again or
-press Escape to go back. A top-movers panel lists the finding tags that
-changed most between the first and last snapshot shown.
+The default form draws one line chart per bucket. The x axis is the source
+date of each snapshot, so uneven spacing between batches is preserved. Each
+panel has its own y scale, which starts at zero and spans at least 1% of the
+cohort, and at least five domains on the count scale, so a small bucket stays
+readable beside a large one. A panel heading shows the latest value and the
+change since the first snapshot. Hovering a panel selects that snapshot in
+every panel and names its date and engine version below the grid. A dashed
+vertical line marks each snapshot whose engine version differs from the
+previous one; a change across that line may be new engine capability rather
+than a change in the cohort.
+
+`view=stacked` draws one 100% stacked bar per snapshot instead. A segment
+links to the domains list filtered to that bucket and snapshot, and each row
+links to the diff against the previous snapshot.
+
+Selecting a panel title or a legend entry focuses that bucket: one larger line
+chart of the bucket across snapshots. `key` holds the focused bucket. `scale`
+switches the panels and the focus chart between absolute count and share.
+"Show all buckets" or Escape returns to the form selected by `view`. A
+top-movers panel lists the finding tags that changed most between the first
+and last snapshot shown.
 
 ## Snapshot Diffs
 

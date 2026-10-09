@@ -7,6 +7,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - tools: `spec-check` fails on a stale possible-tags inventory
+- analysis-ui: trends draw one line chart per bucket on a date axis with engine changes marked; the stacked bars move to `view=stacked`
 
 ### Fixed
 

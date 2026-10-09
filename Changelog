@@ -13,6 +13,10 @@ All notable changes to all gonemaster components will be documented in this file
 - docs: the zone01 and zone09 specs match the emitted arguments and the MX query flow
 - docs: testcase specs document the emitted argument keys and types instead of retired ones
 
+### Security
+
+- deps: bump undici to 7.30.0 and source-map-js to 1.2.2 to fix npm advisories in UI dev dependencies
+
 ## [v1.7.20] - 2026-10-09
 
 The cohort report and the analysis diff page show grade and worst-level transitions, and dnssec22 accepts an NSEC3 Opt-Out proof of an insecure delegation.

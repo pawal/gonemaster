@@ -626,6 +626,19 @@ export type ReportCluster = {
   direction: "improved" | "regressed";
 };
 
+// Domains moving from one value to another; equal sides count those that held.
+export type ReportTransition = {
+  from: string;
+  to: string;
+  category?: DomainCategory;
+  count: number;
+};
+
+export type ReportTransitions = {
+  grade: ReportTransition[];
+  level: ReportTransition[];
+};
+
 export type ReportResponse = {
   dataset_tag: string;
   from_slug: string;
@@ -637,6 +650,8 @@ export type ReportResponse = {
   tags: ReportTags;
   domains: ReportDomain[];
   clusters: ReportCluster[];
+  // Absent on a server that predates it.
+  transitions?: ReportTransitions;
   // domains carries one page; totals, tags and clusters cover them all.
   domain_total: number;
   domain_limit?: number;

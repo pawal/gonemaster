@@ -45,8 +45,10 @@ testcase opens a filtered detail view.
 The UI preserves the active snapshot as visitors click through detail pages.
 Shared links should include `snapshot` when the numbers must remain stable.
 
-Some views add their own parameters: the diff `tab`, the trends form `view`,
-focused bucket `key` and scale `scale`, and the domains list filters `search`,
+Some views add their own parameters: the diff `tab`, transition dimension
+`dim` and pair filter `from_grade`, `to_grade`, `from_level`, `to_level`, the
+trends form `view`, focused bucket `key` and scale `scale`, and the domains
+list filters `search`,
 `worst_level`, `grade`, and `dnssec_posture`. Back, forward, and shared links
 reproduce the same view.
 
@@ -104,15 +106,37 @@ and last snapshot shown.
 
 The diff view compares two snapshots of a cohort. A summary strip counts how
 many domains regressed, improved, were added, or removed. The change lists
-link each domain, and a grade-transition matrix shows how grades moved. Use
-the swap button to reverse the two snapshots; `tab` selects the active list so
-a shared link opens on the right one. When only a "to" snapshot is chosen, the
-snapshot before it is used as "from".
+link each domain, and a transitions card shows how grades and worst levels
+moved. Use the swap button to reverse the two snapshots; `tab` selects the
+active list so a shared link opens on the right one. When only a "to"
+snapshot is chosen, the snapshot before it is used as "from".
 
 Alongside the per-domain changes it shows a tag-level summary: which finding
 tags appeared, cleared, or changed severity cohort-wide, with domain counts.
 This makes a regression explainable, for example "14 domains regressed;
 DS02_NO_MATCHING_DS appeared on 12 of them".
+
+### Transitions
+
+The transitions card shows how the grade of each domain present in both
+snapshots moved, or its worst level under `dim=level`.
+
+With the report available, a flow draws the values of the "from" snapshot on
+the left and those of the "to" snapshot on the right, best at the top. A
+ribbon is the set of domains that moved from one value to another, its
+thickness proportional to their number, and its fill names their cause: real
+in solid colour, mixed hatched, measurement grey, unknown outlined. Domains
+whose value held are drawn as light bands. Domains added or removed between
+the snapshots enter from a "New" node or leave to a "Removed" node. Hovering
+or focusing a ribbon names its pair, its domain count, and its split by
+cause. When the two snapshots ran different engine versions, the card names
+both.
+
+A matrix below the flow counts the same moves, rows by "from" value and
+columns by "to" value; it is drawn without the report as well. Selecting a
+ribbon or a matrix count opens the grade-changed or worst-level-changed list
+filtered to that pair. `from_grade` and `to_grade`, or `from_level` and
+`to_level`, hold the filter; "Show all" clears it.
 
 ### The Report
 

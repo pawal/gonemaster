@@ -4,7 +4,8 @@
 // domains, so the transition matrix covers off-diagonal moves only - unchanged
 // domains are not in the payload.
 
-import type { DiffEntry, DiffResponse } from "./api";
+import type { DiffEntry, DiffResponse, ReportTransition } from "./api";
+import { ADDED_KEY, REMOVED_KEY, type FlowLink } from "./charts/flowLayout";
 
 // Grades best-to-worst; index is the rank, so a larger index is worse.
 export const GRADE_ORDER = ["A+", "A", "B", "C", "D", "F"];
@@ -128,28 +129,91 @@ export function sortByMovement(entries: DiffEntry[], by: "grade" | "level"): Dif
 }
 
 export type GradeMatrix = {
-  grades: string[];
+  keys: string[];
   // cells[fromIdx][toIdx] = number of domains moving from->to.
   cells: number[][];
   max: number;
   total: number;
 };
 
-// Build a from-grade x to-grade count matrix from the grade-changed entries.
-// Only off-diagonal (actually changed) cells are populated; entries with an
-// unrankable grade on either side are ignored.
-export function buildGradeMatrix(entries: DiffEntry[]): GradeMatrix {
-  const n = GRADE_ORDER.length;
-  const cells: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+export type Dimension = "grade" | "level";
+
+// Worst-level buckets best to worst, as the cohort report counts them.
+export const SEVERITY_BUCKETS = ["OK", "NOTICE", "WARNING", "ERROR", "CRITICAL"];
+
+// A worst level as the report buckets it; anything below NOTICE is OK.
+export function severityBucket(level: string | null | undefined): string {
+  const upper = String(level ?? "").trim().toUpperCase();
+  return SEVERITY_BUCKETS.includes(upper) ? upper : "OK";
+}
+
+export function dimensionOrder(dim: Dimension): string[] {
+  return dim === "grade" ? GRADE_ORDER : SEVERITY_BUCKETS;
+}
+
+// One side of an entry in a dimension; "" for a missing grade.
+export function sideValue(entry: DiffEntry, dim: Dimension, side: "from" | "to"): string {
+  if (dim === "level") return severityBucket(side === "from" ? entry.from_level : entry.to_level);
+  return String((side === "from" ? entry.from_grade : entry.to_grade) ?? "").trim().toUpperCase();
+}
+
+// Build a from x to count matrix over changed entries; unknown values are ignored.
+export function buildMatrix(entries: DiffEntry[], dim: Dimension): GradeMatrix {
+  const keys = dimensionOrder(dim);
+  const cells: number[][] = Array.from({ length: keys.length }, () => Array(keys.length).fill(0));
   let max = 0;
   let total = 0;
   for (const e of entries ?? []) {
-    const from = gradeRank(e.from_grade);
-    const to = gradeRank(e.to_grade);
-    if (from === null || to === null) continue;
+    const from = keys.indexOf(sideValue(e, dim, "from"));
+    const to = keys.indexOf(sideValue(e, dim, "to"));
+    if (from < 0 || to < 0 || from === to) continue;
     cells[from][to]++;
     total++;
     if (cells[from][to] > max) max = cells[from][to];
   }
-  return { grades: [...GRADE_ORDER], cells, max, total };
+  return { keys: [...keys], cells, max, total };
+}
+
+export function buildGradeMatrix(entries: DiffEntry[]): GradeMatrix {
+  return buildMatrix(entries, "grade");
+}
+
+// Entries moving from one value to another; an empty side matches any.
+export function filterByPair(entries: DiffEntry[], dim: Dimension, from: string, to: string): DiffEntry[] {
+  if (!from && !to) return entries;
+  return entries.filter(
+    (e) => (!from || sideValue(e, dim, "from") === from) && (!to || sideValue(e, dim, "to") === to)
+  );
+}
+
+// Category counts per moved pair, largest first, keyed "from|to".
+export function pairCategories(rows: ReportTransition[]): Map<string, { category: string; count: number }[]> {
+  const out = new Map<string, { category: string; count: number }[]>();
+  for (const r of rows) {
+    if (r.from === r.to) continue;
+    const key = `${r.from}|${r.to}`;
+    out.set(key, [...(out.get(key) ?? []), { category: r.category ?? "unknown", count: r.count }]);
+  }
+  for (const list of out.values()) list.sort((a, b) => b.count - a.count);
+  return out;
+}
+
+// Report transitions plus the domains the diff added or removed, as flow links.
+export function flowLinks(rows: ReportTransition[], diff: DiffResponse | null | undefined, dim: Dimension): FlowLink[] {
+  const links: FlowLink[] = rows.map((r) => ({ from: r.from, to: r.to, category: r.category ?? "", count: r.count }));
+  const tally = (entries: DiffEntry[] | undefined, side: "from" | "to") => {
+    const counts = new Map<string, number>();
+    for (const e of entries ?? []) {
+      const value = sideValue(e, dim, side);
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+    return counts;
+  };
+  for (const [value, count] of tally(diff?.added, "to")) {
+    links.push({ from: ADDED_KEY, to: value, category: "", count });
+  }
+  for (const [value, count] of tally(diff?.removed, "from")) {
+    links.push({ from: value, to: REMOVED_KEY, category: "", count });
+  }
+  return links;
 }

@@ -21,7 +21,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build deduplicated nameserver list from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) by `ns.String()` (`name/ip`).
 3. For each nameserver (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `SOA` and skip.
    - Query SOA for zone apex.
    - No response message -> emit `NO_RESPONSE`.
    - Response without usable SOA record for zone apex -> emit `NO_RESPONSE_SOA_QUERY`.
@@ -70,8 +70,8 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
-| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
+| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/query type. |
+| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/query type. |
 | `MULTIPLE_SOA_SERIALS` | At least two distinct SOA serial values were observed; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
 | `NO_RESPONSE` | SOA query had no response message from a nameserver. |
 | `NO_RESPONSE_SOA_QUERY` | Response did not contain a usable SOA record for zone apex. |
@@ -86,10 +86,10 @@ emit TEST_CASE_END
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `MULTIPLE_SOA_SERIALS` | `count` | `int` | Number of distinct serial values observed. |
 | `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |

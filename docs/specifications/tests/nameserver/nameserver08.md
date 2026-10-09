@@ -21,7 +21,7 @@ Status: Final
 3. Generate `randomized` by scrambling letter case until it differs from `original`.
 4. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 5. For each deduplicated nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `SOA`, then skip.
    - Query `randomized` with rrtype `SOA`.
    - If response exists and question section is non-empty:
      - Compare first question name (trim trailing dot) to `randomized`.
@@ -45,10 +45,10 @@ Status: Final
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `QNAME_CASE_INSENSITIVE` | `servers` | `array<object>` | Structured sorted list of nameservers with case-insensitive echo behavior (`{ns}`, `{address}` items). |
 | `QNAME_CASE_INSENSITIVE` | `domain` | `string` | Randomized query name used for check. |
 | `QNAME_CASE_SENSITIVE` | `servers` | `array<object>` | Structured sorted list of nameservers with case-preserving echo behavior (`{ns}`, `{address}` items). |

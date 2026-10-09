@@ -195,10 +195,10 @@ no ERROR DS23 tag and a consistent proof  -> DS23_DENIAL_PROOF_CONSISTENT
 | `DS23_NSEC_RANGES_OVERLAP` | `servers` | `array<object>` | Nameservers serving the pair. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `query_type` | `string` | rrtype skipped (`A`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `query_type` | `string` | rrtype skipped (`A`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC23`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC23`). |
 

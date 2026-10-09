@@ -19,7 +19,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 3. For each deduplicated nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `A`, mark not included in summary, and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `A`, mark not included in summary, and skip.
    - Mark nameserver as included in summary.
    - Send apex `A` query over UDP (`UseVC=false`).
    - If no DNS message is returned, emit `NO_RESPONSE` and stop processing this nameserver.
@@ -97,10 +97,10 @@ emit TEST_CASE_END
 | `A_UNEXPECTED_RCODE` | `rcode` | `string` | Returned A-query RCODE string. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no A-query response. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_RESPONSE` | `domain` | `string` | Tested zone name. |

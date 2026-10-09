@@ -248,15 +248,15 @@ After the per-nameserver phase, with:
 | `DS10_NSEC_RRSIG_VERIFY_ERROR` | NSEC RRSIG verification failed for given keytag (RFC 4035 section 5.3.3). |
 | `DS10_SERVER_NO_DNSSEC` | At least one nameserver returned a usable DNSKEY and at least one nameserver returned no usable DNSKEY. |
 | `DS10_ZONE_NO_DNSSEC` | No nameserver returned usable DNSKEY while at least one returned no DNSKEY. |
-| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
-| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
+| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/query type. |
+| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/query type. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `DS10_ALGO_NOT_SUPPORTED_BY_ZM` | `keytag`, `algo_num`, `algo_mnemo`, `addresses` | `int`, `int`, `string`, `string` | Unsupported algorithm details and semicolon-delimited nameserver identity/IP list from verification path. |
+| `DS10_ALGO_NOT_SUPPORTED_BY_ZM` | `keytag`, `algo_num`, `algo_mnemo`, `addresses` | `int`, `int`, `string`, `array<string>` | Unsupported algorithm details and the nameserver IPs from the verification path. |
 | `DS10_ERR_MULT_NSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_ERR_MULT_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_EXPECTED_NSEC_NSEC3_MISSING` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
@@ -274,28 +274,32 @@ After the per-nameserver phase, with:
 | `DS10_NSEC3_MISMATCHES_APEX` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC3_MISSING_SIGNATURE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC3_NODATA_MISSING_SOA` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
-| `DS10_NSEC3_NODATA_WRONG_SOA` | `domain`, `servers` | `string`, `string` | Wrong SOA owner domain and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC3_NODATA_WRONG_SOA` | `domain`, `servers` | `string`, `array<object>` | Wrong SOA owner domain and affected nameservers as `{ns,address}` items. |
 | `DS10_NSEC3_NO_VERIFIED_SIGNATURE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) lacking any verified NSEC3 signature. |
-| `DS10_NSEC3_RRSIG_EXPIRED` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC3_RRSIG_NOT_YET_VALID` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC3_RRSIG_NO_DNSKEY` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC3_RRSIG_VERIFY_ERROR` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC3_RRSIG_EXPIRED` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
+| `DS10_NSEC3_RRSIG_NOT_YET_VALID` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
+| `DS10_NSEC3_RRSIG_NO_DNSKEY` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
+| `DS10_NSEC3_RRSIG_VERIFY_ERROR` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
 | `DS10_NSEC_ERR_TYPE_LIST` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC_GIVES_ERR_ANSWER` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC_MISMATCHES_APEX` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC_MISSING_SIGNATURE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC_NODATA_MISSING_SOA` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
-| `DS10_NSEC_NODATA_WRONG_SOA` | `domain`, `servers` | `string`, `string` | Wrong SOA owner domain and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC_NODATA_WRONG_SOA` | `domain`, `servers` | `string`, `array<object>` | Wrong SOA owner domain and affected nameservers as `{ns,address}` items. |
 | `DS10_NSEC_NO_VERIFIED_SIGNATURE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) lacking any verified NSEC signature. |
 | `DS10_NSEC_QUERY_RESPONSE_ERR` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
-| `DS10_NSEC_RRSIG_EXPIRED` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC_RRSIG_NOT_YET_VALID` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC_RRSIG_NO_DNSKEY` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC_RRSIG_VERIFY_ERROR` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC_RRSIG_EXPIRED` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
+| `DS10_NSEC_RRSIG_NOT_YET_VALID` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
+| `DS10_NSEC_RRSIG_NO_DNSKEY` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
+| `DS10_NSEC_RRSIG_VERIFY_ERROR` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
 | `DS10_SERVER_NO_DNSSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) without DNSKEY among mixed responders. |
 | `DS10_ZONE_NO_DNSSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) without DNSKEY when zone appears unsigned. |
-| `IPV4_DISABLED` | `ns`, `rrtype` | `string`, `string` | Disabled nameserver identity (`name/ip`) and skipped rrtype (`DNSKEY`, `NSEC`, `NSEC3PARAM`). |
-| `IPV6_DISABLED` | `ns`, `rrtype` | `string`, `string` | Disabled nameserver identity (`name/ip`) and skipped rrtype (`DNSKEY`, `NSEC`, `NSEC3PARAM`). |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`, `NSEC`, `NSEC3PARAM`). |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`, `NSEC`, `NSEC3PARAM`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC10`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC10`). |
 

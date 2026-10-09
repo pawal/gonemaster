@@ -20,7 +20,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 3. For each deduplicated nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `AXFR`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `AXFR`, then skip.
    - Attempt AXFR for zone name. The nameserver layer MUST NOT connect to an address that is not globally reachable unless `net.allow_non_global_targets` is `true` or the operator supplied the address; it logs `NON_GLOBAL_QUERY_BLOCKED` and returns no RR and no error.
    - Capture first RR returned by AXFR callback and stop callback immediately.
    - If AXFR call returns an error, or the transfer ends without delivering a record, record server as AXFR failure.
@@ -70,10 +70,10 @@ emit TEST_CASE_END
 | `AXFR_FAILURE` | `servers` | `array<object>` | Structured sorted list of nameservers where AXFR failed (`{ns}`, `{address}` items). |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`AXFR`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`AXFR`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`AXFR`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`AXFR`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver03`). |
 

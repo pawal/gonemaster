@@ -73,7 +73,7 @@ emit TEST_CASE_END
 | --- | --- | --- | --- |
 | `EXTRA_NAME_CHILD` | `extra` | `string` | Semicolon-delimited sorted child-only names. |
 | `EXTRA_NAME_PARENT` | `extra` | `string` | Semicolon-delimited sorted parent-only names. |
-| `NAMES_MATCH` | `names` | `string` | Semicolon-delimited sorted matched names. |
+| `NAMES_MATCH` | `servers` | `array<object>` | Structured matched nameserver names as `{ns}` items (sorted). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Delegation07`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation07`). |
 | `TOTAL_NAME_MISMATCH` | `glue` | `string` | Semicolon-delimited sorted parent-only names. |
@@ -104,5 +104,5 @@ emit TEST_CASE_END
 
 ## Edge Cases And Limitations
 - `TOTAL_NAME_MISMATCH` can be emitted together with `EXTRA_NAME_PARENT` and `EXTRA_NAME_CHILD`.
-- When both parent and child name inputs are empty, `NAMES_MATCH` is emitted with an empty `names` value.
+- When both parent and child name inputs are empty, `NAMES_MATCH` is emitted without a `servers` argument.
 - Repeated occurrences of the same name can produce mismatch findings even when unique-set membership appears equal.

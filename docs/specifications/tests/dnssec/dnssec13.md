@@ -37,8 +37,8 @@ Status: Final
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | DNSKEY RRset answer lacks RRSIG algorithm coverage for at least one DNSKEY algorithm. |
 | `DS13_ALGO_NOT_SIGNED_NS` | NS RRset answer lacks RRSIG algorithm coverage for at least one DNSKEY algorithm. |
 | `DS13_ALGO_NOT_SIGNED_SOA` | SOA RRset answer lacks RRSIG algorithm coverage for at least one DNSKEY algorithm. |
-| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
-| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
+| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/query type. |
+| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/query type. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -57,10 +57,10 @@ Status: Final
 | `DS13_ALGO_NOT_SIGNED_SOA` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic missing in RRSIG coverage. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`, `SOA`, or `NS`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`, `SOA`, or `NS`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`, `SOA`, or `NS`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`, `SOA`, or `NS`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC13`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC13`). |
 

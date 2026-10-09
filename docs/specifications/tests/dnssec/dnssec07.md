@@ -41,7 +41,7 @@ Status: Final
    - If parent-zone fake DS records exist for child, set DS-in-response set to `"-"` and skip parent DS querying.
 6. If no signed child response exists, clear parent evaluation sets and skip DS parent checks.
 7. Otherwise, for each unique parent nameserver IP (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DS`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DS`, then skip.
    - Query `DS` with DNSSEC enabled.
    - If response fails required shape (`NOERROR`, `OPT`, `DO`, `AA`), classify parent nameserver as ignored.
    - Else, if answer contains `RRSIG` covering `DS` at child owner name, classify as DS present.
@@ -211,10 +211,10 @@ emit TEST_CASE_END
 | `DS07_UNEXP_RCODE_RESP_DNSKEY` | `rcode` | `string` | DNSKEY response RCODE mnemonic. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`, `DNSKEY`, or `DS`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`, `DNSKEY`, or `DS`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`, `DNSKEY`, or `DS`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`, `DNSKEY`, or `DS`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC07`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC07`). |
 

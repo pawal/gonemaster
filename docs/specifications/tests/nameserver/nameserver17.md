@@ -23,7 +23,7 @@ Status: Final
 3. Initialize per-behaviour collectors keyed by nameserver.
 4. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 5. For each nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `SOA`, then skip.
    - Query 1 (support and well-formedness): send a UDP-pinned SOA query for the zone name carrying the COOKIE option with only the 8-byte Client Cookie. UDP is pinned because TCP return-routability lets a server skip cookie processing.
      - No response, or a truncated (TC=1) response: collect for `N17_NO_RESPONSE` (a truncated probe is inconclusive and is not retried over TCP).
      - `BADCOOKIE` (RCODE 23) carrying a well-formed full Server Cookie (validated with the same length and client-echo checks as the NOERROR path): the server enforces DNS Cookies, the strongest posture (RFC 7873 sections 5.2.3 and 5.3). Collect for `N17_COOKIE_ENFORCED` and proceed to query 2 with the returned full cookie.
@@ -95,10 +95,10 @@ per nameserver (parallel):
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `N17_COOKIE_CLIENT_ONLY` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
 | `N17_COOKIE_ENFORCED` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
 | `N17_COOKIE_MALFORMED` | `cookie_bytes` | `int` | Observed COOKIE option length in bytes. |

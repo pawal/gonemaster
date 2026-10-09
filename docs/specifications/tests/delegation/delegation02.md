@@ -69,14 +69,14 @@ emit TEST_CASE_END
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `CHILD_DISTINCT_NS_IP` | `-` | `-` | No arguments. |
-| `CHILD_NS_SAME_IP` | `servers` | `array<object>` | Structured nameserver names as `{ns}` items sharing `ns_ip`. |
-| `CHILD_NS_SAME_IP` | `ns_ip` | `string` | Reused IP address. |
+| `CHILD_NS_SAME_IP` | `servers` | `array<object>` | Structured nameserver names as `{ns}` items sharing `address`. |
+| `CHILD_NS_SAME_IP` | `address` | `string` | Reused IP address. |
 | `DEL_DISTINCT_NS_IP` | `-` | `-` | No arguments. |
-| `DEL_NS_SAME_IP` | `servers` | `array<object>` | Structured nameserver names as `{ns}` items sharing `ns_ip`. |
-| `DEL_NS_SAME_IP` | `ns_ip` | `string` | Reused IP address. |
+| `DEL_NS_SAME_IP` | `servers` | `array<object>` | Structured nameserver names as `{ns}` items sharing `address`. |
+| `DEL_NS_SAME_IP` | `address` | `string` | Reused IP address. |
 | `DISTINCT_IP_ADDRESS` | `-` | `-` | No arguments. |
-| `SAME_IP_ADDRESS` | `servers` | `array<object>` | Structured nameserver names as `{ns}` items sharing `ns_ip`. |
-| `SAME_IP_ADDRESS` | `ns_ip` | `string` | Reused IP address. |
+| `SAME_IP_ADDRESS` | `servers` | `array<object>` | Structured nameserver names as `{ns}` items sharing `address`. |
+| `SAME_IP_ADDRESS` | `address` | `string` | Reused IP address. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Delegation02`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation02`). |
 

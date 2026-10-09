@@ -290,10 +290,10 @@ all VALIDATED, no DS24_APEX_UNAVAILABLE -> DS24_BOOTSTRAP_READY
 | `DS24_SIGNAL_ZONE_UNREACHABLE` | `servers` | `array<object>` | Servers (`{ns,address}`) asked at that cut. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `query_type` | `string` | rrtype skipped (`DS`, `CDS` or `CDNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DS`, `CDS` or `CDNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `query_type` | `string` | rrtype skipped (`DS`, `CDS` or `CDNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DS`, `CDS` or `CDNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC24`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC24`). |
 

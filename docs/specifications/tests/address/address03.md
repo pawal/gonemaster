@@ -20,15 +20,15 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Collect nameserver entries with [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
 3. Build an ordered unique list by IP string:
-   - Keep the first `(nsname, ip)` seen for each unique IP.
+   - Keep the first `(ns, address)` seen for each unique IP.
 4. For each unique IP, execute a PTR-check task (parallelized):
    - Compute reverse lookup owner with `dns.ReverseAddr` (RFC 1035 section 3.5, RFC 3596 section 2.5).
    - Send recursive PTR query.
    - If response message exists and `RCODE == NOERROR` with at least one PTR answer:
      - Collect PTR target names.
-     - Compare targets against expected nameserver name (`nsname`) case-insensitively.
-     - If none match, emit `NAMESERVER_IP_PTR_MISMATCH` (`nsname`, `ns_ip`, `names`).
-   - Else if response message exists but PTR conditions above are not met, emit `NAMESERVER_IP_WITHOUT_REVERSE` (`nsname`, `ns_ip`).
+     - Compare targets against expected nameserver name (`ns`) case-insensitively.
+     - If none match, emit `NAMESERVER_IP_PTR_MISMATCH` (`ns`, `address`, `ptr_names`).
+   - Else if response message exists but PTR conditions above are not met, emit `NAMESERVER_IP_WITHOUT_REVERSE` (`ns`, `address`).
    - Else emit `NO_RESPONSE_PTR_QUERY` (`domain`).
 5. After all tasks complete, if at least one IP was checked and no tag besides `TEST_CASE_START` was emitted, emit `NAMESERVER_IP_PTR_MATCH`.
 6. Emit `TEST_CASE_END`.
@@ -39,7 +39,7 @@ Status: Final
 {{% expand "Show diagram" %}}
 ```
 collect nameserver IPs from ApexNameservers
- +- dedupe by IP string; first-seen (nsname, ip) wins
+ +- dedupe by IP string; first-seen (ns, address) wins
  |
  v
 For each unique IP (parallel; fan-out = resolver.defaults.parallel):
@@ -88,11 +88,11 @@ Module-level gating (in AddressAll):
 | `CNAME_TARGET_UNRESOLVED` | `cname_target` | `string` | The last attempted CNAME target. |
 | `CNAME_TOO_MANY_RECORDS` | `query_name` | `string` | The NS hostname whose answer carried too many CNAME RRs. |
 | `NAMESERVER_IP_PTR_MATCH` | `-` | `-` | No arguments. |
-| `NAMESERVER_IP_PTR_MISMATCH` | `nsname` | `string` | Expected nameserver name for the checked IP (first-seen for that IP). |
-| `NAMESERVER_IP_PTR_MISMATCH` | `ns_ip` | `string` | Checked nameserver IP address. |
-| `NAMESERVER_IP_PTR_MISMATCH` | `names` | `string` | Slash-delimited PTR target names returned in answer. |
-| `NAMESERVER_IP_WITHOUT_REVERSE` | `nsname` | `string` | Nameserver name associated with the checked IP. |
-| `NAMESERVER_IP_WITHOUT_REVERSE` | `ns_ip` | `string` | Checked nameserver IP address. |
+| `NAMESERVER_IP_PTR_MISMATCH` | `ns` | `string` | Expected nameserver name for the checked IP (first-seen for that IP). |
+| `NAMESERVER_IP_PTR_MISMATCH` | `address` | `string` | Checked nameserver IP address. |
+| `NAMESERVER_IP_PTR_MISMATCH` | `ptr_names` | `array<string>` | Sorted unique PTR target names returned in answer. |
+| `NAMESERVER_IP_WITHOUT_REVERSE` | `ns` | `string` | Nameserver name associated with the checked IP. |
+| `NAMESERVER_IP_WITHOUT_REVERSE` | `address` | `string` | Checked nameserver IP address. |
 | `NO_RESPONSE_PTR_QUERY` | `domain` | `string` | PTR owner name queried. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Address03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Address03`). |
@@ -122,8 +122,8 @@ Module-level gating (in AddressAll):
 The following behaviors are implementation choices, not mandated by protocol:
 
 - **Module orchestration gating**: `Address03` runs only when `Address02` emitted `NAMESERVERS_IP_WITH_REVERSE`.  No DNS standard mandates this sequencing; it is a gonemaster-specific orchestration decision to skip PTR-match checks when no reverse data was found in the preceding testcase.
-- **First-seen-wins deduplication**: When multiple nameserver entries share the same IP, only the first-seen `(nsname, ip)` pair is retained for PTR checking.  The protocol does not define how to handle nameserver IP collisions; first-seen is an implementation choice.
-- **PTR name list delimiter**: Multiple PTR target names in the `names` argument of `NAMESERVER_IP_PTR_MISMATCH` are joined with `/` (slash).  This delimiter is an internal formatting choice with no protocol counterpart.
+- **First-seen-wins deduplication**: When multiple nameserver entries share the same IP, only the first-seen `(ns, address)` pair is retained for PTR checking.  The protocol does not define how to handle nameserver IP collisions; first-seen is an implementation choice.
+- **PTR name list**: `NAMESERVER_IP_PTR_MISMATCH` carries the PTR target names as a sorted, deduplicated `ptr_names` list.
 
 ## Edge Cases And Limitations
 - If [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.

@@ -56,7 +56,7 @@ Status: Final
 ```
 zoneParent(ctx, z)
    z is root OR zoneParent returns error
-      -> DS21_NO_PARENT_ZONE (zone = z.Name)
+      -> DS21_NO_PARENT_ZONE
          emit TEST_CASE_END and stop
 
 parent set = ParentNameservers; dedupe by IP
@@ -71,7 +71,7 @@ For each unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
 
    query DNSKEY at parent.Name, DNSSEC=on
     +- no resp / RCODE != NOERROR / !AA / no apex DNSKEY
-         -> DS21_PARENT_DNSKEY_MISSING (parent_zone, addresses); skip verification
+         -> DS21_PARENT_DNSKEY_MISSING (addresses); skip verification
 
    no RRSIG covering DS in answer
          -> DS21_NO_DS_RRSIG (addresses)
@@ -136,15 +136,14 @@ emit TEST_CASE_END
 | `DS21_NO_DNSKEY_FOR_DS_RRSIG` | `keytag` | `int` | DS RRSIG keytag with no matching parent DNSKEY. |
 | `DS21_NO_DNSKEY_FOR_DS_RRSIG` | `addresses` | `array<string>` | Parent nameserver IPs. |
 | `DS21_NO_DS_RRSIG` | `addresses` | `array<string>` | Parent nameserver IPs that returned an unsigned DS RRset. |
-| `DS21_NO_PARENT_ZONE` | `zone` | `string` | Zone name under test. |
-| `DS21_PARENT_DNSKEY_MISSING` | `parent_zone` | `string` | Parent zone name whose DNSKEY response was missing or unauthoritative. |
+| `DS21_NO_PARENT_ZONE` | `-` | `-` | No arguments. |
 | `DS21_PARENT_DNSKEY_MISSING` | `addresses` | `array<string>` | Parent nameserver IPs. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS` or `DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DS` or `DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS` or `DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DS` or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC21`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC21`). |
 

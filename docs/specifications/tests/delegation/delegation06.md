@@ -24,7 +24,7 @@ Status: Final
    - If transport family is disabled, task is marked as disabled.
    - Duplicate name entries after first occurrence are skipped.
 4. Execute tasks in parallel (deterministic merged log order):
-   - For disabled tasks, emit `IPV4_DISABLED` or `IPV6_DISABLED` (`rrtype=SOA`).
+   - For disabled tasks, emit `IPV4_DISABLED` or `IPV6_DISABLED` (`query_type=SOA`).
    - For query tasks, query SOA.
    - If response has `RCODE=NOERROR` and SOA answer section is empty, emit `SOA_NOT_EXISTS` (`ns`).
 5. After all tasks, emit `SOA_EXISTS` only when both conditions are true:
@@ -47,10 +47,10 @@ Status: Final
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `SOA_EXISTS` | `-` | `-` | No arguments. |
 | `SOA_NOT_EXISTS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with empty SOA answer on `NOERROR`. |
 | `SOA_NOT_EXISTS` | `address` | `string` | Nameserver IP address for the same endpoint. |

@@ -113,10 +113,10 @@ emit TEST_CASE_END
 | `DS15_NO_CDS_CDNSKEY` | `-` | `-` | No arguments. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`CDS` or `CDNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`CDS` or `CDNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`CDS` or `CDNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`CDS` or `CDNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC15`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC15`). |
 

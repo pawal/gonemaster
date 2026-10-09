@@ -21,7 +21,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build child nameserver set from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) deduplicated by `ns.String()` (not IP-deduplicated).
 3. For each nameserver (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip.
    - Query `DNSKEY` with DNSSEC enabled.
    - If response message is absent, emit `NO_RESPONSE`.
    - Else if answer has no DNSKEY records, emit `NO_RESPONSE_DNSKEY`.
@@ -82,10 +82,10 @@ Status: Final
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | `keysizerec` | `int` | Recommended size for algorithm. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`). |
 | `KEY_SIZE_OK` | `-` | `-` | No arguments. |
 | `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |

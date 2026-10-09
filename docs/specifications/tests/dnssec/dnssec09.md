@@ -19,7 +19,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build nameserver set from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) (deduplicated by `ns.String()`), then deduplicate by IP.
 3. For each unique nameserver IP (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip.
    - Query `DNSKEY` at child apex with DNSSEC enabled.
    - Skip nameserver if response is absent, non-`NOERROR`, non-`AA`, or has no apex DNSKEY records.
    - Query `SOA` at child apex with DNSSEC enabled over UDP (`UseVC=false`).
@@ -117,10 +117,10 @@ emit TEST_CASE_END
 | `DS09_SOA_RRSIG_VALID` | `addresses` | `array<string>` | Structured child nameserver IP list where all SOA RRSIG checks passed. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC09`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC09`). |
 

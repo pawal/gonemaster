@@ -21,7 +21,7 @@ Status: Final
 3. Generate two randomized case variants (`random1`, `random2`) such that both differ from `original` and from each other.
 4. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 5. For each deduplicated nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, store no mismatch for this nameserver, and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `SOA`, store no mismatch for this nameserver, and skip.
    - Query `random1` and `random2`, which name lookup matches case-insensitively (RFC 4343 section 3).
    - If first query has answer RRs:
      - Compare normalized (sorted, lowercased) answer sets.
@@ -97,43 +97,43 @@ emit TEST_CASE_END
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `CASE_QUERIES_RESULTS_DIFFER` | `type` | `string` | Compared rrtype (`SOA`). |
+| `CASE_QUERIES_RESULTS_DIFFER` | `query_type` | `string` | Compared query type (`SOA`). |
 | `CASE_QUERIES_RESULTS_DIFFER` | `domain` | `string` | Base name used for comparisons (`www.<zone>`). |
-| `CASE_QUERIES_RESULTS_OK` | `type` | `string` | Compared rrtype (`SOA`). |
+| `CASE_QUERIES_RESULTS_OK` | `query_type` | `string` | Compared query type (`SOA`). |
 | `CASE_QUERIES_RESULTS_OK` | `domain` | `string` | Base name used for comparisons (`www.<zone>`). |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_DIFFERENT_ANSWER` | `type` | `string` | Compared rrtype (`SOA`). |
+| `CASE_QUERY_DIFFERENT_ANSWER` | `query_type` | `string` | Compared query type (`SOA`). |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `query1` | `string` | First randomized query name. |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `query2` | `string` | Second randomized query name. |
 | `CASE_QUERY_DIFFERENT_RC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_DIFFERENT_RC` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_DIFFERENT_RC` | `type` | `string` | Compared rrtype (`SOA`). |
+| `CASE_QUERY_DIFFERENT_RC` | `query_type` | `string` | Compared query type (`SOA`). |
 | `CASE_QUERY_DIFFERENT_RC` | `query1` | `string` | First randomized query name. |
 | `CASE_QUERY_DIFFERENT_RC` | `query2` | `string` | Second randomized query name. |
 | `CASE_QUERY_DIFFERENT_RC` | `rcode1` | `string` | First query response code. |
 | `CASE_QUERY_DIFFERENT_RC` | `rcode2` | `string` | Second query response code. |
 | `CASE_QUERY_NO_ANSWER` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_NO_ANSWER` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_NO_ANSWER` | `type` | `string` | Compared rrtype (`SOA`). |
+| `CASE_QUERY_NO_ANSWER` | `query_type` | `string` | Compared query type (`SOA`). |
 | `CASE_QUERY_NO_ANSWER` | `domain` | `string` | Query name that had a DNS message. |
 | `CASE_QUERY_SAME_ANSWER` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_SAME_ANSWER` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_SAME_ANSWER` | `type` | `string` | Compared rrtype (`SOA`). |
+| `CASE_QUERY_SAME_ANSWER` | `query_type` | `string` | Compared query type (`SOA`). |
 | `CASE_QUERY_SAME_ANSWER` | `query1` | `string` | First randomized query name. |
 | `CASE_QUERY_SAME_ANSWER` | `query2` | `string` | Second randomized query name. |
 | `CASE_QUERY_SAME_RC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_SAME_RC` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_SAME_RC` | `type` | `string` | Compared rrtype (`SOA`). |
+| `CASE_QUERY_SAME_RC` | `query_type` | `string` | Compared query type (`SOA`). |
 | `CASE_QUERY_SAME_RC` | `query1` | `string` | First randomized query name. |
 | `CASE_QUERY_SAME_RC` | `query2` | `string` | Second randomized query name. |
 | `CASE_QUERY_SAME_RC` | `rcode` | `string` | Shared query response code. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver09`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver09`). |
 

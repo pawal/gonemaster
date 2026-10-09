@@ -22,7 +22,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build parent nameserver set, deduplicate by IP.
 3. For each unique parent nameserver IP (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DS` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DS` and skip.
    - Query parent `DS` for child name with DNSSEC enabled.
    - Require response message, `RCODE=NOERROR`, and `AA=true`.
    - Collect matching-owner DS records and deduplicate by `(keytag,digestType,algorithm,digest)`.
@@ -225,10 +225,10 @@ The bonus criterion `cds_cdnskey_published` in `scoring/bonus.go` treats `DS18_N
 | `DS18_ROLLOVER_EVIDENCE_MULTI_KSK` | `keytags` | `array<uint16>` | Sorted keytags of all SEP-flagged DNSKEYs found. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`, `CDS`, `CDNSKEY`, or `DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DS`, `CDS`, `CDNSKEY`, or `DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`, `CDS`, `CDNSKEY`, or `DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DS`, `CDS`, `CDNSKEY`, or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC18`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC18`). |
 

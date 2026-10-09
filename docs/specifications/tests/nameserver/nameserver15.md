@@ -25,7 +25,7 @@ Status: Final
    - wrong-class nameserver set
 3. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 4. For each nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA TXT`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `SOA TXT`, then skip.
    - Send baseline SOA query for zone; if no response, skip nameserver.
    - For each query name in `{version.bind, version.server}`:
      - Send TXT query with class `CH`.
@@ -59,10 +59,10 @@ Status: Final
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA TXT`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA TXT`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA TXT`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA TXT`). |
 | `N15_ERROR_ON_VERSION_QUERY` | `query_name` | `string` | Version query name (`version.bind` or `version.server`). |
 | `N15_ERROR_ON_VERSION_QUERY` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
 | `N15_NO_VERSION_REVEALED` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |

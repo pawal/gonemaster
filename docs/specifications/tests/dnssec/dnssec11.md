@@ -23,7 +23,7 @@ Status: Final
 3. Undelegated shortcut:
    - If fake-address mode is active and undelegated DS records are absent, emit `TEST_CASE_END` and return.
 4. Parent DS phase (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DS` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DS` and skip.
    - Query `DS` with DNSSEC enabled over UDP; if `TC` is set, retry over TCP.
    - If response is absent, non-`NOERROR`, or non-`AA`, classify nameserver as `Undetermined DS`.
    - Else, if apex DS records are absent classify as `No DS`, otherwise `Has DS`.
@@ -140,10 +140,10 @@ emit TEST_CASE_END
 | `DS11_UNDETERMINED_SIGNED_ZONE` | `-` | `-` | No arguments. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`, `SOA`, or `DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DS`, `SOA`, or `DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`, `SOA`, or `DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DS`, `SOA`, or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC11`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC11`). |
 

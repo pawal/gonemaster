@@ -213,16 +213,16 @@ For each remaining label (BFS from "." down toward child):
 | `CNAME_TOO_MANY_RECORDS` | `query_name` | `string` | The qname whose answer carried too many CNAME RRs. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped due to transport disable. |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped due to transport disable. |
 | `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_ENABLED` | `rrtype` | `string` | rrtype queried over enabled transport. |
+| `IPV4_ENABLED` | `query_type` | `string` | Query type sent over enabled transport. |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped due to transport disable. |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped due to transport disable. |
 | `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV6_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_ENABLED` | `rrtype` | `string` | rrtype queried over enabled transport. |
+| `IPV6_ENABLED` | `query_type` | `string` | Query type sent over enabled transport. |
 | `LOOP_PROTECTION` | `caller` | `string` | Internal caller name that hit loop protection. |
 | `LOOP_PROTECTION` | `child_zone_name` | `string` | Child zone name under test. |
 | `LOOP_PROTECTION` | `zone_name` | `string` | Current loop zone name state. |

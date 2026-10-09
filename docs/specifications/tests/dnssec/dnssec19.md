@@ -24,7 +24,7 @@ Status: Final
 2. Attempt to load the badkeys blocklist from the filesystem search path (CLI flag, XDG data dir, system dir) or embedded fallback. If the blocklist is not available, set `blocklist_available = false`.
 3. Build nameserver set from delegation+zone NS items, grouped by IP.
 4. For each unique nameserver IP (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip.
    - Query child apex `DNSKEY` with DNSSEC enabled.
    - If response is absent, non-`NOERROR`, or non-`AA`, classify nameserver as ignored.
    - If no apex DNSKEY records are present, classify nameserver as `Responds Without DNSKEY`.
@@ -172,10 +172,10 @@ emit TEST_CASE_END
 | `DS19_NO_RESPONSE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) ignored due to invalid/no response shape. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC19`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC19`). |
 

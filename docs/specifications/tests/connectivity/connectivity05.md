@@ -28,7 +28,7 @@ EDNS UDP payload for DNSSEC queries (`constants.EDNSUDPPayloadDNSSECDefault`, 12
 
 1. Emit `TEST_CASE_START`.
 2. For each nameserver address (parallelized):
-   1. If the address family is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip the address.
+   1. If the address family is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip the address.
    2. Issue the reference query with DNSSEC enabled and otherwise default options, so it shares the per-run response cache entry with the `DNSKEY` queries of the DNSSEC module. Classify the outcome:
       - No message: continue at step 2.5 (loss branch).
       - `RCODE != NOERROR`: inconclusive for this testcase, which reports delivery and not response content. Emit nothing for the address.

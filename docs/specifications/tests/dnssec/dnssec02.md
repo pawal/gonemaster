@@ -20,13 +20,13 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Collect DS records from parent nameservers:
    - Query each unique parent nameserver IP in parallel.
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DS` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DS` and skip.
    - Accept response only if DNSSEC response shape passes (`NOERROR`, `OPT`, `DO`, `AA`) and at least one DS record matches child zone owner name.
    - Add unique DS RDATA values to DS record set.
 3. If DS record set is empty, emit `TEST_CASE_END` and stop.
 4. Build child nameserver set from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) (deduplicated by `ns.String()`), then deduplicate by IP.
 5. For each unique child nameserver IP (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip.
    - Query DNSKEY with DNSSEC enabled.
    - Require `NOERROR`, `OPT`, `DO`, `AA`, the TC flag clear, and at least one DNSKEY at child apex; otherwise skip. A truncated answer is a partial RRset, whichever transport delivered it.
    - Mark nameserver as responding.
@@ -195,10 +195,10 @@ emit TEST_CASE_END
 | `DS02_RSA_EXPONENT_UNSUPPORTED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS` or `DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DS` or `DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS` or `DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DS` or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC02`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC02`). |
 

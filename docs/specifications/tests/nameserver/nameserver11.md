@@ -20,7 +20,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 3. For each nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `SOA`, then skip.
    - Send baseline SOA query with EDNS version `0` and no unknown option.
    - Continue to unknown-option test only if baseline response satisfies all:
      - response exists,
@@ -60,10 +60,10 @@ Status: Final
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `N11_NO_EDNS` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `N11_NO_RESPONSE` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `N11_RETURNS_UNKNOWN_OPTION_CODE` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |

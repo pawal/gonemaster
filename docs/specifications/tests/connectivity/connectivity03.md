@@ -23,10 +23,10 @@ Status: Final
 3. Split into unique IPv4 and unique IPv6 IP lists (deduplicated by IP string).
 4. For each unique IP (parallelized by family):
    - Run ASN lookup (`lookupASN`).
-   - If result code is `ERROR_ASN_DATABASE` or `EMPTY_ASN_SET`, emit that tag with `ns_ip` and stop processing for that IP.
-   - If raw lookup text exists, emit `ASN_INFOS_RAW` (`ns_ip`, `data`).
-   - If ASN list exists, emit `ASN_INFOS_ANNOUNCE_BY` (`ns_ip`, `asns`) and store ASN set for diversity classification.
-   - If prefix exists, emit `ASN_INFOS_ANNOUNCE_IN` (`ns_ip`, `prefixes`).
+   - If result code is `ERROR_ASN_DATABASE` or `EMPTY_ASN_SET`, emit that tag with `address` and stop processing for that IP.
+   - If raw lookup text exists, emit `ASN_INFOS_RAW` (`address`, `data`).
+   - If ASN list exists, emit `ASN_INFOS_ANNOUNCE_BY` (`address`, `asns`) and store ASN set for diversity classification.
+   - If prefix exists, emit `ASN_INFOS_ANNOUNCE_IN` (`address`, `prefixes`).
 5. For IPv4 stored ASN data, classify topological diversity (RFC 2182 section 3.1):
    - If no ASN values were stored, emit no IPv4 diversity summary tag.
    - If exactly one unique ASN exists, emit `IPV4_ONE_ASN`.
@@ -101,14 +101,14 @@ emit TEST_CASE_END
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `ASN_INFOS_ANNOUNCE_BY` | `ns_ip` | `string` | IP address looked up. |
+| `ASN_INFOS_ANNOUNCE_BY` | `address` | `string` | IP address looked up. |
 | `ASN_INFOS_ANNOUNCE_BY` | `asns` | `array<int>` | Structured ASN list reported for the IP. |
-| `ASN_INFOS_ANNOUNCE_IN` | `ns_ip` | `string` | IP address looked up. |
+| `ASN_INFOS_ANNOUNCE_IN` | `address` | `string` | IP address looked up. |
 | `ASN_INFOS_ANNOUNCE_IN` | `prefixes` | `array<string>` | Structured prefix list announcing the IP (single-item list per entry). |
-| `ASN_INFOS_RAW` | `ns_ip` | `string` | IP address looked up. |
+| `ASN_INFOS_RAW` | `address` | `string` | IP address looked up. |
 | `ASN_INFOS_RAW` | `data` | `string` | Raw backend response data string. |
-| `EMPTY_ASN_SET` | `ns_ip` | `string` | IP address with empty ASN lookup result. |
-| `ERROR_ASN_DATABASE` | `ns_ip` | `string` | IP address where ASN lookup backend failed. |
+| `EMPTY_ASN_SET` | `address` | `string` | IP address with empty ASN lookup result. |
+| `ERROR_ASN_DATABASE` | `address` | `string` | IP address where ASN lookup backend failed. |
 | `IPV4_DIFFERENT_ASN` | `asns` | `array<int>` | Structured unique IPv4 ASN values. |
 | `IPV4_ONE_ASN` | `asn` | `int` | Single unique IPv4 ASN value. |
 | `IPV4_SAME_ASN` | `asns` | `array<int>` | Structured ASN values shared across IPv4 IPs. |

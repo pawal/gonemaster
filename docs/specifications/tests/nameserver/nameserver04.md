@@ -19,7 +19,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 3. For each deduplicated nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, mark not included in summary, and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `SOA`, mark not included in summary, and skip.
    - Mark nameserver as included in summary.
    - Query zone SOA.
    - If response exists and `AnswerFrom` parses as IP address (with optional port), compare parsed source IP with queried nameserver IP.
@@ -45,11 +45,11 @@ Status: Final
 | `DIFFERENT_SOURCE_IP` | `source` | `string` | Observed response source value in `ip:port` format. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `SAME_SOURCE_IP` | `names` | `string` | Comma-delimited sorted included nameserver identities (`name/ip`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
+| `SAME_SOURCE_IP` | `servers` | `array<object>` | Structured included nameservers as `{ns,address}` items (sorted). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver04`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver04`). |
 
@@ -74,4 +74,3 @@ Status: Final
 ## Edge Cases And Limitations
 - Missing responses or unparsable `AnswerFrom` values do not emit `DIFFERENT_SOURCE_IP`.
 - `SAME_SOURCE_IP` is not emitted when no nameservers are included (for example all skipped due disabled transport).
-- `SAME_SOURCE_IP` uses comma as delimiter in `names`, unlike many other tags that use semicolon.

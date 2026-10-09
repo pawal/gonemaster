@@ -39,7 +39,7 @@ Status: Final
 | --- | --- | --- | --- |
 | `CAN_BE_RESOLVED` | `-` | `-` | No arguments. |
 | `CAN_NOT_BE_RESOLVED` | `servers` | `array<object>` | Structured unresolved nameserver names as `{ns}` items (lowercase, sorted). |
-| `NO_RESOLUTION` | `names` | `string` | Comma-delimited unresolved NS names (lowercase, sorted). |
+| `NO_RESOLUTION` | `servers` | `array<object>` | Structured unresolved nameserver names as `{ns}` items (lowercase, sorted). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver06`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver06`). |
 
@@ -62,5 +62,5 @@ Status: Final
 
 ## Edge Cases And Limitations
 - Name comparisons are case-insensitive (all names lowercased before set operations).
-- If both `allNames` and `withIP` are empty, `NO_RESOLUTION` is emitted with empty `names`.
+- If both `allNames` and `withIP` are empty, `NO_RESOLUTION` is emitted without a `servers` argument.
 - Resolution quality depends entirely on upstream method outputs ([`z.GlueNames`](../../nameserver-resolution.md#gluenames), [`z.ApexNSNames`](../../nameserver-resolution.md#apexnsnames), [`AllNameservers`](../../nameserver-resolution.md#allnameservers)).

@@ -22,7 +22,7 @@ Status: Final
    - Emit `TEST_CASE_END` and return.
 3. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 4. For each deduplicated nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `NS`, mark not included in summary, and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `NS`, mark not included in summary, and skip.
    - Mark nameserver as included.
    - Query qname `.` rrtype `NS`.
    - If response exists and authority section contains `NS` records, record server as having upward referral.
@@ -45,10 +45,10 @@ Status: Final
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`NS`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`NS`). |
 | `NO_UPWARD_REFERRAL` | `servers` | `array<object>` | Structured sorted list of nameservers without upward referral (`{ns}`, `{address}` items). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver07`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver07`). |

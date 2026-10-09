@@ -147,10 +147,10 @@ emit TEST_CASE_END
 | `DS17_MIXED_DELETE_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`CDNSKEY` or `DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`CDNSKEY` or `DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`CDNSKEY` or `DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`CDNSKEY` or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC17`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC17`). |
 

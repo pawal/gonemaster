@@ -23,12 +23,12 @@ Status: Final
 4. For each NS name from step 2:
    - If NS name is in-domain of tested zone:
      - For each merged addressed NS (`name/ip`) in sorted order (parallelized):
-       - Build args `{ns, query_name, rrtype=A}`.
+       - Build args `{ns, address, query_name, query_type=A}`.
        - If transport is disabled for that addressed NS, emit `IPV4_DISABLED` or `IPV6_DISABLED` and skip.
        - Query addressed NS for `A` with recursion disabled (`RD=0`).
        - If no DNS message, emit `NO_RESPONSE`.
        - Else if `RCODE != NOERROR`, emit `UNEXPECTED_RCODE`.
-       - Else if answer contains `CNAME`, emit `NS_IS_CNAME` (`nsname`).
+       - Else if answer contains `CNAME`, emit `NS_IS_CNAME` (`ns`).
        - Else if response is a referral/redirect, perform recursive retry (`RD=1`) against same addressed NS and emit `NS_IS_CNAME` if answer contains `CNAME`.
    - Else (sibling/not-in-domain):
      - Perform recursive lookup via `recurse`.
@@ -48,9 +48,9 @@ For each nsName in nsNames:
   z.Name.IsInBailiwick(nsName)
     +- yes -> for each (name/ip) in allNS, in parallel:
                 transport disabled for A
-                   -> IPV4_DISABLED / IPV6_DISABLED (rrtype=A); skip
+                   -> IPV4_DISABLED / IPV6_DISABLED (query_type=A); skip
                 query A at nsName, Recurse=false
-                  +- err or resp.Msg == nil   -> NO_RESPONSE (query_name, rrtype)
+                  +- err or resp.Msg == nil   -> NO_RESPONSE (query_name, query_type)
                   +- RCODE != NOERROR         -> UNEXPECTED_RCODE (rcode, ...)
                   +- CNAME in answer          -> NS_IS_CNAME (ns=nsName)
                   +- IsRedirect               -> retry with Recurse=true
@@ -89,22 +89,22 @@ emit TEST_CASE_END
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `NO_NS_CNAME` | `-` | `-` | No arguments. |
 | `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) that did not return DNS message. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_RESPONSE` | `query_name` | `string` | NS name queried for type `A`. |
-| `NO_RESPONSE` | `rrtype` | `string` | Queried rrtype (`A`). |
-| `NS_IS_CNAME` | `nsname` | `string` | NS name found as CNAME. |
+| `NO_RESPONSE` | `query_type` | `string` | Query type sent (`A`). |
+| `NS_IS_CNAME` | `ns` | `string` | NS name found as CNAME. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Delegation05`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation05`). |
 | `UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) that returned unexpected RCODE. |
 | `UNEXPECTED_RCODE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `UNEXPECTED_RCODE` | `query_name` | `string` | NS name queried for type `A`. |
-| `UNEXPECTED_RCODE` | `rrtype` | `string` | Queried rrtype (`A`). |
+| `UNEXPECTED_RCODE` | `query_type` | `string` | Query type sent (`A`). |
 | `UNEXPECTED_RCODE` | `rcode` | `string` | Returned DNS response code string. |
 
 ## Severity Levels Per Tag

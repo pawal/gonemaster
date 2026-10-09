@@ -21,13 +21,13 @@ Status: Final
 2. Collect nameserver entries from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
 3. Build an ordered unique list by IP string:
    - Concatenate [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) then [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
-   - Keep the first `(nsname, ip)` seen for each unique IP.
+   - Keep the first `(ns, address)` seen for each unique IP.
 4. For each unique IP, execute a PTR-check task (parallelized):
    - Compute reverse lookup owner with `dns.ReverseAddr` (RFC 1035 section 3.5, RFC 3596 section 2.5).
    - Send recursive PTR query.
    - If response has `NOERROR` and a CNAME in answer, follow the first CNAME target with one additional PTR query (RFC 2317 section 4).
    - If a response message exists:
-     - If RCODE is not `NOERROR` or PTR answer set is empty, emit `NAMESERVER_IP_WITHOUT_REVERSE` (`nsname`, `ns_ip`).
+     - If RCODE is not `NOERROR` or PTR answer set is empty, emit `NAMESERVER_IP_WITHOUT_REVERSE` (`ns`, `address`).
    - If no response message exists, emit `NO_RESPONSE_PTR_QUERY` (`domain`).
 5. After all tasks complete, if at least one IP was checked and no tag besides `TEST_CASE_START` was emitted, emit `NAMESERVERS_IP_WITH_REVERSE`.
 6. Emit `TEST_CASE_END`.
@@ -37,7 +37,7 @@ Status: Final
 {{% expand "Show diagram" %}}
 ```
 collect nameserver IPs from GlueNameservers then ApexNameservers
- +- dedupe by IP string; first-seen (nsname, ip) wins
+ +- dedupe by IP string; first-seen (ns, address) wins
  |
  v
 For each unique IP (parallel; fan-out = resolver.defaults.parallel):
@@ -80,8 +80,8 @@ emit TEST_CASE_END
 | `CNAME_TARGET_UNRESOLVED` | `query_name` | `string` | The NS hostname whose CNAME target could not be resolved. |
 | `CNAME_TARGET_UNRESOLVED` | `cname_target` | `string` | The last attempted CNAME target. |
 | `CNAME_TOO_MANY_RECORDS` | `query_name` | `string` | The NS hostname whose answer carried too many CNAME RRs. |
-| `NAMESERVER_IP_WITHOUT_REVERSE` | `nsname` | `string` | Nameserver name associated with the checked IP (first-seen for that IP). |
-| `NAMESERVER_IP_WITHOUT_REVERSE` | `ns_ip` | `string` | Checked nameserver IP address. |
+| `NAMESERVER_IP_WITHOUT_REVERSE` | `ns` | `string` | Nameserver name associated with the checked IP (first-seen for that IP). |
+| `NAMESERVER_IP_WITHOUT_REVERSE` | `address` | `string` | Checked nameserver IP address. |
 | `NAMESERVERS_IP_WITH_REVERSE` | `-` | `-` | No arguments. |
 | `NO_RESPONSE_PTR_QUERY` | `domain` | `string` | PTR owner name queried (reverse name or followed CNAME target). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Address02`). |

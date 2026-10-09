@@ -368,10 +368,10 @@ emit TEST_CASE_END
 | `DS22_NS_ADDRESS_VALIDATES` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that validated at least one in-domain address RRset. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `query_type` | `string` | rrtype skipped (`A`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `query_type` | `string` | rrtype skipped (`A`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC22`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC22`). |
 

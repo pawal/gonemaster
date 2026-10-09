@@ -19,7 +19,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 3. For each nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `CSYNC`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `CSYNC`, then skip.
    - Send CSYNC query to the zone apex with default query options.
    - If no response, or response is not authoritative NOERROR, skip this nameserver silently.
    - Else record the CSYNC RRset from the answer section.
@@ -99,10 +99,10 @@ emit TEST_CASE_END
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`CSYNC`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`CSYNC`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`CSYNC`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`CSYNC`). |
 | `Z12_CSYNC_FOUND` | `servers` | `array<object>` | Structured sorted list of nameservers with this CSYNC content (`{ns}`, `{address}` items). |
 | `Z12_CSYNC_FOUND` | `serial` | `uint32` | SOA serial from the CSYNC `soaserial` field. |
 | `Z12_CSYNC_FOUND` | `flags` | `uint16` | CSYNC flags field (bit 0 = `immediate`, bit 1 = `soaminimum`). |
@@ -110,7 +110,7 @@ emit TEST_CASE_END
 | `Z12_MULTIPLE_CSYNC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z12_MULTIPLE_CSYNC` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z12_MULTIPLE_CSYNC` | `count` | `int` | Number of CSYNC records returned. |
-| `Z12_NO_CSYNC` | `servers` | `array` | Structured list of nameserver endpoints (name + address) without CSYNC. |
+| `Z12_NO_CSYNC` | `servers` | `array<object>` | Structured list of nameserver endpoints (name + address) without CSYNC. |
 | `Z12_SERIAL_MISMATCH` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z12_SERIAL_MISMATCH` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z12_SERIAL_MISMATCH` | `csync_serial` | `uint32` | The serial carried in the CSYNC `soaserial` field. |

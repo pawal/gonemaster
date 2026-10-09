@@ -23,7 +23,7 @@ Status: Final
    - no-response nameserver set
 3. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 4. For each nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `SOA`, then skip.
    - Send a plain SOA query (DO=0) for the zone name. The DO=0 probe deduplicates against SOA queries other testcases already issue, so it adds no extra traffic.
    - If no response, collect nameserver for `N18_NO_RESPONSE`.
    - Else collect every EDE option present (a response MAY carry more than one, RFC 8914 section 3). For each option, sanitize the EXTRA-TEXT and collect `(info_code, extra_text, nameserver)`. EDE is collected irrespective of RCODE.
@@ -62,10 +62,10 @@ Each observed info-code maps to exactly one class tag. Coverage is complete and 
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `N18_EXTENDED_ERROR_REPORTED` | `info_code` | `int` | EDE info-code (RFC 8914). |
 | `N18_EXTENDED_ERROR_REPORTED` | `info_name` | `string` | EDE info-code registry name, or `code <n>` when unnamed. |
 | `N18_EXTENDED_ERROR_REPORTED` | `extra_text` | `string` | Sanitized EXTRA-TEXT (valid UTF-8, NUL-free, capped at 256 bytes). |

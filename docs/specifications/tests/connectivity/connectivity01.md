@@ -51,8 +51,8 @@ summary tags (per family, once):
 For each nameserver (parallel; fan-out = resolver.defaults.parallel):
 
    transport check for SOA+NS
-    +- IPv6 + Net.IPv6 disabled  -> IPV6_DISABLED per rrtype, skip ns
-    +- IPv4 + Net.IPv4 disabled  -> IPV4_DISABLED per rrtype, skip ns
+    +- IPv6 + Net.IPv6 disabled  -> IPV6_DISABLED per query type, skip ns
+    +- IPv4 + Net.IPv4 disabled  -> IPV4_DISABLED per query type, skip ns
     +- enabled                   -> proceed
 
    query SOA over UDP, query NS over UDP
@@ -104,8 +104,8 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `CNAME_CHAIN_TOO_LONG` | A discovered NS hostname's CNAME chain exceeds `CNAMEMaxChainLength` while resolving its address. |
 | `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address (RFC 1034 section 5.2.2). |
 | `CNAME_TOO_MANY_RECORDS` | A single answer while resolving a discovered NS hostname carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
-| `IPV4_DISABLED` | IPv4 transport is disabled for this nameserver/rrtype pair. |
-| `IPV6_DISABLED` | IPv6 transport is disabled for this nameserver/rrtype pair. |
+| `IPV4_DISABLED` | IPv4 transport is disabled for this nameserver/query type pair. |
+| `IPV6_DISABLED` | IPv6 transport is disabled for this nameserver/query type pair. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -149,10 +149,10 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `CNAME_TOO_MANY_RECORDS` | `query_name` | `string` | The NS hostname whose answer carried too many CNAME RRs. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA` or `NS`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA` or `NS`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA` or `NS`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA` or `NS`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Connectivity01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Connectivity01`). |
 

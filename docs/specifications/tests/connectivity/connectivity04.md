@@ -23,10 +23,10 @@ Status: Final
 3. Build an ordered unique lookup list by IP address (IPv4 and IPv6 tracked separately), preserving first-seen item per unique IP.
 4. For each unique IP (parallelized):
    - Run ASN/prefix lookup (`lookupASN`).
-   - If result code is `ERROR_ASN_DATABASE`, emit `CN04_ERROR_PREFIX_DATABASE` (`ns_ip`) and stop processing for that IP.
-   - If result code is `EMPTY_ASN_SET`, emit `CN04_EMPTY_PREFIX_SET` (`ns_ip`) and stop processing for that IP.
-   - If raw lookup text exists, emit `CN04_ASN_INFOS_RAW` (`ns_ip`, `data`).
-   - If prefix exists, emit `CN04_ASN_INFOS_ANNOUNCE_IN` (`ns_ip`, `prefixes`) and store the `(prefix -> ns item)` relation for that IP family.
+   - If result code is `ERROR_ASN_DATABASE`, emit `CN04_ERROR_PREFIX_DATABASE` (`address`) and stop processing for that IP.
+   - If result code is `EMPTY_ASN_SET`, emit `CN04_EMPTY_PREFIX_SET` (`address`) and stop processing for that IP.
+   - If raw lookup text exists, emit `CN04_ASN_INFOS_RAW` (`address`, `data`).
+   - If prefix exists, emit `CN04_ASN_INFOS_ANNOUNCE_IN` (`address`, `prefixes`) and store the `(prefix -> ns item)` relation for that IP family.
 5. For each family (IPv4 then IPv6) with stored prefixes, classify topological diversity (RFC 2182 section 3.1):
    - For each prefix group with 2 or more members, emit `CN04_IPV<4|6>_SAME_PREFIX` (`prefixes`, `servers`).
    - Collect members from prefix groups with exactly 1 member and emit `CN04_IPV<4|6>_DIFFERENT_PREFIX` with combined `servers` if non-empty.
@@ -94,12 +94,12 @@ emit TEST_CASE_END
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `CN04_ASN_INFOS_ANNOUNCE_IN` | `ns_ip` | `string` | IP address looked up. |
+| `CN04_ASN_INFOS_ANNOUNCE_IN` | `address` | `string` | IP address looked up. |
 | `CN04_ASN_INFOS_ANNOUNCE_IN` | `prefixes` | `array<string>` | Structured prefix list announcing the IP (single-item list per entry). |
-| `CN04_ASN_INFOS_RAW` | `ns_ip` | `string` | IP address looked up. |
+| `CN04_ASN_INFOS_RAW` | `address` | `string` | IP address looked up. |
 | `CN04_ASN_INFOS_RAW` | `data` | `string` | Raw backend response data string. |
-| `CN04_EMPTY_PREFIX_SET` | `ns_ip` | `string` | IP address with empty prefix lookup result. |
-| `CN04_ERROR_PREFIX_DATABASE` | `ns_ip` | `string` | IP address where prefix lookup backend failed. |
+| `CN04_EMPTY_PREFIX_SET` | `address` | `string` | IP address with empty prefix lookup result. |
+| `CN04_ERROR_PREFIX_DATABASE` | `address` | `string` | IP address where prefix lookup backend failed. |
 | `CN04_IPV4_DIFFERENT_PREFIX` | `servers` | `array<object>` | Structured single-member IPv4 prefix-group items (`{ns,address}` object). |
 | `CN04_IPV4_SAME_PREFIX` | `prefixes` | `array<string>` | Structured shared IPv4 prefix list (single-item list per entry). |
 | `CN04_IPV4_SAME_PREFIX` | `servers` | `array<object>` | Structured nameserver items (`{ns,address}` object) in that prefix group. |

@@ -25,7 +25,7 @@ Status: Final
 2. `Basic03` function emits `TEST_CASE_START`.
 3. Build `queryName = "www." + child-zone`.
 4. Resolve nameserver targets with [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and probe each in parallel:
-   - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) for rrtype `A`.
+   - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) for query type `A`.
    - Send `A` query for `queryName`.
    - If response has `A` RR for `queryName`, emit `HAS_A_RECORDS`; otherwise emit `NO_A_RECORDS`.
 5. If no probed nameserver produced any response packet, emit `A_QUERY_NO_RESPONSES`.
@@ -55,16 +55,16 @@ Status: Final
 | `HAS_NAMESERVER_NO_WWW_A_TEST` | `zname` | `string` | Child zone name for skipped `Basic03` probing path. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_ENABLED` | `rrtype` | `string` | rrtype queried (`A`). |
+| `IPV4_ENABLED` | `query_type` | `string` | Query type sent (`A`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`A`). |
 | `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV6_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_ENABLED` | `rrtype` | `string` | rrtype queried (`A`). |
+| `IPV6_ENABLED` | `query_type` | `string` | Query type sent (`A`). |
 | `NO_A_RECORDS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no matching `A` data. |
 | `NO_A_RECORDS` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_A_RECORDS` | `domain` | `string` | Queried name (`www.<child-zone>`). |

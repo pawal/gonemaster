@@ -25,7 +25,7 @@ Status: Final
 3. If no NS names exist, emit `B02_NO_DELEGATION`, then emit `TEST_CASE_END` and return.
 4. If NS names exist but address objects are empty, attempt to populate from glue addresses and mark unresolved names as `nsCantResolve`.
 5. Probe each nameserver (parallelized) with SOA query to child zone:
-   - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) for rrtype `SOA`.
+   - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) for query type `SOA`.
    - Classify each response as no response, unexpected rcode, not authoritative, broken answer, or authoritative SOA answer.
 6. If at least one authoritative SOA response exists, emit `B02_AUTH_RESPONSE_SOA`.
 7. Otherwise emit `B02_NO_WORKING_NS`, then emit detailed categories:
@@ -111,7 +111,7 @@ emit TEST_CASE_END
 | `B02_NS_BROKEN` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `B02_NS_NOT_AUTH` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) missing AA. |
 | `B02_NS_NOT_AUTH` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `B02_NS_NO_IP_ADDR` | `nsname` | `string` | Nameserver owner name lacking resolved IP addresses. |
+| `B02_NS_NO_IP_ADDR` | `ns` | `string` | Nameserver owner name lacking resolved IP addresses. |
 | `B02_NS_NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
 | `B02_NS_NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `B02_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning unexpected rcode. |
@@ -119,16 +119,16 @@ emit TEST_CASE_END
 | `B02_UNEXPECTED_RCODE` | `rcode` | `string` | Observed non-`NOERROR` rcode name. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_ENABLED` | `rrtype` | `string` | rrtype queried (`SOA`). |
+| `IPV4_ENABLED` | `query_type` | `string` | Query type sent (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV6_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_ENABLED` | `rrtype` | `string` | rrtype queried (`SOA`). |
+| `IPV6_ENABLED` | `query_type` | `string` | Query type sent (`SOA`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Basic02`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Basic02`). |
 

@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - docs: the zone01 and zone09 specs match the emitted arguments and the MX query flow
+- docs: testcase specs document the emitted argument keys and types instead of retired ones
 
 ## [v1.7.20] - 2026-10-09
 

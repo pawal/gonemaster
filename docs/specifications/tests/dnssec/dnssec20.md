@@ -22,7 +22,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build nameserver set from delegation+zone NS items, grouped by IP.
 3. For each unique nameserver IP (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip.
    - Query child apex `DNSKEY` with DNSSEC enabled.
    - If response is absent, non-`NOERROR`, or non-`AA`, classify nameserver as `no_dnssec` and skip.
    - If no apex DNSKEY records are present, classify nameserver as `no_dnssec` and skip.
@@ -117,10 +117,10 @@ emit TEST_CASE_END
 | `DS20_NSEC_BITMAP_MISMATCHES_RRTYPE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) exhibiting the mismatch. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `query_type` | `string` | rrtype skipped (`DNSKEY`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `query_type` | `string` | rrtype skipped (`DNSKEY`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC20`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC20`). |
 

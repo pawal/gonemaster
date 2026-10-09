@@ -24,7 +24,7 @@ Status: Final
    - If transport family is disabled, task is marked as disabled.
    - Duplicate name entries after first occurrence are skipped.
 4. Execute tasks in parallel (deterministic merged log order):
-   - For disabled tasks, emit `IPV4_DISABLED` or `IPV6_DISABLED` (`rrtype=SOA`).
+   - For disabled tasks, emit `IPV4_DISABLED` or `IPV6_DISABLED` (`query_type=SOA`).
    - For query tasks, send SOA query twice (`UseVC=false` for UDP, then `UseVC=true` for TCP).
    - For each non-nil response where `AA=false`, emit `IS_NOT_AUTHORITATIVE` with `proto`.
    - Track whether the nameserver produced at least one authoritative response (`AA=true`) across UDP/TCP.
@@ -48,7 +48,7 @@ build ordered task list from GlueNameservers ++ ApexNameservers:
 For each task (parallel; fan-out = resolver.defaults.parallel):
 
    actionSkip      -> nothing
-   actionDisabled  -> IPV4_DISABLED / IPV6_DISABLED (rrtype=SOA)
+   actionDisabled  -> IPV4_DISABLED / IPV6_DISABLED (query_type=SOA)
    actionQuery     -> for useVC in {false, true}:
                         query SOA at z.Name with UseVC
                          +- err or resp.Msg == nil           -> skip
@@ -81,10 +81,10 @@ emit TEST_CASE_END
 | `ARE_AUTHORITATIVE` | `servers` | `array<object>` | Structured authoritative nameserver names as `{ns}` items. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`SOA`). |
 | `IS_NOT_AUTHORITATIVE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-authoritative SOA response. |
 | `IS_NOT_AUTHORITATIVE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IS_NOT_AUTHORITATIVE` | `proto` | `string` | Query transport label (`UDP` or `TCP`). |

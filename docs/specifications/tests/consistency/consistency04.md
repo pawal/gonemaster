@@ -20,7 +20,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build deduplicated nameserver list from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) by `ns.String()`.
 3. For each nameserver (parallelized):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `NS` and skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `NS` and skip.
    - Query NS for zone apex.
    - No response message -> emit `NO_RESPONSE`.
    - Response without usable NS records for zone apex -> emit `NO_RESPONSE_NS_QUERY`.
@@ -36,8 +36,8 @@ Status: Final
 | Tag | Emitted when |
 | --- | --- |
 | `INCONSISTENT_NS_TTL` | Authoritative nameservers serve the apex NS RRset with more than one distinct TTL; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
-| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
-| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
+| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/query type. |
+| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/query type. |
 | `MULTIPLE_NS_SET` | At least two distinct NS target sets were observed; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
 | `NO_RESPONSE` | NS query had no response message from a nameserver. |
 | `NO_RESPONSE_NS_QUERY` | Response did not contain usable NS records for zone apex. |
@@ -54,10 +54,10 @@ Status: Final
 | `INCONSISTENT_NS_TTL` | `ttl_max` | `int` | Largest observed apex NS RRset TTL (seconds). |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`NS`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`NS`). |
 | `MULTIPLE_NS_SET` | `count` | `int` | Number of distinct NS target sets observed. |
 | `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |

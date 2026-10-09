@@ -633,16 +633,29 @@ type reportClusterView struct {
 	Direction string   `json:"direction"`
 }
 
+type reportTransitionView struct {
+	From     string `json:"from"`
+	To       string `json:"to"`
+	Category string `json:"category,omitempty"`
+	Count    int    `json:"count"`
+}
+
+type reportTransitionsView struct {
+	Grade []reportTransitionView `json:"grade" jsonschema:"grade moves; equal from and to count the domains that held"`
+	Level []reportTransitionView `json:"level" jsonschema:"worst-level moves: OK, NOTICE, WARNING, ERROR, CRITICAL"`
+}
+
 // analysisReportView decodes the cohort report endpoint.
 type analysisReportView struct {
-	DatasetTag string              `json:"dataset_tag"`
-	FromSlug   string              `json:"from_slug"`
-	ToSlug     string              `json:"to_slug"`
-	Header     reportHeaderView    `json:"header"`
-	Totals     reportTotalsView    `json:"totals"`
-	Tags       reportTagsView      `json:"tags"`
-	Domains    []reportDomainView  `json:"domains"`
-	Clusters   []reportClusterView `json:"clusters"`
+	DatasetTag  string                `json:"dataset_tag"`
+	FromSlug    string                `json:"from_slug"`
+	ToSlug      string                `json:"to_slug"`
+	Header      reportHeaderView      `json:"header"`
+	Totals      reportTotalsView      `json:"totals"`
+	Tags        reportTagsView        `json:"tags"`
+	Domains     []reportDomainView    `json:"domains"`
+	Clusters    []reportClusterView   `json:"clusters"`
+	Transitions reportTransitionsView `json:"transitions"`
 }
 
 func (c *Client) getAnalysisCatalog(ctx context.Context) (analysisCatalogView, error) {

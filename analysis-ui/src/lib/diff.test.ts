@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGradeMatrix,
+  buildMatrix,
+  filterByPair,
+  flowLinks,
   gradeDirection,
   gradeMovement,
   gradeRank,
   levelDirection,
   netDirection,
+  pairCategories,
+  severityBucket,
   sortByMovement,
   summarizeDiff
 } from "./diff";
@@ -169,5 +174,88 @@ describe("buildGradeMatrix", () => {
     const matrix = buildGradeMatrix([{ domain: "x.se", from_grade: "Z", to_grade: "A" }]);
     expect(matrix.total).toBe(0);
     expect(matrix.max).toBe(0);
+  });
+});
+
+describe("severityBucket", () => {
+  it.each([
+    { level: "error", want: "ERROR" },
+    { level: " Critical ", want: "CRITICAL" },
+    { level: "INFO", want: "OK" },
+    { level: "", want: "OK" },
+    { level: undefined, want: "OK" }
+  ])("buckets $level as $want", ({ level, want }) => {
+    expect(severityBucket(level)).toBe(want);
+  });
+});
+
+describe("buildMatrix", () => {
+  it("tallies worst-level moves over the severity buckets", () => {
+    const matrix = buildMatrix(
+      [
+        { domain: "a.se", from_level: "", to_level: "ERROR" },
+        { domain: "b.se", from_level: "WARNING", to_level: "ERROR" },
+        { domain: "c.se", from_level: "INFO", to_level: "" }
+      ],
+      "level"
+    );
+    expect(matrix.keys).toEqual(["OK", "NOTICE", "WARNING", "ERROR", "CRITICAL"]);
+    expect(matrix.cells[0][3]).toBe(1);
+    expect(matrix.cells[2][3]).toBe(1);
+    expect(matrix.total).toBe(2);
+  });
+});
+
+describe("filterByPair", () => {
+  const entries = [
+    { domain: "a.se", from_grade: "A", to_grade: "D" },
+    { domain: "b.se", from_grade: "A", to_grade: "C" },
+    { domain: "c.se", from_grade: "b", to_grade: "d" }
+  ];
+
+  it.each([
+    { from: "A", to: "D", want: ["a.se"] },
+    { from: "", to: "D", want: ["a.se", "c.se"] },
+    { from: "A", to: "", want: ["a.se", "b.se"] },
+    { from: "", to: "", want: ["a.se", "b.se", "c.se"] }
+  ])("keeps $want for $from to $to", ({ from, to, want }) => {
+    expect(filterByPair(entries, "grade", from, to).map((e) => e.domain)).toEqual(want);
+  });
+});
+
+describe("pairCategories", () => {
+  it("groups moved rows by pair, largest category first, and skips held rows", () => {
+    const cats = pairCategories([
+      { from: "A", to: "A", count: 905 },
+      { from: "A", to: "D", category: "real", count: 9 },
+      { from: "A", to: "D", category: "measurement", count: 171 }
+    ]);
+    expect([...cats.keys()]).toEqual(["A|D"]);
+    expect(cats.get("A|D")).toEqual([
+      { category: "measurement", count: 171 },
+      { category: "real", count: 9 }
+    ]);
+  });
+});
+
+describe("flowLinks", () => {
+  it("adds the diff's new and removed domains as end links", () => {
+    const diff: DiffResponse = {
+      dataset_tag: "tld",
+      from_slug: "s1",
+      to_slug: "s2",
+      added: [
+        { domain: "n1.se", to_grade: "A" },
+        { domain: "n2.se", to_grade: "A" }
+      ],
+      removed: [{ domain: "g.se", from_grade: "F" }],
+      grade_changed: [],
+      level_changed: []
+    };
+    expect(flowLinks([{ from: "A", to: "B", category: "real", count: 2 }], diff, "grade")).toEqual([
+      { from: "A", to: "B", category: "real", count: 2 },
+      { from: "new", to: "A", category: "", count: 2 },
+      { from: "F", to: "removed", category: "", count: 1 }
+    ]);
   });
 });

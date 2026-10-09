@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import TrendLine from "./TrendLine.svelte";
 import Sparkline from "./Sparkline.svelte";
 
@@ -40,6 +40,58 @@ describe("TrendLine", () => {
   it("shows an empty note instead of an empty chart when there are no points", () => {
     render(TrendLine, { values: [], labels: [], caption: "c" });
     expect(screen.getByText(/no data points/i)).toBeInTheDocument();
+  });
+
+  it("draws a dashed marker titled with its label", () => {
+    const { container } = render(TrendLine, {
+      values,
+      labels,
+      markers: [{ index: 2, label: "Engine changed to v1.7.14" }],
+      caption: "c"
+    });
+    const markers = container.querySelectorAll("line.marker");
+    expect(markers).toHaveLength(1);
+    expect(markers[0].querySelector("title")?.textContent).toBe("Engine changed to v1.7.14");
+  });
+
+  it("spaces dots by time when xValues are given", () => {
+    const { container } = render(TrendLine, { values, labels, xValues: [0, 1, 4], caption: "c" });
+    const xs = Array.from(container.querySelectorAll("circle.dot")).map((c) => c.getAttribute("cx"));
+    expect(xs).toEqual(["40", "187", "628"]);
+  });
+
+  it("follows the pointer and names the hovered snapshot and marker", async () => {
+    const { container } = render(TrendLine, {
+      values,
+      labels,
+      markers: [{ index: 1, label: "Engine changed to v2" }],
+      caption: "c"
+    });
+    await fireEvent.pointerMove(container.querySelector('rect.hit[data-index="1"]')!);
+    expect(container.querySelector("circle.dot.active")?.getAttribute("cx")).toBe("334");
+    expect(container.querySelector("line.crosshair")).not.toBeNull();
+    expect(screen.getByText("2026-02: 25. Engine changed to v2")).toBeInTheDocument();
+    await fireEvent.pointerLeave(container.querySelector("svg")!);
+    expect(container.querySelector("circle.dot.active")).toBeNull();
+    expect(container.querySelector("line.crosshair")).toBeNull();
+  });
+
+  it("reports hover to the parent and draws the controlled index", async () => {
+    const onhover = vi.fn();
+    const { container } = render(TrendLine, { values, labels, hoverIndex: 0, onhover, caption: "c" });
+    expect(container.querySelector("circle.dot.active")?.getAttribute("cx")).toBe("40");
+    await fireEvent.pointerMove(container.querySelector('rect.hit[data-index="2"]')!);
+    expect(onhover).toHaveBeenCalledWith(2);
+    expect(container.querySelector("circle.dot.active")?.getAttribute("cx")).toBe("40");
+  });
+
+  it("drops the caption, the hover note and, on request, the table when compact", async () => {
+    const { container } = render(TrendLine, { values, labels, compact: true, table: false, caption: "c" });
+    expect(container.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 280 120");
+    expect(container.querySelector("figcaption")).toBeNull();
+    expect(container.querySelector("table")).toBeNull();
+    await fireEvent.pointerMove(container.querySelector('rect.hit[data-index="0"]')!);
+    expect(container.querySelector(".hover-note")).toBeNull();
   });
 });
 

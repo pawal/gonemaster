@@ -9,7 +9,8 @@ import {
   reportFilename,
   reportToMarkdown,
   signedNumber,
-  splitTagsByClassification
+  splitTagsByClassification,
+  unrecordedScoringSnapshot
 } from "./report";
 import type { ReportTagEntry } from "./api";
 
@@ -134,18 +135,35 @@ describe("reportToMarkdown", () => {
       ...sampleReport,
       header: {
         ...sampleReport.header,
+        from: { ...sampleReport.header.from, scoring_config_hash: undefined },
+        to: { ...sampleReport.header.to, scoring_config_hash: "default" },
         vocabulary: { ...sampleReport.header.vocabulary, from_available: false },
         scoring_config_changed: "unknown"
       }
     });
     expect(blind).toContain("Tag vocabulary unknown on at least one side");
-    expect(blind).toContain("Scoring configuration provenance unknown");
+    expect(blind).toContain("Scoring configuration not recorded for the From snapshot;");
   });
 
   it("marks a partial movers page and stays silent on a whole one", () => {
     expect(md).not.toContain("Showing");
     const paged = reportToMarkdown({ ...sampleReport, domain_total: 290, domain_offset: 0 });
     expect(paged).toContain("Showing 2 of 290 movers, from offset 0.");
+  });
+});
+
+describe("unrecordedScoringSnapshot", () => {
+  it.each([
+    [undefined, "default", "the From snapshot"],
+    ["default", undefined, "the To snapshot"],
+    [undefined, undefined, "either snapshot"]
+  ])("names from=%s to=%s as %s", (fromHash, toHash, want) => {
+    const header = {
+      ...sampleReport.header,
+      from: { ...sampleReport.header.from, scoring_config_hash: fromHash },
+      to: { ...sampleReport.header.to, scoring_config_hash: toHash }
+    };
+    expect(unrecordedScoringSnapshot(header)).toBe(want);
   });
 });
 

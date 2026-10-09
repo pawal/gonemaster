@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutLine, layoutSparkline, resolveDomain } from "./trendLayout";
+import { layoutLine, layoutSparkline, pickLabelIndices, resolveDomain } from "./trendLayout";
 
 // These tests pin the geometry contract the SVG renderers rely on: an empty
 // series must produce no path (so the component can show an empty state), a
@@ -24,6 +24,49 @@ describe("resolveDomain", () => {
 
   it("ignores non-finite values when finding the max", () => {
     expect(resolveDomain([NaN, 8, Infinity])).toEqual([0, 10]);
+  });
+
+  it.each([
+    { values: [1, 2], minSpan: 14, want: [0, 20] },
+    { values: [47], minSpan: 5, want: [0, 50] },
+    { values: [0, 0], minSpan: 3, want: [0, 5] }
+  ])("raises the max to minSpan $minSpan for $values", ({ values, minSpan, want }) => {
+    expect(resolveDomain(values, undefined, minSpan)).toEqual(want);
+  });
+
+  it("ignores minSpan under an explicit domain", () => {
+    expect(resolveDomain([1], [0, 100], 500)).toEqual([0, 100]);
+  });
+});
+
+describe("layoutLine time axis", () => {
+  const opts = { width: 100, height: 100, padding: { top: 0, right: 0, bottom: 0, left: 0 } };
+
+  it.each([
+    { name: "uneven spacing", xValues: [0, 1, 4], want: [0, 25, 100] },
+    { name: "equal timestamps", xValues: [0, 5, 5, 10], want: [0, 50, 50, 100] },
+    { name: "one shared time", xValues: [7, 7], want: [50, 50] },
+    { name: "a non-finite time", xValues: [0, NaN, 10], want: [0, 50, 100] },
+    { name: "a length mismatch", xValues: [0, 10], want: [0, 50, 100] }
+  ])("places points for $name", ({ xValues, want }) => {
+    const values = want.map(() => 1);
+    const layout = layoutLine(values, { ...opts, xValues });
+    expect(layout.points.map((p) => p.x)).toEqual(want);
+  });
+});
+
+describe("pickLabelIndices", () => {
+  it.each([
+    { xs: [0, 10, 12, 50, 100], gap: 20, want: [0, 3, 4] },
+    { xs: [0, 30, 95, 100], gap: 20, want: [0, 1, 3] },
+    { xs: [0, 10], gap: 20, want: [1] },
+    { xs: [], gap: 20, want: [] }
+  ])("keeps $want of $xs at gap $gap", ({ xs, gap, want }) => {
+    expect([...pickLabelIndices(xs, gap)]).toEqual(want);
+  });
+
+  it("keeps the last label lastGap clear of its neighbour", () => {
+    expect([...pickLabelIndices([0, 30, 60, 100], 20, 50)]).toEqual([0, 1, 3]);
   });
 });
 

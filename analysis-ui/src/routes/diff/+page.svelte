@@ -5,15 +5,21 @@
   import FilterBar from "$lib/FilterBar.svelte";
   import GradeChip from "$lib/GradeChip.svelte";
   import TagChip from "$lib/chips/TagChip.svelte";
+  import TransitionFlow from "$lib/charts/TransitionFlow.svelte";
   import { domainHref, scopedQuery } from "$lib/entityLinks";
-  import { snapshotOptionLabel, levelTone, formatCount } from "$lib/format";
+  import { snapshotDisplayLabel, snapshotOptionLabel, levelTone, formatCount } from "$lib/format";
   import { downloadBlob, downloadCSV, type ExportColumn } from "$lib/exporters";
   import {
-    buildGradeMatrix,
+    buildMatrix,
+    dimensionOrder,
+    filterByPair,
+    flowLinks,
     gradeDirection,
     levelDirection,
+    pairCategories,
     sortByMovement,
-    summarizeDiff
+    summarizeDiff,
+    type Dimension
   } from "$lib/diff";
   import {
     CATEGORY_LABELS,
@@ -25,7 +31,8 @@
     reportFilename,
     reportToMarkdown,
     signedNumber,
-    splitTagsByClassification
+    splitTagsByClassification,
+    unrecordedScoringSnapshot
   } from "$lib/report";
   import type { DiffEntry, DomainCategory, ReportTagEntry, TagDiffEntry } from "$lib/api";
   import type { LayoutData } from "../+layout";
@@ -100,7 +107,48 @@
   );
 
   const summary = $derived(summarizeDiff(data.diff));
-  const matrix = $derived(buildGradeMatrix(data.diff?.grade_changed ?? []));
+
+  // ?dim= switches the flow and the matrix between grade and worst level.
+  const dim = $derived<Dimension>(page.url.searchParams.get("dim") === "level" ? "level" : "grade");
+  const dimNoun = $derived(dim === "grade" ? "grade" : "worst level");
+  const matrix = $derived(
+    buildMatrix((dim === "grade" ? data.diff?.grade_changed : data.diff?.level_changed) ?? [], dim)
+  );
+  const hasChanges = $derived(
+    (data.diff?.grade_changed?.length ?? 0) + (data.diff?.level_changed?.length ?? 0) > 0
+  );
+  const transitionRows = $derived(data.report?.transitions?.[dim] ?? null);
+  const links = $derived(transitionRows ? flowLinks(transitionRows, data.diff, dim) : []);
+  const cellCategories = $derived(pairCategories(transitionRows ?? []));
+
+  const PAIR_PARAMS = { grade: ["from_grade", "to_grade"], level: ["from_level", "to_level"] } as const;
+
+  function pairHref(d: Dimension, from: string, to: string): string {
+    const params = new URLSearchParams(page.url.searchParams);
+    for (const key of [...PAIR_PARAMS.grade, ...PAIR_PARAMS.level]) params.delete(key);
+    params.set("tab", d === "grade" ? "grade_changed" : "level_changed");
+    params.set(PAIR_PARAMS[d][0], from);
+    params.set(PAIR_PARAMS[d][1], to);
+    return `${page.url.pathname}?${params.toString()}`;
+  }
+
+  function clearPair() {
+    const params = new URLSearchParams(page.url.searchParams);
+    for (const key of [...PAIR_PARAMS.grade, ...PAIR_PARAMS.level]) params.delete(key);
+    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+  }
+
+  function cellTitle(from: string, to: string, count: number): string {
+    const split = (cellCategories.get(`${from}|${to}`) ?? [])
+      .map((c) => `${formatCount(c.count)} ${CATEGORY_LABELS[c.category as DomainCategory]?.toLowerCase() ?? c.category}`)
+      .join(", ");
+    return `${from} → ${to}: ${formatCount(count)} ${count === 1 ? "domain" : "domains"}${split ? `; ${split}` : ""}`;
+  }
+
+  function sideLabel(slug: string): string {
+    const snap = (layoutData.snapshots ?? []).find((s) => s.slug === slug);
+    return snap ? snapshotDisplayLabel(snap) : slug;
+  }
 
   // Tag rows come from the report when it loaded, so each row carries a
   // classification; otherwise from the plain tag diff.
@@ -131,6 +179,13 @@
     return "0";
   }
 
+  // The pair filter of the active movement tab, set from the flow or the matrix.
+  const listDim = $derived<Dimension | null>(
+    activeTab === "grade_changed" ? "grade" : activeTab === "level_changed" ? "level" : null
+  );
+  const pairFrom = $derived(listDim ? (page.url.searchParams.get(PAIR_PARAMS[listDim][0]) ?? "") : "");
+  const pairTo = $derived(listDim ? (page.url.searchParams.get(PAIR_PARAMS[listDim][1]) ?? "") : "");
+
   const entries = $derived.by<DiffEntry[]>(() => {
     if (!data.diff) return [];
     switch (activeTab) {
@@ -139,9 +194,9 @@
       case "removed":
         return data.diff.removed ?? [];
       case "grade_changed":
-        return sortByMovement(data.diff.grade_changed ?? [], "grade");
+        return filterByPair(sortByMovement(data.diff.grade_changed ?? [], "grade"), "grade", pairFrom, pairTo);
       case "level_changed":
-        return sortByMovement(data.diff.level_changed ?? [], "level");
+        return filterByPair(sortByMovement(data.diff.level_changed ?? [], "level"), "level", pairFrom, pairTo);
       default:
         return [];
     }
@@ -298,8 +353,10 @@
         {:else if header.scoring_config_changed === "false"}
           Scoring configuration unchanged.
         {:else}
-          Scoring configuration provenance is unknown, so a score move cannot
-          be fully attributed.
+          The scoring configuration was not recorded for
+          {unrecordedScoringSnapshot(header)}, so a score move cannot be fully
+          attributed. It is recorded when a batch finishes; a snapshot rebuilt
+          from stored runs, or captured by an older server, has none.
         {/if}
       </p>
       {#if header.tag_floor}
@@ -430,39 +487,69 @@
     </section>
   {/if}
 
-  {#if matrix.total > 0}
-    <section class="card">
-      <h3>Grade transitions</h3>
-      <p class="hint">
-        Where the {matrix.total} grade-changed domains moved: rows are the
-        From grade, columns the To grade. Redder cells are regressions,
-        greener cells improvements. Unchanged domains are not shown.
-      </p>
-      <div class="matrix-wrap">
-        <table class="matrix">
-          <thead>
-            <tr>
-              <th class="corner"><span class="sr-only">From grade down, To grade across</span></th>
-              {#each matrix.grades as g (g)}
-                <th scope="col">{g}</th>
-              {/each}
-            </tr>
-          </thead>
-          <tbody>
-            {#each matrix.grades as fromGrade, fi (fromGrade)}
+  {#if hasChanges}
+    <section class="card" aria-label="Transitions">
+      <div class="list-head">
+        <h3>{dim === "grade" ? "Grade transitions" : "Worst-level transitions"}</h3>
+        <div class="dim-toggle" role="group" aria-label="Transition dimension">
+          <button type="button" class="dim-btn" class:active={dim === "grade"} onclick={() => setParam("dim", "")}>Grade</button>
+          <button type="button" class="dim-btn" class:active={dim === "level"} onclick={() => setParam("dim", "level")}>Worst level</button>
+        </div>
+      </div>
+      {#if links.length > 0}
+        {#if engine?.crossed_engine_versions}
+          <p class="hint">
+            These snapshots ran engine <code>{engine.from_engine_version}</code> and
+            <code>{engine.to_engine_version}</code>. A measurement ribbon is a move the change of
+            tag vocabulary explains; a real ribbon is a move of the cohort.
+          </p>
+        {/if}
+        <TransitionFlow
+          order={dimensionOrder(dim)}
+          {links}
+          fromLabel={sideLabel(data.fromSlug)}
+          toLabel={sideLabel(data.toSlug)}
+          hrefFor={(from, to) => pairHref(dim, from, to)}
+          valueNoun={dimNoun}
+          caption={dim === "grade" ? "Grade transitions" : "Worst-level transitions"}
+        />
+      {/if}
+      {#if matrix.total === 0}
+        <p class="hint">No domain changed {dimNoun} between these snapshots.</p>
+      {:else}
+        <p class="hint">
+          The {matrix.total} domains that changed {dimNoun}: rows are the From {dimNoun},
+          columns the To {dimNoun}. Redder cells are regressions, greener cells
+          improvements. Select a count to list its domains.
+        </p>
+        <div class="matrix-wrap">
+          <table class="matrix">
+            <thead>
               <tr>
-                <th scope="row">{fromGrade}</th>
-                {#each matrix.grades as toGrade, ti (toGrade)}
-                  {@const count = matrix.cells[fi][ti]}
-                  <td class="mx-cell {cellClass(fi, ti, count)}" class:diagonal={fi === ti}>
-                    {#if count > 0}{count}{/if}
-                  </td>
+                <th class="corner"><span class="sr-only">From {dimNoun} down, To {dimNoun} across</span></th>
+                {#each matrix.keys as key (key)}
+                  <th scope="col">{key}</th>
                 {/each}
               </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {#each matrix.keys as fromKey, fi (fromKey)}
+                <tr>
+                  <th scope="row">{fromKey}</th>
+                  {#each matrix.keys as toKey, ti (toKey)}
+                    {@const count = matrix.cells[fi][ti]}
+                    <td class="mx-cell {cellClass(fi, ti, count)}" class:diagonal={fi === ti}>
+                      {#if count > 0}
+                        <a class="mx-link" href={pairHref(dim, fromKey, toKey)} title={cellTitle(fromKey, toKey, count)}>{count}</a>
+                      {/if}
+                    </td>
+                  {/each}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
     </section>
   {/if}
 
@@ -584,6 +671,12 @@
           </button>
         </div>
       </div>
+      {#if pairFrom || pairTo}
+        <p class="hint pair-note">
+          Showing {pairFrom || "any"} → {pairTo || "any"} only.
+          <button type="button" class="link-btn" onclick={clearPair}>Show all</button>
+        </p>
+      {/if}
       {#if entries.length === 0}
         <p class="hint">No entries in this category.</p>
       {:else}
@@ -918,6 +1011,49 @@
   .mx-cell {
     color: var(--ink);
   }
+  .mx-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .mx-link:hover,
+  .mx-link:focus-visible {
+    text-decoration: underline;
+  }
+  .dim-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .dim-btn {
+    padding: 5px var(--space-3);
+    background: var(--surface);
+    color: var(--ink-2);
+    border: none;
+    border-radius: 0;
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .dim-btn.active {
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .pair-note {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+  .link-btn {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--accent-2);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+  }
   .mx-cell.diagonal {
     background: var(--surface);
   }
@@ -977,7 +1113,8 @@
     .diff-side-select,
     .diff-tabs,
     .cause-filter,
-    .swap-btn {
+    .swap-btn,
+    .dim-toggle {
       display: none;
     }
     .engine-rows {

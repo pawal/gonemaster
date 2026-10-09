@@ -478,19 +478,34 @@ type AnalysisReportCluster struct {
 
 // AnalysisReport is GET /pub/api/v1/analysis/cohorts/{tag}/report.
 type AnalysisReport struct {
-	DatasetTag string                  `json:"dataset_tag"`
-	FromSlug   string                  `json:"from_slug"`
-	ToSlug     string                  `json:"to_slug"`
-	MinCluster int                     `json:"min_cluster"`
-	MaxSpread  int                     `json:"max_spread"`
-	Header     AnalysisReportHeader    `json:"header"`
-	Totals     AnalysisReportTotals    `json:"totals"`
-	Tags       AnalysisReportTags      `json:"tags"`
-	Domains    []AnalysisReportDomain  `json:"domains"`
-	Clusters   []AnalysisReportCluster `json:"clusters"`
+	DatasetTag  string                    `json:"dataset_tag"`
+	FromSlug    string                    `json:"from_slug"`
+	ToSlug      string                    `json:"to_slug"`
+	MinCluster  int                       `json:"min_cluster"`
+	MaxSpread   int                       `json:"max_spread"`
+	Header      AnalysisReportHeader      `json:"header"`
+	Totals      AnalysisReportTotals      `json:"totals"`
+	Tags        AnalysisReportTags        `json:"tags"`
+	Domains     []AnalysisReportDomain    `json:"domains"`
+	Clusters    []AnalysisReportCluster   `json:"clusters"`
+	Transitions AnalysisReportTransitions `json:"transitions"`
 	// DomainTotal is every mover; Domains carries one page.
 	DomainTotal  int `json:"domain_total"`
 	DomainOffset int `json:"domain_offset,omitempty"`
+}
+
+// AnalysisReportTransition is one grade or worst-level move; equal sides count domains that held.
+type AnalysisReportTransition struct {
+	From     string `json:"from"`
+	To       string `json:"to"`
+	Category string `json:"category,omitempty"`
+	Count    int    `json:"count"`
+}
+
+// AnalysisReportTransitions covers every domain on both sides.
+type AnalysisReportTransitions struct {
+	Grade []AnalysisReportTransition `json:"grade"`
+	Level []AnalysisReportTransition `json:"level"`
 }
 
 // Identifiers of the report fixture, so both CLIs assert on names.
@@ -585,6 +600,17 @@ func SampleReport() AnalysisReport {
 				Dimensions: []AnalysisReportClusterDimension{{Dimension: "nameserver", Value: ReportClusterHost, TotalDomains: 9}},
 				Domains:    []string{ReportMeasDomain, "degerfors.se", "mala.se"},
 				Size:       3, MinDelta: 8, MaxDelta: 9, Direction: "improved",
+			},
+		},
+		Transitions: AnalysisReportTransitions{
+			Grade: []AnalysisReportTransition{
+				{From: "A", To: "A", Count: 2},
+				{From: "B", To: "D", Category: "real", Count: 1},
+			},
+			Level: []AnalysisReportTransition{
+				{From: "NOTICE", To: "OK", Category: "measurement", Count: 1},
+				{From: "WARNING", To: "ERROR", Category: "real", Count: 1},
+				{From: "WARNING", To: "WARNING", Count: 1},
 			},
 		},
 		DomainTotal: 2,

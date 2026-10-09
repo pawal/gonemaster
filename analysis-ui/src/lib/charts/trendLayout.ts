@@ -28,6 +28,10 @@ export type LineOptions = {
   // domain runs from 0 to a "nice" rounded maximum of the data.
   yDomain?: [number, number];
   tickCount?: number;
+  // Epoch ms per value; x is then linear in time instead of index.
+  xValues?: number[];
+  // Lowest upper bound for a derived y domain.
+  minSpan?: number;
 };
 
 const DEFAULTS = {
@@ -64,10 +68,14 @@ function niceNum(range: number, round: boolean): number {
 
 // Resolve the [min, max] domain for a set of values. Counts start at 0; an
 // explicit domain (e.g. percentages) is passed through untouched.
-export function resolveDomain(values: number[], override?: [number, number]): [number, number] {
+export function resolveDomain(
+  values: number[],
+  override?: [number, number],
+  minSpan = 0
+): [number, number] {
   if (override) return override;
   const finite = values.filter((v) => Number.isFinite(v));
-  const max = finite.length ? Math.max(...finite) : 0;
+  const max = Math.max(finite.length ? Math.max(...finite) : 0, minSpan);
   if (max <= 0) return [0, 1];
   return [0, niceNum(max, false)];
 }
@@ -87,6 +95,28 @@ function buildTicks(yMin: number, yMax: number, count: number, scaleY: (v: numbe
   return ticks;
 }
 
+// Usable only when every value has a finite time.
+function timeAxis(xValues: number[] | undefined, n: number) {
+  if (!xValues || xValues.length !== n || n === 0) return null;
+  if (!xValues.every((x) => Number.isFinite(x))) return null;
+  return { at: xValues, min: Math.min(...xValues), max: Math.max(...xValues) };
+}
+
+// X label indices at least minGap apart; the last index always wins, lastGap clear of its neighbour.
+export function pickLabelIndices(xs: number[], minGap: number, lastGap = minGap): Set<number> {
+  const picked: number[] = [];
+  const last = xs.length - 1;
+  for (let i = 0; i < last; i++) {
+    const prev = picked[picked.length - 1];
+    if (prev === undefined || xs[i] - xs[prev] >= minGap) picked.push(i);
+  }
+  if (last >= 0) {
+    while (picked.length && xs[last] - xs[picked[picked.length - 1]] < lastGap) picked.pop();
+    picked.push(last);
+  }
+  return new Set(picked);
+}
+
 // Lay out a single numeric series as a line/area over an SVG viewBox.
 export function layoutLine(values: number[], options: LineOptions = {}): LineLayout {
   const width = options.width ?? DEFAULTS.width;
@@ -102,11 +132,16 @@ export function layoutLine(values: number[], options: LineOptions = {}): LineLay
   const plotW = Math.max(0, width - pad.left - pad.right);
   const plotH = Math.max(0, height - pad.top - pad.bottom);
 
-  const [yMin, yMax] = resolveDomain(values, options.yDomain);
+  const [yMin, yMax] = resolveDomain(values, options.yDomain, options.minSpan);
   const span = yMax - yMin || 1;
 
   const scaleY = (v: number) => round(pad.top + (1 - (v - yMin) / span) * plotH);
+  const times = timeAxis(options.xValues, values.length);
   const scaleX = (i: number) => {
+    if (times) {
+      if (times.max === times.min) return round(pad.left + plotW / 2);
+      return round(pad.left + ((times.at[i] - times.min) / (times.max - times.min)) * plotW);
+    }
     if (values.length <= 1) return round(pad.left + plotW / 2);
     return round(pad.left + (i / (values.length - 1)) * plotW);
   };

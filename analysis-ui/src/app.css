@@ -91,6 +91,13 @@
   --sev-warning-bg:  #fef3c7; --sev-warning-fg:  #92400e;
   --sev-error-bg:    #ffedd5; --sev-error-fg:    #9a3412;
   --sev-critical-bg: #fee2e2; --sev-critical-fg: #991b1b;
+
+  /* Transition flow ribbons. */
+  --flow-real:        #ea580c;
+  --flow-mixed-bg:    #fed7aa;
+  --flow-measurement: #6b7280;
+  --flow-unknown:     #8896aa;
+  --flow-held:        #c8d0dc;
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -563,6 +570,12 @@ button:hover:not(:disabled) {
     --sev-warning-bg:  #2a1f0a; --sev-warning-fg:  #fbbf24;
     --sev-error-bg:    #2a150a; --sev-error-fg:    #fb923c;
     --sev-critical-bg: #2a0a0a; --sev-critical-fg: #f87171;
+
+    --flow-real:        #ea580c;
+    --flow-mixed-bg:    #431407;
+    --flow-measurement: #6b7280;
+    --flow-unknown:     #8b98a7;
+    --flow-held:        #2d3748;
   }
 }
 
@@ -619,6 +632,12 @@ button:hover:not(:disabled) {
   --sev-warning-bg:  #2a1f0a; --sev-warning-fg:  #fbbf24;
   --sev-error-bg:    #2a150a; --sev-error-fg:    #fb923c;
   --sev-critical-bg: #2a0a0a; --sev-critical-fg: #f87171;
+
+  --flow-real:        #ea580c;
+  --flow-mixed-bg:    #431407;
+  --flow-measurement: #6b7280;
+  --flow-unknown:     #8b98a7;
+  --flow-held:        #2d3748;
 }
 
 /* ── List-page layout ────────────────────────────────────────────────────── */

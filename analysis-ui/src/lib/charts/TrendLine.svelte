@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { layoutLine } from "./trendLayout";
+  import { layoutLine, pickLabelIndices } from "./trendLayout";
   import { formatCount } from "$lib/format";
 
   // Full trend chart for the trends focus view: one numeric series across
@@ -8,6 +8,7 @@
   // decorative). Colour is set through a tone class, keeping stroke/fill
   // CSP-safe and theme-aware.
   type Tone = "ok" | "notice" | "warning" | "error" | "critical" | "neutral";
+  export type Marker = { index: number; label: string };
   type Props = {
     values: number[];
     labels: string[];
@@ -17,8 +18,15 @@
     // "%" for share mode; appended to axis ticks and table values.
     valueSuffix?: string;
     yDomain?: [number, number];
-    width?: number;
-    height?: number;
+    minSpan?: number;
+    // Epoch ms per value for a time axis.
+    xValues?: number[];
+    markers?: Marker[];
+    // Controlled hover; omit to let the chart track its own.
+    hoverIndex?: number | null;
+    onhover?: (index: number | null) => void;
+    compact?: boolean;
+    table?: boolean;
     caption: string;
   };
   let {
@@ -28,25 +36,57 @@
     seriesLabel = "Count",
     valueSuffix = "",
     yDomain,
-    width = 640,
-    height = 220,
+    minSpan,
+    xValues,
+    markers = [],
+    hoverIndex,
+    onhover,
+    compact = false,
+    table = true,
     caption
   }: Props = $props();
 
-  const layout = $derived(layoutLine(values, { width, height, yDomain }));
+  const width = $derived(compact ? 280 : 640);
+  const height = $derived(compact ? 120 : 220);
+  const pad = $derived(
+    compact
+      ? { top: 8, right: 8, bottom: 20, left: 36 }
+      : { top: 12, right: 12, bottom: 24, left: 40 }
+  );
 
-  // Label only a handful of x positions so the axis never crowds; always
-  // include the first and last snapshot.
-  const xLabelIndices = $derived.by<Set<number>>(() => {
-    const n = labels.length;
-    if (n === 0) return new Set();
-    const max = 6;
-    if (n <= max) return new Set(labels.map((_, i) => i));
-    const step = (n - 1) / (max - 1);
-    const idx = new Set<number>();
-    for (let i = 0; i < max; i++) idx.add(Math.round(i * step));
-    return idx;
-  });
+  const layout = $derived(
+    layoutLine(values, { width, height, padding: pad, yDomain, minSpan, xValues, tickCount: compact ? 2 : 4 })
+  );
+
+  // The last label is end-anchored.
+  const xLabelIndices = $derived(pickLabelIndices(layout.points.map((p) => p.x), 64, 96));
+  const lastIndex = $derived(layout.points.length - 1);
+
+  // Hit bands run between the midpoints of neighbouring points.
+  const bands = $derived(
+    layout.points.map((p, i, all) => {
+      const left = i === 0 ? pad.left : (all[i - 1].x + p.x) / 2;
+      const right = i === all.length - 1 ? width - pad.right : (p.x + all[i + 1].x) / 2;
+      return { index: p.index, x: left, width: Math.max(0, right - left) };
+    })
+  );
+
+  let localHover = $state<number | null>(null);
+  const active = $derived(hoverIndex !== undefined ? hoverIndex : localHover);
+  const activePoint = $derived(active === null ? null : (layout.points[active] ?? null));
+  const activeMarker = $derived(markers.find((m) => m.index === active));
+
+  function setHover(index: number | null) {
+    if (index === active) return;
+    localHover = index;
+    onhover?.(index);
+  }
+
+  // Delegated from the hit bands, which carry their point index.
+  function onmove(event: PointerEvent) {
+    const raw = (event.target as Element | null)?.getAttribute?.("data-index");
+    if (raw != null) setHover(Number(raw));
+  }
 
   function fmt(value: number): string {
     return `${formatCount(value)}${valueSuffix}`;
@@ -56,38 +96,72 @@
 {#if layout.points.length === 0}
   <p class="hint">No data points to plot.</p>
 {:else}
-  <figure class="trend-line tone-{tone}">
-    <svg viewBox="0 0 {width} {height}" role="img" aria-label={caption}>
-      <!-- Y gridlines + tick labels -->
+  <figure class="trend-line tone-{tone}" class:compact>
+    <svg viewBox="0 0 {width} {height}" role="img" aria-label={caption} onpointermove={onmove} onpointerleave={() => setHover(null)}>
       {#each layout.yTicks as tick (tick.value)}
-        <line class="grid" x1="40" x2={width - 12} y1={tick.y} y2={tick.y} />
-        <text class="tick-label" x="34" y={tick.y + 4} text-anchor="end">{fmt(tick.value)}</text>
+        <line class="grid" x1={pad.left} x2={width - pad.right} y1={tick.y} y2={tick.y} />
+        <text class="tick-label" x={pad.left - 6} y={tick.y + 4} text-anchor="end">{fmt(tick.value)}</text>
+      {/each}
+      {#each markers as m (m.index)}
+        {@const p = layout.points[m.index]}
+        {#if p}
+          <line class="marker" x1={p.x} x2={p.x} y1={pad.top} y2={layout.baselineY}>
+            <title>{m.label}</title>
+          </line>
+        {/if}
       {/each}
       {#if layout.areaPath}
         <path class="area" d={layout.areaPath} />
       {/if}
       <path class="line" d={layout.linePath} />
+      {#if activePoint}
+        <line class="crosshair" x1={activePoint.x} x2={activePoint.x} y1={pad.top} y2={layout.baselineY} />
+      {/if}
       {#each layout.points as p (p.index)}
-        <circle class="dot" cx={p.x} cy={p.y} r="2.5">
+        <circle class="dot" class:active={p.index === active} cx={p.x} cy={p.y} r={p.index === active ? 4 : 2.5}>
           <title>{labels[p.index]}: {fmt(p.value)}</title>
         </circle>
         {#if xLabelIndices.has(p.index)}
-          <text class="x-label" x={p.x} y={height - 8} text-anchor="middle">{labels[p.index]}</text>
+          <text
+            class="x-label"
+            x={p.x}
+            y={height - 6}
+            text-anchor={p.index === lastIndex && lastIndex > 0 ? "end" : "middle"}
+          >{labels[p.index]}</text>
         {/if}
       {/each}
+      {#each bands as b (b.index)}
+        <rect
+          class="hit"
+          data-index={b.index}
+          x={b.x}
+          y={pad.top}
+          width={b.width}
+          height={layout.baselineY - pad.top}
+        />
+      {/each}
     </svg>
-    <table class="sr-only">
-      <caption>{caption}</caption>
-      <thead>
-        <tr><th>Snapshot</th><th>{seriesLabel}</th></tr>
-      </thead>
-      <tbody>
-        {#each layout.points as p (p.index)}
-          <tr><td>{labels[p.index]}</td><td>{fmt(p.value)}</td></tr>
-        {/each}
-      </tbody>
-    </table>
-    <figcaption class="hint">{caption}</figcaption>
+    {#if !compact && activePoint}
+      <p class="hover-note">
+        {labels[activePoint.index]}: {fmt(activePoint.value)}{activeMarker ? `. ${activeMarker.label}` : ""}
+      </p>
+    {/if}
+    {#if table}
+      <table class="sr-only">
+        <caption>{caption}</caption>
+        <thead>
+          <tr><th>Snapshot</th><th>{seriesLabel}</th></tr>
+        </thead>
+        <tbody>
+          {#each layout.points as p (p.index)}
+            <tr><td>{labels[p.index]}</td><td>{fmt(p.value)}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+    {#if !compact}
+      <figcaption class="hint">{caption}</figcaption>
+    {/if}
   </figure>
 {/if}
 
@@ -126,15 +200,37 @@
     stroke: var(--card);
     stroke-width: 1;
   }
+  .dot.active {
+    stroke-width: 2;
+  }
   .grid {
     stroke: var(--border);
     stroke-width: 1;
+  }
+  .marker {
+    stroke: var(--muted);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+  }
+  .crosshair {
+    stroke: var(--ink-2);
+    stroke-width: 1;
+  }
+  .hit {
+    fill: transparent;
   }
   .tick-label,
   .x-label {
     fill: var(--ink-2);
     font-family: var(--mono);
     font-size: 10px;
+  }
+  .hover-note {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+    text-align: center;
   }
   figcaption {
     text-align: center;

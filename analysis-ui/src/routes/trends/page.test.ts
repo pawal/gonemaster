@@ -1,6 +1,7 @@
 import { appNavigation, appPaths, appState, loadEvent, stubResponse } from "../../test/helpers";
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/svelte";
+import { goto } from "$app/navigation";
 import { load, type TrendsPageData } from "./+page";
 
 const h = vi.hoisted(() => ({
@@ -139,7 +140,7 @@ function trendsData(overrides: Partial<TrendsPageData> = {}): TrendsPageData {
 
 describe("trends page rendering", () => {
   it("links severity segments to the domains behind them in that snapshot", () => {
-    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&view=stacked");
     render(TrendsPage, { data: trendsData() });
     const links = screen.getAllByRole("link");
     const critical = links.find((a) => a.getAttribute("href")?.includes("worst_level=critical"));
@@ -194,7 +195,7 @@ describe("trends page rendering", () => {
   });
 
   it("stays on the stacked view when ?key= names an unknown bucket", () => {
-    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=bogus");
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=bogus&view=stacked");
     const { container } = render(TrendsPage, { data: trendsData() });
     expect(container.querySelector(".trend-list")).not.toBeNull();
   });
@@ -221,7 +222,7 @@ describe("trends page rendering", () => {
   });
 
   it("links each snapshot row (except the oldest) to the diff against its predecessor", () => {
-    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&view=stacked");
     render(TrendsPage, {
       data: trendsData({
         points: [
@@ -243,6 +244,10 @@ describe("trends page rendering", () => {
 // the single most misleading thing this dashboard can show, so the boundary
 // has to be visible on the row where it happens.
 describe("trends engine provenance", () => {
+  beforeEach(() => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&view=stacked");
+  });
+
   function twoPoints(fromVersion?: string, toVersion?: string) {
     return trendsData({
       points: [
@@ -307,5 +312,69 @@ describe("trends engine provenance", () => {
     });
     const { container } = render(TrendsPage, { data });
     expect(container.querySelector(".trend-engine.mixed")?.textContent?.trim()).toBe("mixed");
+  });
+});
+
+describe("trends panels", () => {
+  beforeEach(() => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+  });
+
+  const crossing = () =>
+    trendsData({
+      points: [
+        { slug: "2026-07-31", captured_at: "2026-07-31T00:00:00Z", engine_version: "v1.6.3", payload: { ok: 8, critical: 2 } },
+        { slug: "2026-08-15", captured_at: "2026-08-15T00:00:00Z", engine_version: "v1.6.6", payload: { ok: 6, critical: 4 } }
+      ]
+    });
+
+  it("draws one panel per bucket by default, without the stacked list or legend", () => {
+    const { container } = render(TrendsPage, { data: crossing() });
+    expect(screen.getByRole("img", { name: "OK, domains per snapshot" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Critical, domains per snapshot" })).toBeInTheDocument();
+    expect(container.querySelector(".trend-list")).toBeNull();
+    expect(container.querySelector(".trend-legend")).toBeNull();
+  });
+
+  it("marks the engine change in every panel", () => {
+    const { container } = render(TrendsPage, { data: crossing() });
+    expect(container.querySelectorAll("line.marker")).toHaveLength(2);
+  });
+
+  it("marks the engine change in the focus chart", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=critical");
+    const { container } = render(TrendsPage, { data: crossing() });
+    expect(container.querySelectorAll("line.marker")).toHaveLength(1);
+  });
+
+  it("mirrors snapshots times buckets in the hidden table", () => {
+    render(TrendsPage, { data: crossing() });
+    const table = screen.getByRole("table", { name: "Domain health per snapshot" });
+    const rows = within(table).getAllByRole("row");
+    expect(rows).toHaveLength(3);
+    expect(within(rows[2]).getAllByRole("cell").map((c) => c.textContent)).toEqual([
+      "2026-08-15",
+      "v1.6.6",
+      "6",
+      "4"
+    ]);
+  });
+
+  it("shows shares under ?scale=share", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&scale=share");
+    render(TrendsPage, { data: crossing() });
+    const critical = screen.getByRole("region", { name: "Critical" });
+    expect(critical.querySelector(".panel-value")?.textContent).toBe("40%");
+    expect(critical.querySelector(".panel-delta")?.textContent).toBe("+20%");
+  });
+
+  it.each([
+    { button: "Critical", want: "key=critical" },
+    { button: "Stacked", want: "view=stacked" },
+    { button: "Share", want: "scale=share" }
+  ])("navigates to $want from the $button button", async ({ button, want }) => {
+    render(TrendsPage, { data: crossing() });
+    await fireEvent.click(screen.getByRole("button", { name: button }));
+    expect(vi.mocked(goto).mock.calls.at(-1)?.[0]).toContain(want);
   });
 });

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/scoring"
@@ -684,5 +685,94 @@ func TestReportKeepsFindingsWhenFloorsAgree(t *testing.T) {
 	}
 	if len(report.Domains) != 1 || report.Domains[0].Category != ReportCategoryReal {
 		t.Fatalf("domains = %+v, want one real mover", report.Domains)
+	}
+}
+
+// transitionViews is a pair of snapshots covering held, moved, level-only, ungraded, added and removed domains.
+func transitionViews() (from, to []AnalysisSnapshotDomainView) {
+	ds07 := []DomainViewTag{{Tag: "DS07_NOT_SIGNED", Module: "DNSSEC", Level: "ERROR"}}
+	z15 := []DomainViewTag{{Tag: "Z15_NO_CAA", Module: "ZONE", Level: "NOTICE"}}
+	from = []AnalysisSnapshotDomainView{
+		{DomainName: "held.example", Score: intPtr(95), Grade: "A", WorstLevel: "WARNING"},
+		{DomainName: "held2.example", Score: intPtr(100), Grade: "A"},
+		{DomainName: "engine.example", Score: intPtr(100), Grade: "A"},
+		{DomainName: "real.example", Score: intPtr(80), Grade: "B", WorstLevel: "ERROR", Tags: ds07},
+		{DomainName: "levelonly.example", Score: intPtr(95), Grade: "A", WorstLevel: "WARNING"},
+		{DomainName: "ungraded.example"},
+		{DomainName: "gone.example", Score: intPtr(50), Grade: "D", WorstLevel: "ERROR"},
+	}
+	to = []AnalysisSnapshotDomainView{
+		{DomainName: "held.example", Score: intPtr(95), Grade: "A", WorstLevel: "WARNING"},
+		{DomainName: "held2.example", Score: intPtr(100), Grade: "A"},
+		{DomainName: "engine.example", Score: intPtr(80), Grade: "B", WorstLevel: "NOTICE", Tags: z15},
+		{DomainName: "real.example", Score: intPtr(100), Grade: "A"},
+		{DomainName: "levelonly.example", Score: intPtr(95), Grade: "A", WorstLevel: "ERROR", Tags: ds07},
+		{DomainName: "ungraded.example", Score: intPtr(100), Grade: "A"},
+		{DomainName: "new.example", Score: intPtr(100), Grade: "A"},
+	}
+	return from, to
+}
+
+func TestBuildReportTransitions(t *testing.T) {
+	cases := []struct {
+		name               string
+		fromVocab, toVocab string
+		wantGrade          []PublicAnalysisReportTransition
+		wantLevel          []PublicAnalysisReportTransition
+	}{
+		{
+			name:      "classified",
+			fromVocab: `{"DNSSEC":{"DS07_NOT_SIGNED":"ERROR"}}`,
+			toVocab:   `{"DNSSEC":{"DS07_NOT_SIGNED":"ERROR"},"ZONE":{"Z15_NO_CAA":"NOTICE"}}`,
+			wantGrade: []PublicAnalysisReportTransition{
+				{From: "", To: "A", Category: ReportCategoryUnknown, Count: 1},
+				{From: "A", To: "A", Count: 3},
+				{From: "A", To: "B", Category: ReportCategoryMeasurement, Count: 1},
+				{From: "B", To: "A", Category: ReportCategoryReal, Count: 1},
+			},
+			wantLevel: []PublicAnalysisReportTransition{
+				{From: "ERROR", To: "OK", Category: ReportCategoryReal, Count: 1},
+				{From: "OK", To: "NOTICE", Category: ReportCategoryMeasurement, Count: 1},
+				{From: "OK", To: "OK", Count: 2},
+				{From: "WARNING", To: "ERROR", Category: ReportCategoryReal, Count: 1},
+				{From: "WARNING", To: "WARNING", Count: 1},
+			},
+		},
+		{
+			name: "without vocabulary",
+			wantGrade: []PublicAnalysisReportTransition{
+				{From: "", To: "A", Category: ReportCategoryUnknown, Count: 1},
+				{From: "A", To: "A", Count: 3},
+				{From: "A", To: "B", Category: ReportCategoryUnknown, Count: 1},
+				{From: "B", To: "A", Category: ReportCategoryUnknown, Count: 1},
+			},
+			wantLevel: []PublicAnalysisReportTransition{
+				{From: "ERROR", To: "OK", Category: ReportCategoryUnknown, Count: 1},
+				{From: "OK", To: "NOTICE", Category: ReportCategoryUnknown, Count: 1},
+				{From: "OK", To: "OK", Count: 2},
+				{From: "WARNING", To: "ERROR", Category: ReportCategoryUnknown, Count: 1},
+				{From: "WARNING", To: "WARNING", Count: 1},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			from, to := transitionViews()
+			report := buildAnalysisReport(reportInput{
+				From:        AnalysisCohortSnapshot{Slug: "s1", Vocabulary: tc.fromVocab},
+				To:          AnalysisCohortSnapshot{Slug: "s2", Vocabulary: tc.toVocab},
+				FromDomains: from,
+				ToDomains:   to,
+				Scoring:     oneCategoryScoring(),
+				MinCluster:  defaultReportMinCluster,
+				MaxSpread:   defaultReportMaxSpread,
+			})
+			if !slices.Equal(report.Transitions.Grade, tc.wantGrade) {
+				t.Errorf("grade transitions = %+v, want %+v", report.Transitions.Grade, tc.wantGrade)
+			}
+			if !slices.Equal(report.Transitions.Level, tc.wantLevel) {
+				t.Errorf("level transitions = %+v, want %+v", report.Transitions.Level, tc.wantLevel)
+			}
+		})
 	}
 }

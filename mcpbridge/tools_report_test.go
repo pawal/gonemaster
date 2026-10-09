@@ -3,6 +3,7 @@ package mcpbridge
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -54,6 +55,13 @@ func TestCohortReport(t *testing.T) {
 	if len(out.Clusters) != 1 || out.Clusters[0].Size != 3 ||
 		out.Clusters[0].Dimensions[0] != "nameserver="+apitest.ReportClusterHost+" (3 of 9)" {
 		t.Fatalf("clusters wrong: %+v", out.Clusters)
+	}
+	wantGrade := []reportTransitionView{
+		{From: "A", To: "A", Count: 2},
+		{From: "B", To: "D", Category: "real", Count: 1},
+	}
+	if !slices.Equal(out.Transitions.Grade, wantGrade) || len(out.Transitions.Level) != 3 {
+		t.Errorf("transitions wrong: %+v", out.Transitions)
 	}
 	if out.Truncated {
 		t.Errorf("nothing was cut, truncated should be false")

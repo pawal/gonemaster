@@ -45,8 +45,10 @@ testcase opens a filtered detail view.
 The UI preserves the active snapshot as visitors click through detail pages.
 Shared links should include `snapshot` when the numbers must remain stable.
 
-Some views add their own parameters: the diff `tab`, the trends focused
-bucket `key` and scale `scale`, and the domains list filters `search`,
+Some views add their own parameters: the diff `tab`, transition dimension
+`dim` and pair filter `from_grade`, `to_grade`, `from_level`, `to_level`, the
+trends form `view`, focused bucket `key` and scale `scale`, and the domains
+list filters `search`,
 `worst_level`, `grade`, and `dnssec_posture`. Back, forward, and shared links
 reproduce the same view.
 
@@ -74,33 +76,74 @@ posture column existed. Rebuilding that snapshot's views fills it in.
 
 ## Trends
 
-The trends page shows how the grade, severity, DNSSEC, and DNSKEY algorithm
-mix changes over time, one stacked bar per snapshot.
+The trends page shows how the severity, grade, DNSSEC posture, and DNSKEY
+algorithm mix of a cohort changes across its snapshots. `view` selects one of
+two forms.
 
-Click a bucket in the legend to focus it: the bars are replaced by a single
-line chart of that bucket across snapshots. `key` holds the focused bucket and
-`scale` switches between share and absolute count. Click the bucket again or
-press Escape to go back. A top-movers panel lists the finding tags that
-changed most between the first and last snapshot shown.
+The default form draws one line chart per bucket. The x axis is the source
+date of each snapshot, so uneven spacing between batches is preserved. Each
+panel has its own y scale, which starts at zero and spans at least 1% of the
+cohort, and at least five domains on the count scale, so a small bucket stays
+readable beside a large one. A panel heading shows the latest value and the
+change since the first snapshot. Hovering a panel selects that snapshot in
+every panel and names its date and engine version below the grid. A dashed
+vertical line marks each snapshot whose engine version differs from the
+previous one; a change across that line may be new engine capability rather
+than a change in the cohort.
+
+`view=stacked` draws one 100% stacked bar per snapshot instead. A segment
+links to the domains list filtered to that bucket and snapshot, and each row
+links to the diff against the previous snapshot.
+
+Selecting a panel title or a legend entry focuses that bucket: one larger line
+chart of the bucket across snapshots. `key` holds the focused bucket. `scale`
+switches the panels and the focus chart between absolute count and share.
+"Show all buckets" or Escape returns to the form selected by `view`. A
+top-movers panel lists the finding tags that changed most between the first
+and last snapshot shown.
 
 ## Snapshot Diffs
 
 The diff view compares two snapshots of a cohort. A summary strip counts how
 many domains regressed, improved, were added, or removed. The change lists
-link each domain, and a grade-transition matrix shows how grades moved. Use
-the swap button to reverse the two snapshots; `tab` selects the active list so
-a shared link opens on the right one. When only a "to" snapshot is chosen, the
-snapshot before it is used as "from".
+link each domain, and a transitions card shows how grades and worst levels
+moved. Use the swap button to reverse the two snapshots; `tab` selects the
+active list so a shared link opens on the right one. When only a "to"
+snapshot is chosen, the snapshot before it is used as "from".
 
 Alongside the per-domain changes it shows a tag-level summary: which finding
 tags appeared, cleared, or changed severity cohort-wide, with domain counts.
 This makes a regression explainable, for example "14 domains regressed;
 DS02_NO_MATCHING_DS appeared on 12 of them".
 
+### Transitions
+
+The transitions card shows how the grade of each domain present in both
+snapshots moved, or its worst level under `dim=level`.
+
+With the report available, a flow draws the values of the "from" snapshot on
+the left and those of the "to" snapshot on the right, best at the top. A
+ribbon is the set of domains that moved from one value to another, its
+thickness proportional to their number, and its fill names their cause: real
+in solid colour, mixed hatched, measurement grey, unknown outlined. Domains
+whose value held are drawn as light bands. Domains added or removed between
+the snapshots enter from a "New" node or leave to a "Removed" node. Hovering
+or focusing a ribbon names its pair, its domain count, and its split by
+cause. When the two snapshots ran different engine versions, the card names
+both.
+
+A matrix below the flow counts the same moves, rows by "from" value and
+columns by "to" value; it is drawn without the report as well. Selecting a
+ribbon or a matrix count opens the grade-changed or worst-level-changed list
+filtered to that pair. `from_grade` and `to_grade`, or `from_level` and
+`to_level`, hold the filter; "Show all" clears it.
+
 ### The Report
 
 The page leads with a provenance banner naming both engine versions, both
 profile names, the tag vocabulary delta and the scoring configuration state.
+When the scoring configuration state is unknown, the banner names the
+snapshot that did not record it.
 Below it, cohort-change tag rows render inline, while engine-driven rows and
 unattributable rows sit behind their own disclosures with their counts
 visible. A Movers tab lists each moving domain with its score delta, the part

@@ -200,6 +200,21 @@ type PublicAnalysisReportCluster struct {
 	Direction string `json:"direction"`
 }
 
+// PublicAnalysisReportTransition counts domains from From to To; equal values count those that held.
+type PublicAnalysisReportTransition struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+	// Category is the moving domains' category; empty on a held row.
+	Category string `json:"category,omitempty"`
+	Count    int    `json:"count"`
+}
+
+// PublicAnalysisReportTransitions covers every domain present on both sides.
+type PublicAnalysisReportTransitions struct {
+	Grade []PublicAnalysisReportTransition `json:"grade"`
+	Level []PublicAnalysisReportTransition `json:"level"`
+}
+
 // PublicAnalysisReportResponse is the /report response: the mechanical part
 // of a cohort comparison, with every change classified.
 type PublicAnalysisReportResponse struct {
@@ -213,6 +228,8 @@ type PublicAnalysisReportResponse struct {
 	Tags       PublicAnalysisReportTags      `json:"tags"`
 	Domains    []PublicAnalysisReportDomain  `json:"domains"`
 	Clusters   []PublicAnalysisReportCluster `json:"clusters"`
+	// Transitions is computed over every domain, not the page.
+	Transitions PublicAnalysisReportTransitions `json:"transitions"`
 	// DomainTotal is every mover, of which Domains carries one page.
 	DomainTotal  int `json:"domain_total"`
 	DomainLimit  int `json:"domain_limit,omitempty"`
@@ -417,6 +434,7 @@ func buildAnalysisReport(in reportInput) PublicAnalysisReportResponse {
 	resp.Domains = buildReportDomains(fromByName, toByName, delta, in.Scoring)
 	resp.Totals = buildReportTotals(fromByName, toByName, resp.Domains)
 	resp.Clusters = buildReportClusters(toByName, resp.Domains, in.MinCluster, in.MaxSpread)
+	resp.Transitions = buildReportTransitions(fromByName, toByName, resp.Domains, delta)
 	resp.DomainTotal = len(resp.Domains)
 	return resp
 }
@@ -558,19 +576,10 @@ func buildReportDomains(
 			d := *to.Score - *from.Score
 			row.ScoreDelta = &d
 		}
-		appeared, cleared, changed := diffDomainTags(from.Tags, to.Tags)
-		engineCount, cohortCount := 0, 0
-		row.Appeared = classifyDomainTags(appeared, func(m reportTagMove) string {
-			return delta.classifyAppeared(m.Tag)
-		}, &engineCount, &cohortCount)
-		row.Cleared = classifyDomainTags(cleared, func(m reportTagMove) string {
-			return delta.classifyCleared(m.Tag)
-		}, &engineCount, &cohortCount)
-		row.LevelChanged = classifyDomainTags(changed, func(m reportTagMove) string {
-			return delta.classifyLevelMove(m.Tag, m.FromLevel, m.ToLevel)
-		}, &engineCount, &cohortCount)
-		row.Category = domainCategory(delta.available, engineCount, cohortCount)
-		row.ExplainedDelta = explainScoreDelta(cfg, appeared, cleared, changed)
+		moves := classifyDomainMoves(from, to, delta)
+		row.Appeared, row.Cleared, row.LevelChanged = moves.appearedRows, moves.clearedRows, moves.changedRows
+		row.Category = moves.category
+		row.ExplainedDelta = explainScoreDelta(cfg, moves.appeared, moves.cleared, moves.changed)
 		if row.ScoreDelta != nil {
 			row.UnexplainedDelta = *row.ScoreDelta - row.ExplainedDelta
 		}
@@ -582,6 +591,89 @@ func buildReportDomains(
 			return di < dj
 		}
 		return out[i].Domain < out[j].Domain
+	})
+	return out
+}
+
+// classifiedMoves is one domain's finding changes and the category they roll up to.
+type classifiedMoves struct {
+	appeared, cleared, changed             []reportTagMove
+	appearedRows, clearedRows, changedRows []PublicAnalysisReportTagChange
+	category                               string
+}
+
+func classifyDomainMoves(from, to AnalysisSnapshotDomainView, delta reportVocabularyDelta) classifiedMoves {
+	var c classifiedMoves
+	c.appeared, c.cleared, c.changed = diffDomainTags(from.Tags, to.Tags)
+	engineCount, cohortCount := 0, 0
+	c.appearedRows = classifyDomainTags(c.appeared, func(m reportTagMove) string {
+		return delta.classifyAppeared(m.Tag)
+	}, &engineCount, &cohortCount)
+	c.clearedRows = classifyDomainTags(c.cleared, func(m reportTagMove) string {
+		return delta.classifyCleared(m.Tag)
+	}, &engineCount, &cohortCount)
+	c.changedRows = classifyDomainTags(c.changed, func(m reportTagMove) string {
+		return delta.classifyLevelMove(m.Tag, m.FromLevel, m.ToLevel)
+	}, &engineCount, &cohortCount)
+	c.category = domainCategory(delta.available, engineCount, cohortCount)
+	return c
+}
+
+// buildReportTransitions counts grade and worst-level moves over every domain on both sides.
+func buildReportTransitions(
+	fromByName, toByName map[string]AnalysisSnapshotDomainView,
+	domains []PublicAnalysisReportDomain,
+	delta reportVocabularyDelta,
+) PublicAnalysisReportTransitions {
+	categories := make(map[string]string, len(domains))
+	for _, d := range domains {
+		categories[d.Domain] = d.Category
+	}
+	grade := map[PublicAnalysisReportTransition]int{}
+	level := map[PublicAnalysisReportTransition]int{}
+	for name, to := range toByName {
+		from, ok := fromByName[name]
+		if !ok {
+			continue
+		}
+		// A worst-level move without a score move is not a mover.
+		category := func() string {
+			if c, ok := categories[name]; ok {
+				return c
+			}
+			c := classifyDomainMoves(from, to, delta).category
+			categories[name] = c
+			return c
+		}
+		g := PublicAnalysisReportTransition{From: from.Grade, To: to.Grade}
+		if g.From != g.To {
+			g.Category = category()
+		}
+		grade[g]++
+		l := PublicAnalysisReportTransition{From: severityBucket(from.WorstLevel), To: severityBucket(to.WorstLevel)}
+		if l.From != l.To {
+			l.Category = category()
+		}
+		level[l]++
+	}
+	return PublicAnalysisReportTransitions{Grade: transitionRows(grade), Level: transitionRows(level)}
+}
+
+func transitionRows(counts map[PublicAnalysisReportTransition]int) []PublicAnalysisReportTransition {
+	out := make([]PublicAnalysisReportTransition, 0, len(counts))
+	for k, n := range counts {
+		k.Count = n
+		out = append(out, k)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.From != b.From {
+			return a.From < b.From
+		}
+		if a.To != b.To {
+			return a.To < b.To
+		}
+		return a.Category < b.Category
 	})
 	return out
 }

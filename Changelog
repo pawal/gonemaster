@@ -4,9 +4,16 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- server, mcp: the cohort report counts grade and worst-level transitions per domain category
+- analysis-ui: the diff page draws grade and worst-level transitions as a flow split by cause, and each matrix count links to its domains
+
 ### Changed
 
 - tools: `spec-check` fails on a stale possible-tags inventory
+- analysis-ui: trends draw one line chart per bucket on a date axis with engine changes marked; the stacked bars move to `view=stacked`
+- analysis-ui: the diff page and the report export name the snapshot whose scoring configuration was not recorded
 
 ### Fixed
 

@@ -1,6 +1,7 @@
 import { appNavigation, appPaths, appState, loadEvent, reportFixture, stubResponse } from "../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/svelte";
+import { fireEvent, render, screen, within } from "@testing-library/svelte";
+import { goto } from "$app/navigation";
 import { load, type DiffPageData } from "./+page";
 import { previousSlug } from "$lib/diff";
 import type { DiffResponse, TagDiffResponse } from "$lib/api";
@@ -278,6 +279,8 @@ describe("diff report", () => {
         ...base,
         header: {
           ...base.header,
+          from: { ...base.header.from, scoring_config_hash: undefined },
+          to: { ...base.header.to, scoring_config_hash: "default" },
           vocabulary: { ...base.header.vocabulary, from_available: false },
           scoring_config_changed: "unknown"
         }
@@ -285,7 +288,8 @@ describe("diff report", () => {
     });
     const banner = container.querySelector(".provenance");
     expect(banner?.textContent).toContain("tag vocabulary is unknown");
-    expect(banner?.textContent).toContain("provenance is unknown");
+    expect(banner?.textContent).toContain("The scoring configuration was not recorded for");
+    expect(banner?.textContent).toContain("the From snapshot, so a score move");
   });
 
   it("counts the movers by cause and lists the clusters", () => {
@@ -328,5 +332,75 @@ describe("diff report", () => {
     const disclosure = section.getByText("1 explained by the engine's tag vocabulary");
     expect(disclosure.closest("details")).not.toBeNull();
     expect(section.getByRole("link", { name: "Z15_NO_CAA" })).toBeInTheDocument();
+  });
+});
+
+describe("diff transitions", () => {
+  const transitions = {
+    grade: [
+      { from: "A", to: "A", count: 40 },
+      { from: "A", to: "D", category: "measurement" as const, count: 3 },
+      { from: "B", to: "D", category: "real" as const, count: 1 }
+    ],
+    level: [
+      { from: "NOTICE", to: "ERROR", category: "real" as const, count: 1 },
+      { from: "WARNING", to: "WARNING", count: 40 }
+    ]
+  };
+  const renderWith = (search: string, overrides: Partial<DiffPageData> = {}) => {
+    h.url = new URL(`http://localhost/analysis/diff?from=s1&to=s2${search}`);
+    return render(DiffPage, {
+      data: pageData({ report: reportFixture({ transitions }), ...overrides })
+    });
+  };
+
+  it("draws the grade flow from the report and links each ribbon to its pair", () => {
+    renderWith("&tab=grade_changed");
+    const flow = screen.getByRole("group", { name: "Grade transitions" });
+    const ribbon = within(flow).getByRole("link", { name: "A to D, measurement: 3 domains" });
+    const href = new URL(ribbon.getAttribute("href")!, "http://localhost");
+    expect(href.searchParams.get("tab")).toBe("grade_changed");
+    expect(href.searchParams.get("from_grade")).toBe("A");
+    expect(href.searchParams.get("to_grade")).toBe("D");
+  });
+
+  it("names both engines above the flow when they differ", () => {
+    renderWith("", {
+      diff: { ...sampleDiff, engine: { from_engine_version: "v1.7.7", to_engine_version: "v1.7.14", crossed_engine_versions: true } }
+    });
+    const card = within(screen.getByRole("region", { name: "Transitions" }));
+    expect(card.getByText(/A measurement ribbon is a move the change of\s+tag vocabulary explains/)).toBeInTheDocument();
+  });
+
+  it("links each matrix count to its pair and splits it by cause", () => {
+    renderWith("&tab=added");
+    const cell = screen.getByRole("link", { name: "1" });
+    expect(cell.getAttribute("title")).toBe("B → D: 1 domain; 1 real");
+    expect(new URL(cell.getAttribute("href")!, "http://localhost").searchParams.get("to_grade")).toBe("D");
+  });
+
+  it("keeps the matrix and drops the flow on a server without transitions", () => {
+    h.url = new URL("http://localhost/analysis/diff?from=s1&to=s2&tab=grade_changed");
+    render(DiffPage, { data: pageData({ report: reportFixture() }) });
+    expect(screen.queryByRole("group", { name: "Grade transitions" })).toBeNull();
+    expect(screen.getByRole("link", { name: "1" })).toBeInTheDocument();
+  });
+
+  it("lists only the selected pair and clears it on request", async () => {
+    renderWith("&tab=grade_changed&from_grade=A&to_grade=F");
+    expect(screen.queryByRole("link", { name: "reg.se" })).toBeNull();
+    expect(screen.getByText(/Showing A → F only\./)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    const target = new URL(vi.mocked(goto).mock.calls.at(-1)![0] as string, "http://localhost");
+    expect(target.searchParams.has("from_grade")).toBe(false);
+    expect(target.searchParams.get("tab")).toBe("grade_changed");
+  });
+
+  it("switches the flow and the matrix to worst levels under ?dim=level", () => {
+    renderWith("&dim=level&tab=level_changed&from_level=NOTICE&to_level=ERROR");
+    expect(screen.getByRole("heading", { name: "Worst-level transitions" })).toBeInTheDocument();
+    const flow = screen.getByRole("group", { name: "Worst-level transitions" });
+    expect(within(flow).getByRole("link", { name: "NOTICE to ERROR, real: 1 domain" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "lvl.se" })).toBeInTheDocument();
   });
 });

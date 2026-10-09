@@ -226,7 +226,9 @@ state, tag floor, profiles), `totals`, `tags_appeared`, `tags_cleared`,
 `tags_level_changed` (each with `classification`: `new_in_engine`,
 `removed_from_engine`, `level_reclassified`, `cohort_change`, `unknown`),
 `movers` (each with `category`: `real`, `measurement`, `mixed`, `unknown`),
-`clusters`, `truncated`. The model is described in
+`clusters`, `transitions` (`grade` and `level` rows of `from`, `to`,
+`category`, `count` over every domain on both sides), `truncated`. The model
+is described in
 [../analysis/cohort-report.md](../analysis/cohort-report.md).
 
 ## Write tools

@@ -4304,7 +4304,7 @@ components:
 
     PublicAnalysisReportResponse:
       type: object
-      required: [dataset_tag, from_slug, to_slug, min_cluster, max_spread, header, totals, tags, domains, clusters, domain_total]
+      required: [dataset_tag, from_slug, to_slug, min_cluster, max_spread, header, totals, tags, domains, clusters, transitions, domain_total]
       properties:
         dataset_tag:
           type: string
@@ -4330,11 +4330,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PublicAnalysisReportCluster'
+        transitions:
+          $ref: '#/components/schemas/PublicAnalysisReportTransitions'
         domain_total:
           type: integer
           description: >-
             Movers in the whole comparison. The domains array carries one
-            page of them; totals, tags and clusters cover all of them.
+            page of them; totals, tags, clusters and transitions cover all
+            of them.
         domain_limit:
           type: integer
         domain_offset:
@@ -4591,6 +4594,41 @@ components:
         direction:
           type: string
           enum: [improved, regressed]
+
+    PublicAnalysisReportTransitions:
+      type: object
+      description: >-
+        Grade and worst-level transitions over every domain present in both
+        snapshots. Domains added or removed between them are not counted.
+      required: [grade, level]
+      properties:
+        grade:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTransition'
+        level:
+          type: array
+          description: Worst levels are OK, NOTICE, WARNING, ERROR or CRITICAL.
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTransition'
+
+    PublicAnalysisReportTransition:
+      type: object
+      description: >-
+        Domains whose value moved from `from` to `to`, per domain category.
+        A row with equal `from` and `to` counts the domains whose value held
+        and carries no category. An empty grade is an ungraded run.
+      required: [from, to, count]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        category:
+          type: string
+          enum: [real, measurement, mixed, unknown]
+        count:
+          type: integer
 
     PublicAnalysisReportClusterDimension:
       type: object

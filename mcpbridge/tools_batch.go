@@ -465,6 +465,7 @@ type cohortReportOutput struct {
 	TagsLevelChanged []cohortReportTag      `json:"tags_level_changed"`
 	Movers           []cohortReportMover    `json:"movers" jsonschema:"biggest score movements first, in either direction"`
 	Clusters         []cohortReportCluster  `json:"clusters" jsonschema:"movers that moved together and share a nameserver, ASN, prefix or software version"`
+	Transitions      reportTransitionsView  `json:"transitions" jsonschema:"grade and worst-level moves of every domain on both sides, by domain category"`
 	Truncated        bool                   `json:"truncated" jsonschema:"true when a list was cut to limit"`
 }
 
@@ -676,6 +677,7 @@ func registerCohortReport(srv *mcp.Server, api *Client) {
 			}
 			out.Clusters = append(out.Clusters, cluster)
 		}
+		out.Transitions = report.Transitions
 		return nil, out, nil
 	})
 }

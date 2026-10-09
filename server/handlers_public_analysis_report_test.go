@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -285,6 +286,32 @@ func TestPublicAnalysisReportPagesMovers(t *testing.T) {
 			getPublic(t, f.srv, f.reportURL(older.Slug, "offset=99")), http.StatusOK)
 		if len(past.Domains) != 0 || past.DomainTotal != 2 {
 			t.Errorf("offset past the end = %d of %d, want 0 of 2", len(past.Domains), past.DomainTotal)
+		}
+	})
+}
+
+// Transitions cover every domain on both sides, not the page of movers served.
+func TestPublicAnalysisReportTransitionsIgnorePaging(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		older := seedReportPair(t, f)
+		page := mustJSON[PublicAnalysisReportResponse](t,
+			getPublic(t, f.srv, f.reportURL(older.Slug, "limit=1&offset=1")), http.StatusOK)
+		if len(page.Domains) != 1 || page.Domains[0].Domain != "a.example" {
+			t.Fatalf("page = %+v, want a.example alone", page.Domains)
+		}
+		wantGrade := []PublicAnalysisReportTransition{
+			{From: "A", To: "A", Count: 1},
+			{From: "A", To: "B", Category: ReportCategoryReal, Count: 1},
+		}
+		if !slices.Equal(page.Transitions.Grade, wantGrade) {
+			t.Errorf("grade transitions = %+v, want %+v", page.Transitions.Grade, wantGrade)
+		}
+		wantLevel := []PublicAnalysisReportTransition{
+			{From: "OK", To: "ERROR", Category: ReportCategoryReal, Count: 1},
+			{From: "OK", To: "NOTICE", Category: ReportCategoryMeasurement, Count: 1},
+		}
+		if !slices.Equal(page.Transitions.Level, wantLevel) {
+			t.Errorf("level transitions = %+v, want %+v", page.Transitions.Level, wantLevel)
 		}
 	})
 }

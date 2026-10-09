@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- server, mcp: the cohort report counts grade and worst-level transitions per domain category
+
 ### Changed
 
 - tools: `spec-check` fails on a stale possible-tags inventory

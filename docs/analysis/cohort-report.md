@@ -28,8 +28,7 @@ is a superset.
 
 `domains` carries one page of movers, at most 500, selected by `limit` and
 `offset`. `domain_total` is the whole count. The header, the totals, the tag
-rows and the clusters are computed over every mover and do not narrow with
-the page.
+rows, the clusters and the transitions do not narrow with the page.
 
 ## Provenance
 
@@ -84,6 +83,21 @@ Each moving domain rolls its findings up to one cause:
 | `measurement` | Only engine changes moved it. |
 | `mixed` | Both. |
 | `unknown` | Its score moved with no visible finding change: the cause is below the tag floor or outside the findings. |
+
+## Transitions
+
+`transitions.grade` and `transitions.level` count how the grade and the worst
+level of every domain present in both snapshots moved. Each row names `from`,
+`to` and `count`. A row whose `from` and `to` are equal counts the domains
+whose value held and carries no `category`. Every other row carries the
+`category` of the domains it counts, so one `from` and `to` pair yields one
+row per category present.
+
+Worst levels are bucketed as `OK`, `NOTICE`, `WARNING`, `ERROR` and
+`CRITICAL`; `OK` covers a run with no finding at `NOTICE` or above. An empty
+grade is an ungraded run. A domain whose worst level moved while its score
+and grade held is not a mover; its category is computed from its findings
+all the same.
 
 ## Score Attribution
 

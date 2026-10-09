@@ -79,7 +79,7 @@ emit TEST_CASE_END
 | `IPV6_DISABLED` | IPv6 in-domain per-NS-IP check is skipped because IPv6 is disabled. |
 | `NO_NS_CNAME` | No `NS_IS_CNAME` finding was produced in testcase execution. |
 | `NO_RESPONSE` | In-domain `A` query (`RD=0`) produced no DNS message. |
-| `NS_IS_CNAME` | NS name resolves as CNAME in direct or recursive branch. |
+| `NS_IS_CNAME` | NS name resolves as CNAME in direct or recursive branch; RFC 2181 section 10.3 forbids an alias as NS RDATA. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 | `UNEXPECTED_RCODE` | In-domain `A` query (`RD=0`) returned non-`NOERROR` response code. |

@@ -114,8 +114,8 @@ interval is every other name.
 
 - NSEC3 records are ordered by their hashed owner label, the first label of
   the owner name, compared bytewise after lowercasing. Base32hex preserves the
-  order of the hash values, so this is hash order (RFC 5155 section 7.1 step
-  5). The Next Hashed Owner Name is a label in the same encoding.
+  order of the hash values, so this is hash order (RFC 5155 section 1.3).
+  The Next Hashed Owner Name is a label in the same encoding.
 - NSEC records are ordered by canonical name order, which `dns.CompareName`
   implements.
 
@@ -162,12 +162,12 @@ no ERROR DS23 tag and a consistent proof  -> DS23_DENIAL_PROOF_CONSISTENT
 | --- | --- |
 | `DS23_DENIAL_PROOF_CONSISTENT` | No ERROR-level `DS23_*` tag was emitted and at least one nameserver served a proof that passed every rule. |
 | `DS23_MULTIPLE_NSEC3PARAM` | The apex NSEC3PARAM RRset on a nameserver has more than one record. |
-| `DS23_NO_DENIAL_PROOF` | A nameserver that serves an apex DNSKEY RRset answered the probe authoritatively with neither NSEC nor NSEC3 records. |
-| `DS23_NSEC3_CHAIN_NOT_PUBLISHED` | No NSEC3PARAM record at the apex carries the hash algorithm, iterations and salt of the NSEC3 records in the proof. |
-| `DS23_NSEC3_DUPLICATE_NEXT` | Two NSEC3 records in one response have distinct owner names and the same Next Hashed Owner Name. |
-| `DS23_NSEC3_MIXED_PARAMETERS` | The NSEC3 records in one response do not share hash algorithm, iterations and salt. |
-| `DS23_NSEC3_RANGES_OVERLAP` | The owner name of one NSEC3 record lies strictly inside the interval of another, and the pair is not reported as a duplicate next field. |
-| `DS23_NSEC_RANGES_OVERLAP` | The owner name of one NSEC record lies strictly inside the interval of another. |
+| `DS23_NO_DENIAL_PROOF` | A nameserver that serves an apex DNSKEY RRset answered the probe authoritatively with neither NSEC nor NSEC3 records (RFC 4035 section 3.1.3, RFC 5155 section 7.2). |
+| `DS23_NSEC3_CHAIN_NOT_PUBLISHED` | No NSEC3PARAM record at the apex carries the hash algorithm, iterations and salt of the NSEC3 records in the proof (RFC 5155 section 7.3). |
+| `DS23_NSEC3_DUPLICATE_NEXT` | Two NSEC3 records in one response have distinct owner names and the same Next Hashed Owner Name (RFC 5155 section 3.1.7). |
+| `DS23_NSEC3_MIXED_PARAMETERS` | The NSEC3 records in one response do not share hash algorithm, iterations and salt (RFC 5155 section 7.2). |
+| `DS23_NSEC3_RANGES_OVERLAP` | The owner name of one NSEC3 record lies strictly inside the interval of another, and the pair is not reported as a duplicate next field (RFC 5155 section 3.1.7). |
+| `DS23_NSEC_RANGES_OVERLAP` | The owner name of one NSEC record lies strictly inside the interval of another (RFC 4034 section 4.1.1, RFC 4470 section 3). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`A`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`A`). |
 | `TEST_CASE_END` | Testcase end marker is emitted. |
@@ -257,9 +257,9 @@ no ERROR DS23 tag and a consistent proof  -> DS23_DENIAL_PROOF_CONSISTENT
   checked: no rule computes a hash.
 - `DS23_NSEC3_CHAIN_NOT_PUBLISHED` fires during a transition to NSEC3 when a
   nameserver serves the new chain before the NSEC3PARAM RRset is added, which
-  RFC 5155 section 10.4 step 3 forbids, and during a transition away from a
-  chain when the NSEC3PARAM record is removed before the server stops serving
-  the chain.
+  RFC 5155 section 10.4 steps 2 and 3 forbid, and during a transition away
+  from a chain when the NSEC3PARAM record is removed before the server stops
+  serving the chain.
 - Records are not verified cryptographically and signatures are not read.
   DNSSEC10 owns NSEC and NSEC3 signature checks.
 - Several nameserver names sharing one IP are evaluated once; the `servers`
@@ -288,11 +288,12 @@ Implementation-defined choices, none of them mandated by the protocol:
 - Related tests:
   - `engine/test/dnssec/dnssec23_test.go`.
 - References:
-  - RFC 4034 section 4.1.1 (NSEC Next Domain Name and the last record of the
-    zone) and section 6.1 (canonical name order).
+  - RFC 4034 sections 4.1.1 (NSEC Next Domain Name and the last record of the
+    zone) and 6.1 (canonical name order).
   - RFC 4035 section 3.1.3 (denial of existence in authoritative responses).
-  - RFC 4470 (minimally covering NSEC records).
-  - RFC 5155 section 7.1 (NSEC3 chain construction), 7.2 (one chain per
-    response), 7.3 (NSEC3PARAM as the chain indication), 7.5 (dynamic update)
-    and 10.4 (transition order).
+  - RFC 4470 section 3 (minimally covering NSEC records).
+  - RFC 5155 sections 1.3 (hash order), 3.1.7 (Next Hashed Owner Name), 7.1
+    (NSEC3 chain construction), 7.2 (one chain per response), 7.3 (NSEC3PARAM
+    as the chain indication), 7.5 (dynamic update) and 10.4 (transition
+    order).
   - RFC 9824 (compact denial of existence).

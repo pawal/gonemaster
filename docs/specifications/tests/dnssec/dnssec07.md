@@ -49,7 +49,7 @@ Status: Final
      as a delegation, read from the response already in hand:
      - The NSEC record whose owner is the zone name, or the NSEC3 record whose
        owner matches the hash of the zone name computed with the salt and
-       iteration count of that record:
+       iteration count of that record (RFC 5155 section 5):
        - Type bitmap with the NS bit: `delegated`. The parent delegates the
          name and the delegation is insecure.
        - Type bitmap without the NS bit: `denied`. The parent proves no
@@ -84,7 +84,8 @@ Status: Final
     4. The parent zone is anchored: query the parent zone's `DS` at a
        grandparent nameserver and the parent zone's apex `DNSKEY` at a parent
        nameserver, both with DNSSEC enabled. The DS RRset MUST carry an RRSIG,
-       a DNSKEY of the parent MUST match a DS by keytag, algorithm and digest,
+       a DNSKEY of the parent MUST match a DS by keytag, algorithm and digest
+       (RFC 4035 section 5.2),
        and the RRSIG covering the NSEC or NSEC3 of step 7 MUST verify under a
        DNSKEY of the parent. A signature whose algorithm the local verifier
        cannot process yields no verdict.
@@ -178,9 +179,9 @@ emit TEST_CASE_END
 | `DS07_NOT_SIGNED` | Zone is determined not signed by child-evaluation logic. |
 | `DS07_NOT_SIGNED_ON_SERVER` | Child nameservers whose DNSKEY response carries no RRSIG covering DNSKEY, either because the DNSKEY RRset is absent or because it is unsigned. |
 | `DS07_NO_DS_ON_PARENT_SERVER` | At least one parent nameserver returned no DS-signature evidence and at least one other parent nameserver did - i.e., the parent is inconsistent. Suppressed when every parent fails. |
-| `DS07_NO_DS_FOR_SIGNED_ZONE` | Zone is considered signed but no parent DS-present evidence exists. |
+| `DS07_NO_DS_FOR_SIGNED_ZONE` | Zone is considered signed but no parent DS-present evidence exists (RFC 4035 section 2.4). |
 | `DS07_NO_RESPONSE_DNSKEY` | Child nameservers did not respond to DNSKEY query. |
-| `DS07_PARENT_PROVES_NO_DELEGATION` | The child zone is signed, no parent nameserver has a DS, the NSEC or NSEC3 record matching the zone name in the parent carries no NS bit, and the parent zone is anchored by a DS at its own parent. |
+| `DS07_PARENT_PROVES_NO_DELEGATION` | The child zone is signed, no parent nameserver has a DS, the NSEC or NSEC3 record matching the zone name in the parent carries no NS bit (RFC 6840 section 4.4), and the parent zone is anchored by a DS at its own parent. |
 | `DS07_SIGNED` | Zone is determined signed by child-evaluation logic. |
 | `DS07_SIGNED_ON_SERVER` | Child nameservers returned DNSKEY-covering RRSIG evidence. |
 | `DS07_UNEXP_RCODE_RESP_DNSKEY` | Child nameservers returned unexpected DNSKEY query RCODE. |

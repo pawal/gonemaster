@@ -46,7 +46,7 @@ Status: Final
    - Else for `issue`, `issuewild` and `issuemail`, emit `Z15_INVALID_ISSUE_VALUE` when the value fails the issue-value grammar.
    - Else for `iodef`, emit `Z15_INVALID_IODEF_VALUE` when the value is not a valid `mailto:`, `http:` or `https:` URL.
    - The remaining known properties (`contactemail`, `contactphone`, `issuevmc`) are recognized but their values are not validated.
-6. Policy evaluation over the distinct `issue`, `issuewild` and `issuemail` records. Skipped entirely when `Z15_INCONSISTENT_CAA` was emitted, and when the tested apex is the root zone. A record forbids issuance when its value has an empty issuer-domain-name, or when its value failed the grammar (RFC 8659 section 4.2 equates the two):
+6. Policy evaluation over the distinct `issue`, `issuewild` and `issuemail` records. Skipped entirely when `Z15_INCONSISTENT_CAA` was emitted, and when the tested apex is the root zone. A record forbids issuance when its value has an empty issuer-domain-name, or when its value failed the grammar (RFC 8659 section 4.2 and RFC 9495 section 4 equate the two):
    - If `issue` records are present and every `issue` value forbids, and either no `issuewild` record exists or every `issuewild` value forbids, emit `Z15_ISSUANCE_FORBIDDEN`.
    - For each property tag independently, if both a forbidding and a permitting record are present, emit `Z15_ISSUE_CONTRADICTION` with that property tag.
 7. Emit `TEST_CASE_END`.
@@ -134,19 +134,19 @@ emit TEST_CASE_END
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `Z15_CAA_FOUND` | CAA record found at zone apex (consolidated per distinct record content). |
 | `Z15_INCONSISTENT_CAA` | CAA content differs across authoritative nameservers. |
-| `Z15_INVALID_IODEF_VALUE` | An `iodef` value is not a valid `mailto:`, `http:` or `https:` URL. |
-| `Z15_INVALID_ISSUE_VALUE` | An `issue`, `issuewild` or `issuemail` value does not match the RFC 8659 issue-value grammar. |
+| `Z15_INVALID_IODEF_VALUE` | An `iodef` value is not a valid `mailto:`, `http:` or `https:` URL (RFC 8659 section 4.4). |
+| `Z15_INVALID_ISSUE_VALUE` | An `issue`, `issuewild` or `issuemail` value does not match the RFC 8659 section 4.2 issue-value grammar. |
 | `Z15_INVALID_PROPERTY_TAG` | A property tag is empty or contains characters outside ASCII letters and digits. |
-| `Z15_ISSUANCE_FORBIDDEN` | Every `issue` value forbids issuance, and no `issuewild` value permits it. |
-| `Z15_ISSUE_CONTRADICTION` | For one property tag, a forbidding record and a permitting record coexist. |
+| `Z15_ISSUANCE_FORBIDDEN` | Every `issue` value forbids issuance, and no `issuewild` value permits it (RFC 8659 sections 4.2 and 4.3). |
+| `Z15_ISSUE_CONTRADICTION` | For one property tag, a forbidding record and a permitting record coexist (RFC 8659 section 4.2). |
 | `Z15_MIXED_PRESENCE` | CAA present on some nameservers but absent on others. |
 | `Z15_NO_CAA` | No CAA record found at zone apex (consolidated across all nameservers without CAA). |
 | `Z15_NO_CAA_TLD` | No CAA record found at the apex of the root zone or a top-level domain (consolidated). |
 | `Z15_NO_RESPONSE_CAA_QUERY` | No response to the CAA query (consolidated across all silent endpoints). |
-| `Z15_RESERVED_FLAGS` | A CAA record sets flag bits other than the issuer-critical flag. |
-| `Z15_UNEXPECTED_RCODE_CAA` | The CAA query returned a non-NOERROR RCODE (consolidated per distinct RCODE). |
+| `Z15_RESERVED_FLAGS` | A CAA record sets flag bits other than the issuer-critical flag (RFC 8659 section 4.1). |
+| `Z15_UNEXPECTED_RCODE_CAA` | The CAA query returned a non-NOERROR RCODE (RFC 8659 section 6.2; consolidated per distinct RCODE). |
 | `Z15_UNKNOWN_PROPERTY` | A property tag is not in the known set and the issuer-critical flag is not set. |
-| `Z15_UNKNOWN_PROPERTY_CRITICAL` | A property tag is unknown or unusable and the issuer-critical flag is set. |
+| `Z15_UNKNOWN_PROPERTY_CRITICAL` | A property tag is unknown or unusable and the issuer-critical flag is set (RFC 8659 section 4.1). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

@@ -29,7 +29,7 @@ Status: Final
      - Non-`NOERROR` or non-`AA` -> mark `Error Response NSEC Query`.
      - No NSEC3 in authority -> mark `Responds Without NSEC3`.
      - Otherwise mark `Responds With NSEC3`; if multiple NSEC3 RRs exist, also mark `Multiple NSEC3`.
-     - Extract hash algorithm, flags, iterations, and salt length in octets (RFC 5155 section 3.1.5) from every NSEC3 RR in the response. Each distinct value is recorded once per nameserver, so a nameserver serving two NSEC3 chains contributes both parameter sets.
+     - Extract hash algorithm, flags, iterations, and salt length in octets (RFC 5155 section 3.1.4) from every NSEC3 RR in the response. Each distinct value is recorded once per nameserver, so a nameserver serving two NSEC3 chains contributes both parameter sets.
 4. Emit DNSSEC-support summary tags:
    - `DS03_NO_DNSSEC_SUPPORT` if no nameserver had DNSKEY but at least one lacked DNSKEY.
    - `DS03_SERVER_NO_DNSSEC_SUPPORT` if mixed DNSKEY support exists.
@@ -43,7 +43,7 @@ Status: Final
 8. NSEC3 flags checks:
    - Emit `DS03_INCONSISTENT_NSEC3_FLAGS` when more than one flags value appears.
    - For each flags value, emit `DS03_UNASSIGNED_FLAG_USED` for set bits `0..6`.
-   - Determine opt-out from bit `7`:
+   - Determine opt-out from bit `7` (RFC 5155 section 3.1.2.1):
      - Emit `DS03_NSEC3_OPT_OUT_ENABLED_TLD` when bit `7` is set and tested zone is root or single-label TLD.
      - Emit `DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD` when bit `7` is set and zone is not root/single-label TLD.
      - Emit `DS03_NSEC3_OPT_OUT_DISABLED` when bit `7` is unset.
@@ -131,9 +131,9 @@ emit TEST_CASE_END
 | --- | --- |
 | `DS03_ERROR_RESPONSE_NSEC_QUERY` | NSEC query response exists but is non-`NOERROR` or non-`AA`. |
 | `DS03_ERR_MULT_NSEC3` | Authority section contains more than one NSEC3 record. |
-| `DS03_ILLEGAL_HASH_ALGO` | NSEC3 hash algorithm is not `1` (SHA-1). |
-| `DS03_ILLEGAL_ITERATION_VALUE` | NSEC3 iterations value is non-zero. |
-| `DS03_ILLEGAL_SALT_LENGTH` | NSEC3 salt length is non-zero. |
+| `DS03_ILLEGAL_HASH_ALGO` | NSEC3 hash algorithm is not `1` (SHA-1, RFC 5155 section 11). |
+| `DS03_ILLEGAL_ITERATION_VALUE` | NSEC3 iterations value is non-zero (RFC 9276 section 3.1). |
+| `DS03_ILLEGAL_SALT_LENGTH` | NSEC3 salt length is non-zero (RFC 9276 section 3.1). |
 | `DS03_INCONSISTENT_HASH_ALGO` | Different hash algorithm values are observed across nameservers. |
 | `DS03_INCONSISTENT_ITERATION` | Different iteration values are observed across nameservers. |
 | `DS03_INCONSISTENT_NSEC3_FLAGS` | Different NSEC3 flags values are observed across nameservers. |
@@ -145,11 +145,11 @@ emit TEST_CASE_END
 | `DS03_NO_NSEC3` | No queried nameserver returned NSEC3 after usable DNSKEY support was present. |
 | `DS03_NO_RESPONSE_NSEC_QUERY` | NSEC query had no response message. |
 | `DS03_NSEC3_OPT_OUT_DISABLED` | NSEC3 flags have opt-out bit unset. |
-| `DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD` | NSEC3 flags have opt-out bit set for a non-root/non-single-label-TLD zone. |
+| `DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD` | NSEC3 flags have opt-out bit set for a non-root/non-single-label-TLD zone (RFC 9276 section 3.1). |
 | `DS03_NSEC3_OPT_OUT_ENABLED_TLD` | NSEC3 flags have opt-out bit set for root or single-label TLD zone. |
 | `DS03_SERVER_NO_DNSSEC_SUPPORT` | Mixed DNSKEY support exists across nameservers. |
 | `DS03_SERVER_NO_NSEC3` | Mixed NSEC3 support exists across nameservers. |
-| `DS03_UNASSIGNED_FLAG_USED` | One or more unassigned NSEC3 flag bits (`0..6`) are set. |
+| `DS03_UNASSIGNED_FLAG_USED` | One or more unassigned NSEC3 flag bits (`0..6`) are set (RFC 5155 sections 3.1.2 and 7.2). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`/`NSEC`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`/`NSEC`). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -165,7 +165,7 @@ emit TEST_CASE_END
 | `DS03_ILLEGAL_ITERATION_VALUE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with non-zero NSEC3 iterations. |
 | `DS03_ILLEGAL_ITERATION_VALUE` | `int` | `int` | NSEC3 iteration value. |
 | `DS03_ILLEGAL_SALT_LENGTH` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with non-zero salt length. |
-| `DS03_ILLEGAL_SALT_LENGTH` | `int` | `int` | NSEC3 salt length in octets (RFC 5155 section 3.1.5). |
+| `DS03_ILLEGAL_SALT_LENGTH` | `int` | `int` | NSEC3 salt length in octets (RFC 5155 section 3.1.4). |
 | `DS03_INCONSISTENT_HASH_ALGO` | `-` | `-` | No arguments. |
 | `DS03_INCONSISTENT_ITERATION` | `-` | `-` | No arguments. |
 | `DS03_INCONSISTENT_NSEC3_FLAGS` | `-` | `-` | No arguments. |
@@ -225,7 +225,7 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: allows TLD-like classification based on Public Suffix List data for opt-out interpretation. Gonemaster: treats TLD context as only root (`.`) or a direct single-label TLD (no PSL-based classification in this testcase).
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
-  - Upstream: derives the salt length from the hexadecimal representation of the NSEC3 `Salt` field, so `DS03_ILLEGAL_SALT_LENGTH` reports twice the octet count while the message names the value as octets. Gonemaster reports the octet count defined by RFC 5155 section 3.1.5, so a four-octet salt is reported as `4`.
+  - Upstream: derives the salt length from the hexadecimal representation of the NSEC3 `Salt` field, so `DS03_ILLEGAL_SALT_LENGTH` reports twice the octet count while the message names the value as octets. Gonemaster reports the octet count defined by RFC 5155 section 3.1.4, so a four-octet salt is reported as `4`.
 - Potential upstream report:
   - `yes` (the upstream salt length is the hex-string length, which is twice the octet count the message text promises).
 

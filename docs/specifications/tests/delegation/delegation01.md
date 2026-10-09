@@ -17,7 +17,7 @@ Status: Final
   - Raw delegation items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers), which carry in-domain NS names without an address when the referral has no glue for them.
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
-  - Minimum required nameserver count is fixed by `constants.MinimumNumberOfNameservers`.
+  - Minimum required nameserver count is fixed by `constants.MinimumNumberOfNameservers` (two: RFC 1034 section 4.1 overall, RFC 10001 section 4.1 per IP family).
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
@@ -38,7 +38,7 @@ Status: Final
 
 ### In-Domain Glue Presence Check (step 6)
 
-A delegation NS name that lies inside the zone (in-domain) can only be reached if the parent referral carries its address as glue; otherwise a resolver holding only the referral cannot resolve the name (the address lives inside the very zone the name serves). The raw referral view from `DelegationNameservers` is used here rather than [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers), because the latter resolves the name through the recursor and would mask the missing glue.
+A delegation NS name that lies inside the zone (in-domain, RFC 9499 section 7) can only be reached if the parent referral carries its address as glue; otherwise a resolver holding only the referral cannot resolve the name (the address lives inside the very zone the name serves). The raw referral view from `DelegationNameservers` is used here rather than [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers), because the latter resolves the name through the recursor and would mask the missing glue.
 
 {{% expand "Show diagram" %}}
 ```
@@ -89,7 +89,7 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 | `ENOUGH_IPV6_NS_DEL` | Delegation side has at least minimum number of NS names with IPv6 addresses. |
 | `ENOUGH_NS_CHILD` | Child NS name count is at least minimum. |
 | `ENOUGH_NS_DEL` | Delegation NS name count is at least minimum. |
-| `IN_DOMAIN_GLUE_MISSING` | An in-domain delegation NS name has no A/AAAA glue in the parent referral. |
+| `IN_DOMAIN_GLUE_MISSING` | An in-domain delegation NS name has no A/AAAA glue in the parent referral (RFC 1034 section 4.2.1, RFC 9471 section 3.1). |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | Child side has IPv4-addressed NS names, but fewer than minimum. |
 | `NOT_ENOUGH_IPV4_NS_DEL` | Delegation side has IPv4-addressed NS names, but fewer than minimum. |
 | `NOT_ENOUGH_IPV6_NS_CHILD` | Child side has IPv6-addressed NS names, but fewer than minimum. |

@@ -28,7 +28,7 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `RNAME_MISUSED_AT_SIGN` | SOA `RNAME` contains `@`. |
+| `RNAME_MISUSED_AT_SIGN` | SOA `RNAME` contains `@` (RFC 1035 section 8, RFC 1912 section 2.2). |
 | `RNAME_NO_AT_SIGN` | SOA `RNAME` has no `@`. |
 | `NO_RESPONSE_SOA_QUERY` | No usable SOA answer is obtained. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

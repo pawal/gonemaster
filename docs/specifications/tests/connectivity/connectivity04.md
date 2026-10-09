@@ -27,7 +27,7 @@ Status: Final
    - If result code is `EMPTY_ASN_SET`, emit `CN04_EMPTY_PREFIX_SET` (`ns_ip`) and stop processing for that IP.
    - If raw lookup text exists, emit `CN04_ASN_INFOS_RAW` (`ns_ip`, `data`).
    - If prefix exists, emit `CN04_ASN_INFOS_ANNOUNCE_IN` (`ns_ip`, `prefixes`) and store the `(prefix -> ns item)` relation for that IP family.
-5. For each family (IPv4 then IPv6) with stored prefixes:
+5. For each family (IPv4 then IPv6) with stored prefixes, classify topological diversity (RFC 2182 section 3.1):
    - For each prefix group with 2 or more members, emit `CN04_IPV<4|6>_SAME_PREFIX` (`prefixes`, `servers`).
    - Collect members from prefix groups with exactly 1 member and emit `CN04_IPV<4|6>_DIFFERENT_PREFIX` with combined `servers` if non-empty.
    - If exactly one prefix exists for the family and all processed family IPs mapped to that prefix, emit `CN04_IPV<4|6>_SINGLE_PREFIX`.

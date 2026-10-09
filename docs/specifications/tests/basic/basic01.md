@@ -28,7 +28,7 @@ Status: Final
 5. For each probed nameserver address:
    - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) per rrtype (`SOA`, `NS`, `DNAME`) and skip queries on disabled transports.
    - Emit `B01_SERVER_ZONE_ERROR` when response requirements fail.
-   - On `NXDOMAIN`+AA at an intermediate name (not the child itself), additionally probe SOA for the child name on the same nameserver. If that probe returns a referral with NS records for the child, the nameserver is contradicting itself (it denies an ancestor name but still has a deeper delegation, violating RFC 8020). The probe-confirmed referral counts as a valid delegation observation (added to `delegationFound`), and the offending `(parent NS, intermediate name)` pair is recorded for the diagnostic tag. The NS is not added to `aaNXDomain` in this case.
+   - On `NXDOMAIN`+AA at an intermediate name (not the child itself), additionally probe SOA for the child name on the same nameserver. If that probe returns a referral with NS records for the child, the nameserver is contradicting itself (it denies an ancestor name but still has a deeper delegation, violating RFC 8020 section 3.1). The probe-confirmed referral counts as a valid delegation observation (added to `delegationFound`), and the offending `(parent NS, intermediate name)` pair is recorded for the diagnostic tag. The NS is not added to `aaNXDomain` in this case.
 6. Collect parent/delegation observations and emit:
    - `B01_PARENT_FOUND` for discovered parents.
    - `B01_PARENT_UNDETERMINED` when multiple parent candidates exist.
@@ -164,12 +164,12 @@ For each remaining label (BFS from "." down toward child):
 | `B01_PARENT_DISREGARDED` | Fake-address (undelegated) mode is active, so parent search is skipped. |
 | `B01_PARENT_FOUND` | At least one parent zone candidate is identified. |
 | `B01_PARENT_NOT_FOUND` | No parent zone candidate was identified from any probed nameserver response. |
-| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | A parent nameserver returned authoritative NXDOMAIN for an intermediate empty non-terminal but also has a delegation at the child name. The contradiction violates RFC 8020. The zone is still tested via the directly-observed delegation. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | A parent nameserver returned authoritative NXDOMAIN for an intermediate empty non-terminal but also has a delegation at the child name. The contradiction violates RFC 8020 section 3.1. The zone is still tested via the directly-observed delegation. |
 | `B01_PARENT_UNDETERMINED` | Multiple parent zone candidates were identified. |
 | `B01_ROOT_HAS_NO_PARENT` | Child zone is root (`.`). |
 | `B01_SERVER_ZONE_ERROR` | SOA/NS response validation fails for a probed server/query name. |
 | `CNAME_CHAIN_TOO_LONG` | CNAME chain across recursion hops while resolving a discovered NS A/AAAA exceeds `CNAMEMaxChainLength`. |
-| `CNAME_TARGET_UNRESOLVED` | CNAME chain while resolving a discovered NS A/AAAA forms a loop, breaks, or fails qtype match. |
+| `CNAME_TARGET_UNRESOLVED` | CNAME chain while resolving a discovered NS A/AAAA forms a loop, breaks, or fails qtype match (RFC 1034 section 5.2.2). |
 | `CNAME_TOO_MANY_RECORDS` | A single answer for a discovered NS A/AAAA carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for queried rrtype. |
 | `IPV4_ENABLED` | IPv4 transport is enabled for queried rrtype. |
@@ -273,7 +273,7 @@ For each remaining label (BFS from "." down toward child):
 
 ## Implementation Notes
 
-The following behaviors are implementation choices, not mandated by RFC 1034/1035:
+The following behaviors are implementation choices, not mandated by RFC 1034 or RFC 1035:
 
 - **Traversal strategy**: The testcase probes iteratively from root servers using SOA, NS, and DNAME queries, extending the intermediate name toward the child zone at each step.  The DNS protocol specifies the resolution model but does not define how a testcase tool should walk the hierarchy.
 - **One root path below a TLD**: Every root server is probed only when the roots are the parent (a TLD child) or when one root path finds nothing.  Root server faults are a root or TLD issue, not one the owner of a deeper zone can act on.

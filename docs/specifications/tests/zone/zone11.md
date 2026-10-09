@@ -26,7 +26,7 @@ Status: Final
    - Skip disabled transports.
    - Query apex `TXT`.
    - Accept response only when response exists, `RCODE=NOERROR`, and `AA=true`.
-   - Extract TXT records for apex, concatenate fragments per record, lowercase text, and keep only SPF records (`v=spf1` with end/space/tab boundary).
+   - Extract TXT records for apex, concatenate fragments per record (RFC 7208 section 3.3), lowercase text, and keep only SPF records (`v=spf1` with end/space/tab boundary).
    - Store per-IP SPF policy list plus associated nameserver `name/ip` list.
 3. If no IP produced an accepted authoritative response, emit `Z11_UNABLE_TO_CHECK_FOR_SPF`.
 4. Else group per-IP policy sets by a normalized key:
@@ -40,7 +40,7 @@ Status: Final
    - Else evaluate the single effective SPF policy text against the grammar in [SPF Syntax Check](#spf-syntax-check):
      - if syntax invalid, emit `Z11_SPF_SYNTAX_ERROR`;
      - if syntax valid and zone is root/TLD/`.arpa`:
-       - emit `Z11_NULL_SPF_NON_MAIL_DOMAIN` for null SPF (`v=spf1 -all`);
+       - emit `Z11_NULL_SPF_NON_MAIL_DOMAIN` for null SPF (`v=spf1 -all`, RFC 7208 section 10.1.2);
        - else emit `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN`;
      - if syntax valid and zone is regular mail domain, emit `Z11_SPF_SYNTAX_OK`;
      - if syntax valid, emit `Z11_SPF_UNKNOWN_MODIFIER` after the verdict above, once per distinct unknown modifier name in record order, for every zone class.
@@ -111,7 +111,7 @@ emit TEST_CASE_END
 | `Z11_NO_SPF_NON_MAIL_DOMAIN` | No SPF policy found for root/TLD/`.arpa` domain class. |
 | `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN` | Non-null SPF policy found for root/TLD/`.arpa` domain class. |
 | `Z11_NULL_SPF_NON_MAIL_DOMAIN` | Null SPF policy found for root/TLD/`.arpa` domain class. |
-| `Z11_SPF_MULTIPLE_RECORDS` | At least one checked IP returned more than one SPF policy. |
+| `Z11_SPF_MULTIPLE_RECORDS` | At least one checked IP returned more than one SPF policy (RFC 7208 section 3.2). |
 | `Z11_SPF_SYNTAX_ERROR` | Effective SPF policy failed local syntax validation. |
 | `Z11_SPF_SYNTAX_OK` | Effective SPF policy passed local syntax validation. |
 | `Z11_SPF_UNKNOWN_MODIFIER` | Effective SPF policy passed local syntax validation and carries a modifier other than `redirect` and `exp`; one entry per distinct modifier name. |
@@ -179,7 +179,7 @@ macro-string     = *( macro-expand / macro-literal )
 macro-expand     = ( "%{" macro-letter transformers *delimiter "}" )
                    / "%%" / "%_" / "%-"
 macro-literal    = %x21-24 / %x26-7E ; visible characters except "%"
-macro-letter     = "s" / "l" / "o" / "d" / "i" / "p" / "v" / "h" / "c" / "r" / "t"
+macro-letter     = "s" / "l" / "o" / "d" / "i" / "p" / "h" / "c" / "r" / "t" / "v"
 transformers     = *DIGIT [ "r" ]
 delimiter        = "." / "-" / "+" / "," / "/" / "_" / "="
 ```
@@ -187,7 +187,7 @@ delimiter        = "." / "-" / "+" / "," / "/" / "_" / "="
 Consequences relied on by this testcase:
 - `a` and `mx` accept `dual-cidr-length`, so `a:example.com/24`, `a:example.com//64` and `a:example.com/24//64` are all valid. The IPv4 length is bounded to 32 and the IPv6 length to 128. A length with a leading zero, such as `/08`, is outside the grammar and is rejected. The same bounds and the same leading zero rule apply to the `ip4` and `ip6` lengths.
 - A term containing `=` before any `:` is matched as a modifier, before any qualifier is considered, because a qualifier is only permitted on a directive. `-redirect=example.com` is therefore a syntax error, and so is a verification token appended to a directive, such as `-allfoo=bar`. `exists:foo=bar.example.com` is a mechanism, since its `:` precedes the `=`.
-- `redirect` and `exp` take a domain value. Every other `name` is an unknown modifier whose value must match `macro-string`. RFC 7208 section 6 states that "Unrecognized modifiers MUST be ignored no matter where, or how often, they appear in a record", so the record stays valid and each distinct name is reported once with `Z11_SPF_UNKNOWN_MODIFIER`. The RFC 6652 modifiers `ra`, `rp` and `rr` fall in this class.
+- `redirect` and `exp` take a domain value. Every other `name` is an unknown modifier whose value must match `macro-string`. RFC 7208 section 6 states that "Unrecognized modifiers MUST be ignored no matter where, or how often, they appear in a record", so the record stays valid and each distinct name is reported once with `Z11_SPF_UNKNOWN_MODIFIER`. The modifiers `ra`, `rp` and `rr` of RFC 6652 section 3 fall in this class.
 - The name `v` is not accepted as a modifier name. A second `v=spf1` among the terms results from two policies merged into one record, and such a record is reported with `Z11_SPF_SYNTAX_ERROR` rather than as an unknown modifier.
 - `macro-literal` excludes `%`, so a `%` that does not begin a `macro-expand`, such as `%z` or `%{q}`, makes the record invalid.
 
@@ -195,8 +195,8 @@ Consequences relied on by this testcase:
 - Distinct nameserver names sharing one IP are grouped and represented together in `servers` outputs.
 - TXT responses with authoritative `NOERROR` but without SPF TXT records are treated as empty-policy results.
 - `Z11_SPF_UNKNOWN_MODIFIER` is emitted once per distinct modifier name, so a name repeated in the record yields one entry.
-- Unknown modifier values are validated only as `macro-string`. The RFC 6652 values are not checked against the RFC 6652 grammar: a receiver never rejects a record on the content of a modifier it ignores, and the published `rp` grammar disagrees with its own prose (errata 6579, held for document update).
+- Unknown modifier values are validated only as `macro-string`. The RFC 6652 values are not checked against the grammar of RFC 6652 section 3: a receiver never rejects a record on the content of a modifier it ignores, and the published `rp` grammar disagrees with its own prose (errata 6579, held for document update).
 - Domain targets of `include`, `exists`, `redirect`, `exp`, `a`, `mx` and `ptr` are validated with a permissive name check. Macro expansions in a domain target are accepted without being checked against `macro-string`.
-- `ptr` accepts a `dual-cidr-length` suffix although RFC 7208 defines none for it.
+- `ptr` accepts a `dual-cidr-length` suffix although RFC 7208 section 5.5 defines none for it.
 - Duplicate `redirect` or `exp` modifiers are not detected. RFC 7208 section 6 treats them as a permanent error.
 - Runtime boundary markers (`TEST_CASE_START`/`TEST_CASE_END`) are emitted by shared testcase wrappers but omitted from current Zone11 metadata tag contract.

@@ -22,7 +22,7 @@ Status: Final
    - skip disabled transports;
    - return the first response that has SOA in answer and `AA=true`.
 3. If no qualifying SOA response is found, emit `NO_RESPONSE_SOA_QUERY`.
-4. Else read SOA `refresh` and compare against configured minimum:
+4. Else read SOA `refresh` (RFC 1035 section 3.3.13) and compare against configured minimum:
    - if `refresh < required_refresh`, emit `REFRESH_MINIMUM_VALUE_LOWER`;
    - else emit `REFRESH_MINIMUM_VALUE_OK`.
 5. Emit `TEST_CASE_END`.

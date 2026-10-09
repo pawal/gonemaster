@@ -24,7 +24,7 @@ Status: Final
    - skip disabled transports;
    - return the first response that has SOA in answer and `AA=true`.
 3. If no qualifying SOA response is found, emit `NO_RESPONSE_SOA_QUERY`.
-4. Else read SOA `expire` and `refresh` and evaluate:
+4. Else read SOA `expire` and `refresh` (RFC 1035 section 3.3.13) and evaluate:
    - if `expire < required_expire`, emit `EXPIRE_MINIMUM_VALUE_LOWER`;
    - if `expire < refresh`, emit `EXPIRE_LOWER_THAN_REFRESH`;
    - if neither tag above was emitted, emit `EXPIRE_MINIMUM_VALUE_OK`.
@@ -34,7 +34,7 @@ Status: Final
 | Tag | Emitted when |
 | --- | --- |
 | `EXPIRE_LOWER_THAN_REFRESH` | SOA `expire` is lower than SOA `refresh`. |
-| `EXPIRE_MINIMUM_VALUE_LOWER` | SOA `expire` is below configured minimum. |
+| `EXPIRE_MINIMUM_VALUE_LOWER` | SOA `expire` is below configured minimum; RFC 1912 section 2.2 suggests 2 to 4 weeks. |
 | `EXPIRE_MINIMUM_VALUE_OK` | `expire` is not below the configured minimum and not below `refresh`. |
 | `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

@@ -71,7 +71,7 @@ emit TEST_CASE_END
 | `ARE_AUTHORITATIVE` | At least one evaluated nameserver was authoritative and no `IS_NOT_AUTHORITATIVE` tag was emitted. |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `IS_NOT_AUTHORITATIVE` | A SOA response was received with `AA=false` on UDP or TCP. |
+| `IS_NOT_AUTHORITATIVE` | A SOA response was received with `AA=false` (RFC 1035 section 4.1.1) on UDP or TCP; NS-listed servers are authoritative for the zone (RFC 2181 section 6.1). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

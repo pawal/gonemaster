@@ -38,7 +38,7 @@ Status: Final
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `SOA_EXISTS` | Nameserver set is non-empty and no `SOA_NOT_EXISTS` tag was emitted. |
-| `SOA_NOT_EXISTS` | SOA query returned `NOERROR` but answer section had no SOA RR. |
+| `SOA_NOT_EXISTS` | SOA query returned `NOERROR` but answer section had no SOA RR, which RFC 2181 section 6.1 makes mandatory in every zone. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

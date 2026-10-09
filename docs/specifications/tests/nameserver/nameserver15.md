@@ -50,7 +50,7 @@ Status: Final
 | `N15_ERROR_ON_VERSION_QUERY` | TXT/CH query failed, had no response, or returned SERVFAIL for a version query name. |
 | `N15_NO_VERSION_REVEALED` | Nameserver passed baseline SOA probe but revealed no non-empty version string. |
 | `N15_SOFTWARE_VERSION` | Non-empty version string was returned for a version query name. |
-| `N15_WRONG_CLASS` | TXT answer RR class was not CHAOS (`CH`) on a CH query. |
+| `N15_WRONG_CLASS` | TXT answer RR class was not CHAOS (`CH`) on a CH query; a QCLASS matches just that class (RFC 1034 section 3.7.1). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

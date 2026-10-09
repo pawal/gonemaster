@@ -31,7 +31,7 @@ Status: Final
 | --- | --- |
 | `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `REFRESH_HIGHER_THAN_RETRY` | SOA `refresh` is greater than SOA `retry`. |
-| `REFRESH_LOWER_THAN_RETRY` | SOA `retry` is greater than or equal to SOA `refresh`. |
+| `REFRESH_LOWER_THAN_RETRY` | SOA `retry` is greater than or equal to SOA `refresh`; RFC 1912 section 2.2 describes `retry` as typically a fraction of `refresh`. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

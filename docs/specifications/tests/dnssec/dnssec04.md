@@ -27,7 +27,7 @@ Status: Final
 5. Collect `RRSIG` records from answer sections of both responses.
 6. Load thresholds from profile (`REMAINING_SHORT`, `REMAINING_LONG`, `DURATION_LONG`) and compute current reference time from DNSKEY packet timestamp.
 7. For each RRSIG:
-   - Emit `RRSIG_EXPIRATION` with UTC expiration timestamp in RFC3339 format, keytag, and covered RR type.
+   - Emit `RRSIG_EXPIRATION` with UTC expiration timestamp in RFC 3339 format, keytag, and covered RR type.
    - Compute remaining time (`expiration - now`) and emit one of:
      - `RRSIG_EXPIRED` if remaining is negative,
      - `REMAINING_SHORT` if remaining is below short threshold,
@@ -53,7 +53,7 @@ thresholds = profile.test_cases_vars.dnssec04
 now = packetTime(DNSKEY response)
 
 For each RRSIG:
-   emit RRSIG_EXPIRATION (date in RFC3339, keytag, types)
+   emit RRSIG_EXPIRATION (date in RFC 3339, keytag, types)
 
    remaining = sig.Expiration - now
      remaining < 0                       -> RRSIG_EXPIRED      (expiration, keytag, types)
@@ -78,7 +78,7 @@ emit TEST_CASE_END
 | `REMAINING_LONG` | Remaining validity (`expiration - now`) is above configured long-remaining threshold. |
 | `REMAINING_SHORT` | Remaining validity (`expiration - now`) is below configured short-remaining threshold and non-negative. |
 | `RRSIG_EXPIRATION` | Per-RRSIG expiration detail is logged. |
-| `RRSIG_EXPIRED` | Signature expiration is already in the past (`expiration < now`). |
+| `RRSIG_EXPIRED` | Signature expiration is already in the past (`expiration < now`; RFC 4034 section 3.1.5). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -127,9 +127,9 @@ emit TEST_CASE_END
 
 ## Implementation Notes
 
-The following behaviors are implementation choices, not mandated by RFC 4034/4035:
+The following behaviors are implementation choices, not mandated by RFC 4034 or RFC 4035:
 
-- **Reference time source**: RRSIG remaining-validity checks use the DNSKEY response packet timestamp as the reference "now", not wall-clock time.  RFC 4034 requires checking whether a signature is currently valid; the specific reference clock is unspecified.  Using the packet timestamp avoids race conditions when queries take time but introduces a subtle inconsistency: if the DNSKEY and SOA responses arrive at different moments, the DNSKEY packet time applies uniformly to all RRSIG records from both responses.  Contrast with `dnssec10`, which uses wall-clock time.
+- **Reference time source**: RRSIG remaining-validity checks use the DNSKEY response packet timestamp as the reference "now", not wall-clock time.  RFC 4034 section 3.1.5 requires checking whether a signature is currently valid; the specific reference clock is unspecified.  Using the packet timestamp avoids race conditions when queries take time but introduces a subtle inconsistency: if the DNSKEY and SOA responses arrive at different moments, the DNSKEY packet time applies uniformly to all RRSIG records from both responses.  Contrast with `dnssec10`, which uses wall-clock time.
 - **Parallel query execution**: When `resolver.defaults.parallel > 1`, DNSKEY and SOA queries run concurrently.  The protocol defines no query ordering requirement; sequential vs concurrent is an implementation choice controlled by `resolver.defaults.parallel`.
 - **`DURATION_OK` gating**: `DURATION_OK` is emitted per RRSIG only when no remaining-time or duration-long tag was emitted for that same RRSIG.  This "no prior finding" gating pattern is not protocol-defined.
 

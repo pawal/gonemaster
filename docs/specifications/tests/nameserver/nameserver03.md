@@ -56,7 +56,7 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `AXFR_AVAILABLE` | AXFR succeeded and the first transfer RR was `SOA`. |
+| `AXFR_AVAILABLE` | AXFR succeeded and the first transfer RR was `SOA` (access restriction: RFC 5936 section 5). |
 | `AXFR_FAILURE` | AXFR call returned an error, or the transfer ended without a record. |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
@@ -98,7 +98,7 @@ emit TEST_CASE_END
 
 The following behaviors are implementation choices, not mandated by RFC 5936 (DNS Zone Transfer Protocol):
 
-- **First-RR-only inspection**: The testcase captures only the first RR from the AXFR response stream and immediately terminates the callback.  RFC 5936 specifies that a valid AXFR transfer begins and ends with the zone SOA record.  Inspecting only the first RR is a deliberate shortcut: if the server sends any RR before the leading SOA it is treated as an unusual response rather than an error.  A full conformance check would also verify the trailing SOA.
+- **First-RR-only inspection**: The testcase captures only the first RR from the AXFR response stream and immediately terminates the callback.  RFC 5936 section 2.2 specifies that a valid AXFR transfer begins and ends with the zone SOA record.  Inspecting only the first RR is a deliberate shortcut: if the server sends any RR before the leading SOA it is treated as an unusual response rather than an error.  A full conformance check would also verify the trailing SOA.
 - **Deduplication by `name/ip`**: Nameservers are deduplicated by their `name/ip` identity string, preserving first-seen order.  The protocol does not define deduplication rules for testcase purposes.
 
 ## Edge Cases And Limitations

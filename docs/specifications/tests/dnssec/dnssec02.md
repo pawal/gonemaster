@@ -32,7 +32,7 @@ Status: Final
    - Mark nameserver as responding.
    - For each DS record:
      - Find DNSKEY candidates by keytag and select a matching candidate (digest-checked when digest type is supported).
-     - A keytag candidate whose DNSKEY algorithm differs from the DS algorithm field is never a match: add keytag/ns with both algorithm values to `DS02_DS_ALGO_DNSKEY_MISMATCH` and skip the candidate. This applies on both the supported-digest and unsupported-digest branches (RFC 4034 section 5.2 requires the DS algorithm field to equal the DNSKEY algorithm).
+     - A keytag candidate whose DNSKEY algorithm differs from the DS algorithm field is never a match: add keytag/ns with both algorithm values to `DS02_DS_ALGO_DNSKEY_MISMATCH` and skip the candidate. This applies on both the supported-digest and unsupported-digest branches (RFC 4035 section 5.2 requires the DS algorithm field to equal the DNSKEY algorithm).
      - If no DNSKEY by keytag exists, add keytag/ns to `DS02_NO_DNSKEY_FOR_DS`.
      - If DNSKEY exists but DS digest check fails, add keytag/ns to `DS02_NO_MATCH_DS_DNSKEY`.
      - If DNSKEY has no ZONE flag, add keytag/ns to `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` and stop processing that DS.
@@ -148,14 +148,14 @@ emit TEST_CASE_END
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | DNSKEY RRSIG verification requires an unsupported algorithm for this build/runtime. |
 | `DS02_DS_ALGO_DNSKEY_MISMATCH` | A DNSKEY matches the DS keytag but the DS algorithm field differs from the DNSKEY algorithm; validating resolvers ignore such a DS record. |
 | `DS02_MATCH_DS_DNSKEY` | A DS-matching DNSKEY validates the DNSKEY RRset; emitted once per such keytag. |
-| `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | DS-matching DNSKEY is found but lacks ZONE flag. |
-| `DS02_DNSKEY_NOT_SEP` | DS-matching DNSKEY is found but lacks SEP flag. |
-| `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | Nameserver has DS-matching DNSKEY(s), but no validating DNSKEY RRSIG from those keys. |
-| `DS02_NO_DNSKEY_FOR_DS` | No DNSKEY with matching keytag exists for DS record. |
-| `DS02_NO_MATCHING_DNSKEY_RRSIG` | No valid DNSKEY-covering RRSIG could be matched to a DS-matching DNSKEY. |
-| `DS02_NO_MATCH_DS_DNSKEY` | DNSKEY keytag match exists but DS digest/algorithm does not match DNSKEY data. |
-| `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | Responding child nameserver has no valid DS-matching DNSKEY for any DS. |
-| `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | Candidate DNSKEY RRSIG was present but failed verification with matching DNSKEY. |
+| `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | DS-matching DNSKEY is found but lacks ZONE flag (RFC 4034 section 5.2). |
+| `DS02_DNSKEY_NOT_SEP` | DS-matching DNSKEY is found but lacks SEP flag (RFC 6781 section 3.2.3). |
+| `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | Nameserver has DS-matching DNSKEY(s), but no validating DNSKEY RRSIG from those keys (RFC 4035 section 5.2). |
+| `DS02_NO_DNSKEY_FOR_DS` | No DNSKEY with matching keytag exists for DS record (RFC 4035 section 2.4). |
+| `DS02_NO_MATCHING_DNSKEY_RRSIG` | No valid DNSKEY-covering RRSIG could be matched to a DS-matching DNSKEY (RFC 4035 section 2.4). |
+| `DS02_NO_MATCH_DS_DNSKEY` | DNSKEY keytag match exists but DS digest/algorithm does not match DNSKEY data (RFC 4034 section 5.1.4). |
+| `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | Responding child nameserver has no valid DS-matching DNSKEY for any DS (RFC 4035 section 5.2). |
+| `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | Candidate DNSKEY RRSIG was present but failed verification with matching DNSKEY (RFC 4035 section 5.3.3). |
 | `DS02_RSA_EXPONENT_UNSUPPORTED` | Candidate DNSKEY RRSIG could not be checked only because the matching DS-linked DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports (more than 64 bits). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DS` or `DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DS` or `DNSKEY`). |
@@ -238,4 +238,4 @@ emit TEST_CASE_END
 - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` and `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` are mutually exclusive by implementation (`else if` branch).
 - A zone whose DS RRset names one key that signs the DNSKEY RRset and one that does not gets `DS02_NO_MATCHING_DNSKEY_RRSIG` for the second keytag and `DS02_MATCH_DS_DNSKEY` for the first. The two findings name different keytags and both hold.
 - DS algorithm field mismatch: a DS whose algorithm field differs from the keytag-matching DNSKEY algorithm never counts as a match. A zone whose only DS has a mismatched algorithm therefore gets both `DS02_DS_ALGO_DNSKEY_MISMATCH` and the summary `DS02_NO_VALID_DNSKEY_FOR_ANY_DS`; a zone with an additional correct DS keeps `DS02_MATCH_DS_DNSKEY` alongside the mismatch tag. The keytag-fallback selection of the candidate for the ZONE/SEP flag checks is unaffected.
-- Large RSA public exponent handling: an RSA DNSKEY the DNS library refuses although RFC 3110 permits it (an exponent of more than 4 bytes or greater than 2^31-1, as with the `.lv` KSK and its exponent of 2^32+1, or a leading zero byte in the exponent or modulus) is verified by gonemaster's own RSA path instead, so its RRSIGs pass or fail like any other. Only when the exponent exceeds 64 bits, a ceiling most validators share, is the finding reclassified from the `ERROR` `DS02_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS02_RSA_EXPONENT_UNSUPPORTED`. Such a key is treated as indeterminate rather than failed: it does not raise `DS02_NO_MATCHING_DNSKEY_RRSIG`, and when it is the sole reason a nameserver has no validating DS-linked key, `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` is suppressed.
+- Large RSA public exponent handling: an RSA DNSKEY the DNS library refuses (an exponent of more than 4 bytes or greater than 2^31-1, as with the `.lv` KSK and its exponent of 2^32+1, which RFC 3110 section 2 permits up to 4096 bits, or a leading zero byte in the exponent or modulus, which RFC 3110 section 2 prohibits) is verified by gonemaster's own RSA path instead, so its RRSIGs pass or fail like any other. Only when the exponent exceeds 64 bits, a ceiling most validators share, is the finding reclassified from the `ERROR` `DS02_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS02_RSA_EXPONENT_UNSUPPORTED`. Such a key is treated as indeterminate rather than failed: it does not raise `DS02_NO_MATCHING_DNSKEY_RRSIG`, and when it is the sole reason a nameserver has no validating DS-linked key, `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` is suppressed.

@@ -23,7 +23,7 @@ Status: Final
    - skip disabled transports;
    - return the first response that has SOA in answer and `AA=true`.
 3. If no qualifying SOA response is found, emit `NO_RESPONSE_SOA_QUERY`.
-4. Else read SOA `minimum` (`Minttl`) and compare against configured bounds:
+4. Else read SOA `minimum` (`Minttl`, the negative caching TTL of RFC 2308 section 4) and compare against configured bounds:
    - if `minimum > highest_minimum`, emit `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER`;
    - else if `minimum < lowest_minimum`, emit `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER`;
    - else emit `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK`.

@@ -4,7 +4,7 @@ Status: Final
 
 ## Purpose
 - Validate that the SPF policy at the zone apex does not exceed the DNS lookup limit defined in RFC 7208 Section 4.6.4.
-- Detect use of the deprecated `ptr` mechanism (RFC 7208 Section 5.5).
+- Detect use of the deprecated `ptr` mechanism (RFC 7208 section 5.5).
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -15,7 +15,7 @@ Status: Final
   - The SPF TXT record at the zone apex.
   - Live DNS resolution for following `include`/`redirect` chains.
 - Profile/config knobs that affect behavior:
-  - `test_cases_vars.zone13.spf_lookup_limit`: maximum allowed DNS-resolving mechanisms (default: `10` per RFC 7208).
+  - `test_cases_vars.zone13.spf_lookup_limit`: maximum allowed DNS-resolving mechanisms (default: `10` per RFC 7208 section 4.6.4).
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped.
   - `resolver.defaults.parallel`: parallel nameserver query fanout.
 
@@ -35,7 +35,7 @@ Status: Final
      - `exists:domain`: count +1.
      - `all`, `ip4:...`, `ip6:...`: do not count (no DNS lookup).
      - `exp=domain`: do not count toward the mechanism limit.
-   - If an `include`/`redirect` target contains an SPF macro (RFC 7208 Section 7), the count is still incremented but the target is not followed; emit `Z13_SPF_MACRO_TARGET`. The sub-tree's lookup count is undecidable at audit time.
+   - If an `include`/`redirect` target contains an SPF macro (RFC 7208 section 7), the count is still incremented but the target is not followed; emit `Z13_SPF_MACRO_TARGET`. The sub-tree's lookup count is undecidable at audit time.
    - If a domain has already been visited during recursion, emit `Z13_SPF_LOOKUP_LOOP` and stop recursing that branch.
    - If an `include`/`redirect` target cannot be resolved, emit `Z13_SPF_RECURSIVE_ERROR` and stop recursing that branch.
    - If a `ptr` or `ptr:domain` mechanism is encountered, emit `Z13_SPF_PTR_DEPRECATED`.
@@ -95,8 +95,8 @@ emit TEST_CASE_END
 | `Z13_SPF_LOOKUP_COUNT_OK` | Total DNS-resolving mechanism count is within the configured limit. |
 | `Z13_SPF_LOOKUP_LOOP` | Recursive `include`/`redirect` chain revisits a previously seen domain. |
 | `Z13_SPF_MACRO_TARGET` | An `include`/`redirect` target contains SPF macros and cannot be followed at audit time. |
-| `Z13_SPF_PTR_DEPRECATED` | SPF record uses the deprecated `ptr` mechanism (RFC 7208 Section 5.5). |
-| `Z13_SPF_RECURSIVE_ERROR` | An `include`/`redirect` target could not be resolved via DNS. |
+| `Z13_SPF_PTR_DEPRECATED` | SPF record uses the deprecated `ptr` mechanism (RFC 7208 section 5.5). |
+| `Z13_SPF_RECURSIVE_ERROR` | An `include`/`redirect` target could not be resolved via DNS (RFC 7208 sections 5.2 and 6.1). |
 | `Z13_UNABLE_TO_CHECK` | No authoritative TXT response could be obtained for the zone apex. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
@@ -142,10 +142,10 @@ emit TEST_CASE_END
 ## Edge Cases And Limitations
 - When Zone11 ran and rejected the apex policy, or found none, the runner does not start Zone13 and no Zone13 tag is emitted.
 - When Zone11 was not selected, Zone13 walks the retrieved policy without syntax validation, because the walk ignores terms it does not recognise. A record Zone11 would have rejected can therefore still yield a lookup count.
-- Root, TLD and `.arpa` zones are analysed whenever Zone11 accepted the published policy. RFC 7208 Section 4.6.4 exempts no zone class.
+- Root, TLD and `.arpa` zones are analysed whenever Zone11 accepted the published policy. RFC 7208 section 4.6.4 exempts no zone class.
 - The test performs live DNS lookups to follow `include`/`redirect` chains. Results may vary depending on network conditions and the state of external DNS records.
 - Loop detection prevents infinite recursion but the count up to the loop detection point is still included in the total.
-- `exp=domain` modifiers are not counted toward the lookup limit per RFC 7208, as they are only evaluated during result explanation and do not affect SPF evaluation.
+- `exp=domain` modifiers are not counted toward the lookup limit per RFC 7208 section 4.6.4, as they are only evaluated during result explanation and do not affect SPF evaluation.
 - The `ptr` mechanism is counted toward the lookup limit AND flagged as deprecated; both tags may be emitted for the same record.
 - Qualified mechanisms (e.g., `+include:`, `-a`, `~mx`) are handled identically to their unqualified forms for counting purposes.
-- SPF macros (RFC 7208 Section 7) are detected by the presence of `%` in an `include`/`redirect` target. Such targets are not resolved because macros (e.g., `%{ir}`, `%{v}`, `%{d}`) are only expanded at SMTP time with a real client IP/sender; the audit emits `Z13_SPF_MACRO_TARGET` and stops recursing that branch. The `+1` lookup itself still counts toward the limit, but any nested lookups in the macro-targeted policy are not counted.
+- SPF macros (RFC 7208 section 7) are detected by the presence of `%` in an `include`/`redirect` target. Such targets are not resolved because macros (e.g., `%{ir}`, `%{v}`, `%{d}`) are only expanded at SMTP time with a real client IP/sender; the audit emits `Z13_SPF_MACRO_TARGET` and stops recursing that branch. The `+1` lookup itself still counts toward the limit, but any nested lookups in the macro-targeted policy are not counted.

@@ -103,13 +103,13 @@ emit TEST_CASE_END
 | Tag | Emitted when |
 | --- | --- |
 | `DS21_ALGO_NOT_SUPPORTED` | DS RRSIG verification requires an unsupported algorithm for this build/runtime. |
-| `DS21_DS_RRSIG_EXPIRED` | DS-covering RRSIG has expired (signature inception/expiration is past). |
-| `DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY` | DS-covering RRSIG was matched to a parent DNSKEY by keytag but cryptographic verification failed. |
+| `DS21_DS_RRSIG_EXPIRED` | DS-covering RRSIG has expired (signature inception/expiration is past, RFC 4035 section 5.3.1). |
+| `DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY` | DS-covering RRSIG was matched to a parent DNSKEY by keytag but cryptographic verification failed (RFC 4035 section 5.3.3). |
 | `DS21_DS_RRSIG_NOT_VERIFIABLE` | At least one parent nameserver returned a DS RRset with RRSIG, but no parent NS produced a DS RRset whose RRSIG verified against a parent DNSKEY. |
-| `DS21_DS_RRSIG_NOT_YET_VALID` | DS-covering RRSIG inception time is in the future. |
+| `DS21_DS_RRSIG_NOT_YET_VALID` | DS-covering RRSIG inception time is in the future (RFC 4035 section 5.3.1). |
 | `DS21_DS_RRSIG_VERIFIED` | At least one parent nameserver returned a DS RRset whose RRSIG verifies against a published parent DNSKEY. |
-| `DS21_NO_DNSKEY_FOR_DS_RRSIG` | DS-covering RRSIG references a keytag for which no parent DNSKEY is published. |
-| `DS21_NO_DS_RRSIG` | Parent nameserver returned the DS RRset without any answer-section RRSIG covering DS. |
+| `DS21_NO_DNSKEY_FOR_DS_RRSIG` | DS-covering RRSIG references a keytag for which no parent DNSKEY is published (RFC 4035 section 5.3.1). |
+| `DS21_NO_DS_RRSIG` | Parent nameserver returned the DS RRset without any answer-section RRSIG covering DS (RFC 4035 sections 2.4 and 3.1.1). |
 | `DS21_NO_PARENT_ZONE` | The zone under test has no resolvable parent (root zone) and the testcase cannot run. |
 | `DS21_PARENT_DNSKEY_MISSING` | Parent nameserver did not return an authoritative apex DNSKEY response, so DS RRSIG verification cannot be attempted. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried parent nameserver (`DS` or `DNSKEY`). |
@@ -192,5 +192,5 @@ The child zone operator cannot fix a parent-zone signing failure, so DNSSEC21 re
 - Related tests (when implemented):
   - `engine/test/dnssec/dnssec_test.go` (synthetic parent NS that returns a DS RRset with an unverifiable RRSIG; regression fixtures using `cachefile.Restore` against captured parent-failure traffic).
 - References:
-  - RFC 4033, 4034, 4035 (DNSSEC).
+  - RFC 4033, RFC 4034, RFC 4035 (DNSSEC).
   - RFC 5155 (NSEC3, parent-side denial-of-DS handling).

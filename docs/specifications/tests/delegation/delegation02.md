@@ -4,6 +4,7 @@ Status: Final
 
 ## Purpose
 - Detect nameserver IP-address reuse within delegation data, within child data, and across the combined delegation+child addressed NS set.
+- NS names sharing one address are not the topologically dispersed servers that RFC 2182 section 3.1 requires.
 
 ## Preconditions And Inputs
 - Preconditions:

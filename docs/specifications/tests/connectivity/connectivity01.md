@@ -25,14 +25,14 @@ Status: Final
 4. For each nameserver (parallelized):
    - If transport for this nameserver IP version is disabled:
      - Emit `IPV4_DISABLED` or `IPV6_DISABLED` for each rrtype (`SOA`, `NS`) and skip queries for that nameserver.
-   - Else query SOA and NS for child zone over UDP.
+   - Else query SOA and NS for child zone over UDP, a transport every DNS server MUST service (RFC 9210 section 3).
    - If both responses are absent, emit `CN01_NO_RESPONSE_UDP`.
-   - Otherwise evaluate SOA and NS responses independently:
+   - Otherwise evaluate SOA and NS responses independently; a server for the zone answers both from the apex NS RRset and SOA RR (RFC 1034 sections 4.2.1 and 4.3.2):
      - No response -> `CN01_NO_RESPONSE_<QTYPE>_QUERY_UDP`.
      - `RCODE != NOERROR` -> `CN01_UNEXPECTED_RCODE_<QTYPE>_QUERY_UDP`.
      - No `<QTYPE>` record in answer -> `CN01_MISSING_<QTYPE>_RECORD_UDP`.
      - First answer owner name differs from child zone -> `CN01_WRONG_<QTYPE>_RECORD_UDP`.
-     - AA flag unset -> `CN01_<QTYPE>_RECORD_NOT_AA_UDP`.
+     - AA flag unset (RFC 1035 section 4.1.1) -> `CN01_<QTYPE>_RECORD_NOT_AA_UDP`.
    - If all checks passed, record nameserver as ok.
 5. If any nameservers passed all checks, emit one `CN01_OK_UDP` with `servers` listing them all.
 6. Emit `TEST_CASE_END`.
@@ -102,7 +102,7 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `CN01_WRONG_NS_RECORD_UDP` | First NS answer owner name is not the child zone name. |
 | `CN01_WRONG_SOA_RECORD_UDP` | First SOA answer owner name is not the child zone name. |
 | `CNAME_CHAIN_TOO_LONG` | A discovered NS hostname's CNAME chain exceeds `CNAMEMaxChainLength` while resolving its address. |
-| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address. |
+| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address (RFC 1034 section 5.2.2). |
 | `CNAME_TOO_MANY_RECORDS` | A single answer while resolving a discovered NS hostname carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for this nameserver/rrtype pair. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for this nameserver/rrtype pair. |

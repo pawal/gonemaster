@@ -89,7 +89,7 @@ emit TEST_CASE_END
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `IS_A_RECURSOR` | Nameserver returned `RA=1` together with at least one record in the ANSWER section on any probe response, or all received probe responses were `NXDOMAIN` without all having `AA=1` while at least one response had `RA=1`. |
+| `IS_A_RECURSOR` | Nameserver returned `RA=1` together with at least one record in the ANSWER section on any probe response, or all received probe responses were `NXDOMAIN` without all having `AA=1` while at least one response had `RA=1` (RFC 1034 section 4.3.1). RFC 5358 section 4 recommends turning recursion off on authoritative-only nameservers. |
 | `NO_RECURSOR` | Nameserver produced responses but did not match recursor criteria and had no `NO_RESPONSE` for probes. |
 | `NO_RESPONSE` | A probe query returned no DNS message. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

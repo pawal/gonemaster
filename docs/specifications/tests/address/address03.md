@@ -22,7 +22,7 @@ Status: Final
 3. Build an ordered unique list by IP string:
    - Keep the first `(nsname, ip)` seen for each unique IP.
 4. For each unique IP, execute a PTR-check task (parallelized):
-   - Compute reverse lookup owner with `dns.ReverseAddr`.
+   - Compute reverse lookup owner with `dns.ReverseAddr` (RFC 1035 section 3.5, RFC 3596 section 2.5).
    - Send recursive PTR query.
    - If response message exists and `RCODE == NOERROR` with at least one PTR answer:
      - Collect PTR target names.
@@ -71,11 +71,11 @@ Module-level gating (in AddressAll):
 | Tag | Emitted when |
 | --- | --- |
 | `CNAME_CHAIN_TOO_LONG` | A discovered NS hostname's CNAME chain exceeds `CNAMEMaxChainLength` while resolving its address. |
-| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address. |
+| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address (RFC 1034 section 5.2.2). |
 | `CNAME_TOO_MANY_RECORDS` | A single answer while resolving a discovered NS hostname carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
 | `NAMESERVER_IP_PTR_MATCH` | All checked IPs returned PTR answers that include their expected nameserver name. |
-| `NAMESERVER_IP_PTR_MISMATCH` | PTR answers exist for an IP, but none matches the expected nameserver name. |
-| `NAMESERVER_IP_WITHOUT_REVERSE` | PTR response is present but not successful (`RCODE != NOERROR`) or has no PTR record. |
+| `NAMESERVER_IP_PTR_MISMATCH` | PTR answers exist for an IP, but none matches the expected nameserver name (RFC 1912 section 2.1). |
+| `NAMESERVER_IP_WITHOUT_REVERSE` | PTR response is present but not successful (`RCODE != NOERROR`) or has no PTR record (RFC 1912 section 2.1). |
 | `NO_RESPONSE_PTR_QUERY` | PTR recursive query returned no response message. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

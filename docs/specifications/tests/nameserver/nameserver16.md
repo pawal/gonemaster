@@ -43,8 +43,8 @@ Status: Final
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `N16_HAS_NSID` | Server included NSID option in response; reports the NSID value and nameservers returning it. |
 | `N16_NO_NSID_REVEALED` | Server responded but did not include NSID option in response. |
-| `N16_NO_RESPONSE` | NSID query produced no DNS response. |
-| `N16_UNEXPECTED_RCODE` | NSID query response had non-`NOERROR` RCODE. |
+| `N16_NO_RESPONSE` | NSID query produced no DNS response (RFC 8906 section 3.2.3). |
+| `N16_UNEXPECTED_RCODE` | NSID query response had non-`NOERROR` RCODE; a responder ignores option codes it does not understand (RFC 6891 section 6.1.2). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

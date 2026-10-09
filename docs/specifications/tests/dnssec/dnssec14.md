@@ -40,10 +40,10 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DNSKEY_RSA_EXPONENT_LARGE` | RSA DNSKEY public exponent is above 2^31-1, beyond what validators built on some cryptographic libraries accept. |
+| `DNSKEY_RSA_EXPONENT_LARGE` | RSA DNSKEY public exponent is above 2^31-1, beyond what validators built on some cryptographic libraries accept. RFC 3110 section 3 recommends a small public exponent. |
 | `DNSKEY_SMALLER_THAN_REC` | RSA DNSKEY size is below recommended size for algorithm. |
-| `DNSKEY_TOO_LARGE_FOR_ALGO` | RSA DNSKEY size is above allowed maximum for algorithm. |
-| `DNSKEY_TOO_SMALL_FOR_ALGO` | RSA DNSKEY size is below allowed minimum for algorithm. |
+| `DNSKEY_TOO_LARGE_FOR_ALGO` | RSA DNSKEY size is above allowed maximum for algorithm (RFC 3110 section 3, RFC 5702 sections 2.1 and 2.2). |
+| `DNSKEY_TOO_SMALL_FOR_ALGO` | RSA DNSKEY size is below allowed minimum for algorithm (RFC 3110 section 3, RFC 5702 sections 2.1 and 2.2). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `KEY_SIZE_OK` | At least one DNSKEY was collected and step 4 emitted no tag. |

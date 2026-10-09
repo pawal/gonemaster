@@ -35,7 +35,7 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `QNAME_CASE_INSENSITIVE` | Response question name does not preserve the randomized query case exactly. |
+| `QNAME_CASE_INSENSITIVE` | Response question name does not preserve the randomized query case exactly (RFC 1034 section 3.1, RFC 4343 section 4). |
 | `QNAME_CASE_SENSITIVE` | Response question name preserves the randomized query case exactly. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

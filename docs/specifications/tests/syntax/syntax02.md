@@ -24,8 +24,8 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `INITIAL_HYPHEN` | A label starts with `-`. |
-| `TERMINAL_HYPHEN` | A label ends with `-`. |
+| `INITIAL_HYPHEN` | A label starts with `-` (RFC 1035 section 2.3.1, RFC 1123 section 2.1). |
+| `TERMINAL_HYPHEN` | A label ends with `-` (RFC 1035 section 2.3.1). |
 | `NO_ENDING_HYPHENS` | Domain labels exist and none starts/ends with `-`. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

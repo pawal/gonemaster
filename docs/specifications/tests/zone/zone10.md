@@ -34,12 +34,12 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `APEX_DNAME` | Single SOA present and nameserver returns a DNAME at the zone apex (legal per RFC 6672, informational). |
-| `MULTIPLE_SOA` | SOA response contains more than one SOA RR in answer section. |
+| `APEX_DNAME` | Single SOA present and nameserver returns a DNAME at the zone apex (legal per RFC 6672 section 2.3, informational). |
+| `MULTIPLE_SOA` | SOA response contains more than one SOA RR in answer section (RFC 1034 section 4.2.1). |
 | `NO_RESPONSE` | Nameserver did not return a DNS response to SOA query. |
 | `NO_SOA_IN_RESPONSE` | Nameserver returned response without SOA in answer section. |
 | `ONE_SOA` | At least one nameserver answered, and no answer produced a finding. |
-| `SOA_AND_CNAME` | Single SOA present and nameserver returns a CNAME at the zone apex alongside the SOA (illegal per RFC 1034 s3.6.2). |
+| `SOA_AND_CNAME` | Single SOA present and nameserver returns a CNAME at the zone apex alongside the SOA (illegal per RFC 1034 section 3.6.2 and RFC 2181 section 10.1). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 | `WRONG_SOA` | Single SOA answer owner name does not match tested zone apex FQDN. |
@@ -69,12 +69,12 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `APEX_DNAME` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). DNAME at apex is legal per RFC 6672; informational only. |
+| `APEX_DNAME` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). DNAME at apex is legal per RFC 6672 section 2.3; informational only. |
 | `MULTIPLE_SOA` | `ERROR` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `NO_SOA_IN_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `ONE_SOA` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
-| `SOA_AND_CNAME` | `ERROR` | Default from `share/profile.json` (`test_levels.ZONE`). CNAME coexisting with SOA is illegal per RFC 1034 s3.6.2. |
+| `SOA_AND_CNAME` | `ERROR` | Default from `share/profile.json` (`test_levels.ZONE`). CNAME coexisting with SOA is illegal per RFC 1034 section 3.6.2 and RFC 2181 section 10.1. |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `WRONG_SOA` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |

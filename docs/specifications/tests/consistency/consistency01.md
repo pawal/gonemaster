@@ -25,13 +25,13 @@ Status: Final
    - Query SOA for zone apex.
    - No response message -> emit `NO_RESPONSE`.
    - Response without usable SOA record for zone apex -> emit `NO_RESPONSE_SOA_QUERY`.
-   - Otherwise store serial value for that nameserver.
+   - Otherwise store serial value (RFC 1035 section 3.3.13) for that nameserver.
 4. Group successful responses by serial value.
 5. Emit `SOA_SERIAL` once per serial (ordered numerically) with sorted `servers`.
 6. If exactly one serial exists, emit `ONE_SOA_SERIAL`.
 7. If multiple serials exist:
    - Emit `MULTIPLE_SOA_SERIALS`.
-   - Select the oldest and newest serial using RFC 1982 serial arithmetic, compute the wrap-safe forward distance between them, and when it exceeds `SerialMaxVariation` emit `SOA_SERIAL_VARIATION` with the lagging nameservers in `servers_behind`.
+   - Select the oldest and newest serial using serial number arithmetic (RFC 1982 sections 3.2 and 7), compute the wrap-safe forward distance between them, and when it exceeds `SerialMaxVariation` emit `SOA_SERIAL_VARIATION` with the lagging nameservers in `servers_behind`.
 8. Emit `TEST_CASE_END`.
 
 ### Per-NS SOA Probe and Serial Aggregation (steps 2-8)
@@ -72,7 +72,7 @@ emit TEST_CASE_END
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
-| `MULTIPLE_SOA_SERIALS` | At least two distinct SOA serial values were observed. |
+| `MULTIPLE_SOA_SERIALS` | At least two distinct SOA serial values were observed; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
 | `NO_RESPONSE` | SOA query had no response message from a nameserver. |
 | `NO_RESPONSE_SOA_QUERY` | Response did not contain a usable SOA record for zone apex. |
 | `ONE_SOA_SERIAL` | Exactly one SOA serial value was observed. |

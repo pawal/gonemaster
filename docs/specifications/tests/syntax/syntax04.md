@@ -28,9 +28,9 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `NAMESERVER_DISCOURAGED_DOUBLE_DASH` | A nameserver label has non-ACE `--` in positions 3 and 4. |
-| `NAMESERVER_NON_ALLOWED_CHARS` | A nameserver label contains disallowed characters. |
-| `NAMESERVER_NUMERIC_TLD` | Nameserver rightmost label is numeric-only. |
+| `NAMESERVER_DISCOURAGED_DOUBLE_DASH` | A nameserver label has non-ACE `--` in positions 3 and 4 (RFC 5890 section 2.3.1). |
+| `NAMESERVER_NON_ALLOWED_CHARS` | A nameserver label contains disallowed characters (RFC 1035 section 2.3.1). |
+| `NAMESERVER_NUMERIC_TLD` | Nameserver rightmost label is numeric-only (RFC 1123 section 2.1, RFC 3696 section 2). |
 | `NAMESERVER_SYNTAX_OK` | Name passes all implemented checks. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

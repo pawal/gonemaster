@@ -45,13 +45,13 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `N11_NO_EDNS` | Unknown-option query response lacked EDNS. |
-| `N11_NO_RESPONSE` | Unknown-option query produced no DNS response. |
-| `N11_RETURNS_UNKNOWN_OPTION_CODE` | Unknown EDNS option code `137` was echoed back in response EDNS options. |
-| `N11_UNEXPECTED_ANSWER_SECTION` | Unknown-option query response did not include expected zone SOA answer. |
-| `N11_UNEXPECTED_RCODE` | Unknown-option query response had non-`NOERROR` RCODE. |
+| `N11_NO_EDNS` | Unknown-option query response lacked EDNS (RFC 6891 section 6.1.1). |
+| `N11_NO_RESPONSE` | Unknown-option query produced no DNS response (RFC 8906 section 3.2.3). |
+| `N11_RETURNS_UNKNOWN_OPTION_CODE` | Unknown EDNS option code `137` was echoed back in response EDNS options; unknown option codes are ignored (RFC 6891 section 6.1.2). |
+| `N11_UNEXPECTED_ANSWER_SECTION` | Unknown-option query response did not include expected zone SOA answer (RFC 8906 section 8.2.3). |
+| `N11_UNEXPECTED_RCODE` | Unknown-option query response had non-`NOERROR` RCODE (RFC 8906 section 8.2.3). |
 | `N11_UNKNOWN_OPTION_OK` | Unknown-option query response passed every check above and did not echo option code `137`. |
-| `N11_UNSET_AA` | Unknown-option query response was not authoritative. |
+| `N11_UNSET_AA` | Unknown-option query response was not authoritative (RFC 8906 section 8.2.3). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

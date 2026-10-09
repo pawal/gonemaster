@@ -13,7 +13,7 @@ Status: Final
 - Required inputs:
   - Delegation nameserver names and addresses from `GetDelNSNamesAndIPs`.
   - Zone-apex nameserver names and addresses from `GetZoneNSNamesAndIPs`.
-  - Special-purpose address registry data via `constants.FindSpecialAddress`.
+  - Special-purpose address registry data (RFC 6890 section 2.2) via `constants.FindSpecialAddress`.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6` may affect address discovery in Methodsv2 lookups.
 
@@ -83,14 +83,14 @@ After classification, emit in fixed order:
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `A01_ADDR_NOT_GLOBALLY_REACHABLE` | At least one nameserver IP is in a special-purpose range that is not globally reachable and not classified as documentation/local-use. |
-| `A01_DOCUMENTATION_ADDR` | At least one nameserver IP is in a documentation-only range. |
+| `A01_ADDR_NOT_GLOBALLY_REACHABLE` | At least one nameserver IP is in a special-purpose range that is not globally reachable (RFC 8190 section 2.1) and not classified as documentation/local-use. |
+| `A01_DOCUMENTATION_ADDR` | At least one nameserver IP is in a documentation-only range (RFC 5737 section 4, RFC 3849 section 3, RFC 9637 section 4). |
 | `A01_GLOBALLY_REACHABLE_ADDR` | At least one nameserver IP is classified as globally reachable. |
-| `A01_LOCAL_USE_ADDR` | At least one nameserver IP is in a local-use category. |
+| `A01_LOCAL_USE_ADDR` | At least one nameserver IP is in a local-use category, none of which is globally reachable (RFC 8190 section 2.1). |
 | `A01_NO_GLOBALLY_REACHABLE_ADDR` | No nameserver IP is classified as globally reachable. |
 | `A01_NO_NAME_SERVERS_FOUND` | No nameserver with an address was discovered from delegation+zone sources. |
 | `CNAME_CHAIN_TOO_LONG` | A discovered NS hostname's CNAME chain exceeds `CNAMEMaxChainLength` while resolving its address. |
-| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address. |
+| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address (RFC 1034 section 5.2.2). |
 | `CNAME_TOO_MANY_RECORDS` | A single answer while resolving a discovered NS hostname carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

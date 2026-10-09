@@ -24,8 +24,8 @@ Status: Final
    - Query SOA (RD=0, TCP off).
    - If no response, emit `NO_RESPONSE` and continue.
    - If no SOA answer, emit `NO_RESPONSE_SOA_QUERY` and continue.
-   - Convert SOA `RNAME` to email-like form (`rnameToEmail`).
-   - If invalid RFC822 mailbox, emit `RNAME_RFC822_INVALID` and continue.
+   - Convert SOA `RNAME` to email-like form (`rnameToEmail`, RFC 1035 section 8).
+   - If not a valid mailbox (`addr-spec`, RFC 5322 section 3.4.1), emit `RNAME_RFC822_INVALID` and continue.
    - Resolve MX for mailbox domain (with CNAME-follow behavior from packet/question chain).
    - If MX lookup is not `NOERROR`, emit `RNAME_MAIL_DOMAIN_INVALID` and continue.
    - For each deduplicated mail server target (or mailbox domain if no MX):
@@ -44,9 +44,9 @@ Status: Final
 | `IPV6_DISABLED` | IPv6 SOA probing for a nameserver is skipped by profile. |
 | `NO_RESPONSE` | Nameserver SOA query yields no response packet. |
 | `NO_RESPONSE_SOA_QUERY` | Response exists but has no SOA answer. |
-| `RNAME_MAIL_DOMAIN_INVALID` | Mail domain/exchange resolution is unusable for delivery checks. |
-| `RNAME_MAIL_DOMAIN_LOCALHOST` | Mail domain/exchange resolves to loopback (`127.0.0.1` or `::1`). |
-| `RNAME_MAIL_ILLEGAL_CNAME` | A/AAAA lookup for mail domain/exchange contains CNAME in answer. |
+| `RNAME_MAIL_DOMAIN_INVALID` | Mail domain/exchange resolution is unusable for delivery checks (RFC 5321 section 5.1). |
+| `RNAME_MAIL_DOMAIN_LOCALHOST` | Mail domain/exchange resolves to loopback (`127.0.0.1` or `::1`), which RFC 1122 section 3.2.1.3 and RFC 4291 section 2.5.3 confine to a single host. |
+| `RNAME_MAIL_ILLEGAL_CNAME` | A/AAAA lookup for mail domain/exchange contains CNAME in answer (RFC 2181 section 10.3, RFC 5321 section 5.1). |
 | `RNAME_RFC822_INVALID` | Converted SOA `RNAME` does not validate as mailbox address. |
 | `RNAME_RFC822_VALID` | Converted SOA `RNAME` remains valid after all exchange checks. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

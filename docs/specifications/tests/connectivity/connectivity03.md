@@ -27,7 +27,7 @@ Status: Final
    - If raw lookup text exists, emit `ASN_INFOS_RAW` (`ns_ip`, `data`).
    - If ASN list exists, emit `ASN_INFOS_ANNOUNCE_BY` (`ns_ip`, `asns`) and store ASN set for diversity classification.
    - If prefix exists, emit `ASN_INFOS_ANNOUNCE_IN` (`ns_ip`, `prefixes`).
-5. For IPv4 stored ASN data:
+5. For IPv4 stored ASN data, classify topological diversity (RFC 2182 section 3.1):
    - If no ASN values were stored, emit no IPv4 diversity summary tag.
    - If exactly one unique ASN exists, emit `IPV4_ONE_ASN`.
    - Else if all IPv4 IPs with ASN data share the same ASN-set signature, emit `IPV4_SAME_ASN`.

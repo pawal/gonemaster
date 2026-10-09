@@ -39,9 +39,9 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `MISSING_OPT_IN_TRUNCATED` | Response was truncated but lacked EDNS OPT record. |
+| `MISSING_OPT_IN_TRUNCATED` | Response was truncated but lacked EDNS OPT record (RFC 6891 section 7). |
 | `N13_EDNS_RESPONSE_OK` | At least one nameserver returned the success shape of step 3. |
-| `NO_EDNS_SUPPORT` | Response indicates FORMERR with no EDNS OPT record. |
+| `NO_EDNS_SUPPORT` | Response indicates FORMERR with no EDNS OPT record, the response of a responder that does not implement EDNS (RFC 6891 section 7). |
 | `NO_RESPONSE` | Query produced no DNS response. |
 | `NS_ERROR` | Response did not fit expected success or explicit failure branches. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

@@ -25,7 +25,7 @@ Status: Final
    - If no apex DNSKEY records are present, classify nameserver as `Responds Without DNSKEY`.
    - Else classify nameserver as `Responds With DNSKEY`, and for each DNSKEY:
      - Compute keytag.
-     - Classify `Algorithm` value with `dnssec05TagForAlgorithm`: algorithms 5 and 7, and every algorithm the IANA DNS Security Algorithm Numbers registry marks `MUST NOT` for signing, map to `DS05_ALGO_DEPRECATED`; `NOT RECOMMENDED` maps to `DS05_ALGO_NOT_RECOMMENDED`; every other value follows the registry status (RFC 9904).
+     - Classify `Algorithm` value (RFC 4034 section 2.1.3) with `dnssec05TagForAlgorithm`: algorithms 5 and 7, and every algorithm the IANA DNS Security Algorithm Numbers registry marks `MUST NOT` for signing, map to `DS05_ALGO_DEPRECATED`; `NOT RECOMMENDED` maps to `DS05_ALGO_NOT_RECOMMENDED`; every other value follows the registry status (RFC 9904).
      - Store `(tag, algo, keytag, ns)` tuple.
 4. Emit all `DS05_ALGO_*` tags grouped by `(algo, keytag)` with merged `servers`, including `algo_descr` and `algo_mnemo`.
 5. If both `Responds Without DNSKEY` and `Responds With DNSKEY` are empty, emit `DS05_NO_RESPONSE` for ignored nameservers.
@@ -74,9 +74,9 @@ emit TEST_CASE_END
 | --- | --- |
 | `DS05_ALGO_DEPRECATED` | At least one DNSKEY algorithm maps to deprecated class. |
 | `DS05_ALGO_NOT_RECOMMENDED` | At least one DNSKEY algorithm maps to not-recommended class. |
-| `DS05_ALGO_NOT_ZONE_SIGN` | At least one DNSKEY algorithm maps to not-for-zone-signing class. |
+| `DS05_ALGO_NOT_ZONE_SIGN` | At least one DNSKEY algorithm maps to not-for-zone-signing class (RFC 4034 appendix A.1). |
 | `DS05_ALGO_OK` | At least one DNSKEY algorithm maps to acceptable class. |
-| `DS05_ALGO_PRIVATE` | At least one DNSKEY algorithm maps to private-use class. |
+| `DS05_ALGO_PRIVATE` | At least one DNSKEY algorithm maps to private-use class (RFC 4034 appendix A.1.1). |
 | `DS05_ALGO_RESERVED` | At least one DNSKEY algorithm maps to reserved class. |
 | `DS05_ALGO_UNASSIGNED` | At least one DNSKEY algorithm maps to unassigned class. |
 | `DS05_NO_RESPONSE` | No nameserver produced usable DNSKEY/no-DNSKEY outcome and at least one nameserver was ignored due to invalid/no response shape. |
@@ -164,6 +164,6 @@ emit TEST_CASE_END
 
 ## Edge Cases And Limitations
 - Nameserver evaluation is deduplicated by IP; multiple names mapped to one IP are merged into one query outcome and expanded in `servers`.
-- Algorithms 5 and 7 sign with SHA-1. The IANA registry marks both `NOT RECOMMENDED` for signing, while this testcase maps them to `DS05_ALGO_DEPRECATED` at `ERROR`, matching the `MUST NOT` the registry gives the SHA-1 DS digest.
+- Algorithms 5 and 7 sign with SHA-1. RFC 9905 section 2 makes both `MUST NOT` for signing, and this testcase maps them to `DS05_ALGO_DEPRECATED` at `ERROR`.
 - Nameservers with non-`NOERROR` or non-`AA` DNSKEY responses are treated as ignored for DS05 classification and can only contribute to `DS05_NO_RESPONSE`.
 - If a DNSKEY algorithm maps outside explicit switch cases, Gonemaster classifies it as `DS05_ALGO_UNASSIGNED`.

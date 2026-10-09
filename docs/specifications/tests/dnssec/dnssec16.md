@@ -109,17 +109,17 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DS16_CDS_INVALID_RRSIG` | CDS RRSIG keytag matches DNSKEY keytag(s), but signature verification fails. |
-| `DS16_CDS_MATCHES_NON_SEP_DNSKEY` | CDS points to a DNSKEY with SEP bit unset. |
-| `DS16_CDS_MATCHES_NON_ZONE_DNSKEY` | CDS points to a DNSKEY with zone bit unset. |
-| `DS16_CDS_MATCHES_NO_DNSKEY` | CDS keytag matches no DNSKEY keytag. |
+| `DS16_CDS_INVALID_RRSIG` | CDS RRSIG keytag matches DNSKEY keytag(s), but signature verification fails (RFC 4035 section 5.3). |
+| `DS16_CDS_MATCHES_NON_SEP_DNSKEY` | CDS points to a DNSKEY with SEP bit unset (RFC 4034 section 2.1.1, RFC 6781 section 3.2.3). |
+| `DS16_CDS_MATCHES_NON_ZONE_DNSKEY` | CDS points to a DNSKEY with zone bit unset (RFC 4034 section 5.2). |
+| `DS16_CDS_MATCHES_NO_DNSKEY` | CDS keytag matches no DNSKEY keytag (RFC 4035 section 2.4). |
 | `DS16_CDS_NOT_SIGNED_BY_CDS` | CDS RRset has no RRSIG with CDS keytag. |
-| `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY` | CDS RRset has RRSIG keytag not present in DNSKEY RRset. |
-| `DS16_CDS_UNSIGNED` | CDS RRset has no RRSIG records. |
+| `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY` | CDS RRset has RRSIG keytag not present in DNSKEY RRset (RFC 4035 section 5.3.1). |
+| `DS16_CDS_UNSIGNED` | CDS RRset has no RRSIG records (RFC 4035 section 2.2). |
 | `DS16_CDS_WITHOUT_DNSKEY` | CDS RRset exists but DNSKEY RRset is missing. |
-| `DS16_DELETE_CDS` | Nameserver CDS RRset consists only of delete CDS record(s). |
-| `DS16_DNSKEY_NOT_SIGNED_BY_CDS` | DNSKEY RRset has no RRSIG with CDS keytag. |
-| `DS16_MIXED_DELETE_CDS` | Delete CDS record is mixed with non-delete CDS record(s). |
+| `DS16_DELETE_CDS` | Nameserver CDS RRset consists only of delete CDS record(s) (RFC 8078 section 4). |
+| `DS16_DNSKEY_NOT_SIGNED_BY_CDS` | DNSKEY RRset has no RRSIG with CDS keytag (RFC 4035 section 2.4). |
+| `DS16_MIXED_DELETE_CDS` | Delete CDS record is mixed with non-delete CDS record(s) (RFC 8078 section 4). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`CDS`, `DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`CDS`, `DNSKEY`). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

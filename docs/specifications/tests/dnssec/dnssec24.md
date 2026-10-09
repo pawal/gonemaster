@@ -9,7 +9,7 @@ Status: Final
   at a signaling name under each nameserver hostname, in a signaling zone with
   a valid chain of trust from the root (RFC 9615 sections 3.1, 3.2, 4.1). A
   parental agent that validates these copies publishes the DS without the
-  acceptance delay of RFC 8078 section 3. The testcase executes the four
+  acceptance delay of RFC 8078 section 3.3. The testcase executes the four
   validation steps of RFC 9615 section 4.2 and reports every condition on
   which a parental agent aborts.
 - DNSSEC15 to DNSSEC18 evaluate the apex records. This testcase evaluates the
@@ -186,7 +186,7 @@ secure:
 - Root level: query `. DNSKEY` at the root servers. A DNSKEY MUST match a root
   trust anchor by key tag, algorithm and digest, and that key MUST verify an
   RRSIG covering the DNSKEY RRset. Failure: broken at `.`.
-- Any other level C:
+- Any other level C (RFC 4035 section 5.2):
   - No DS RRset: insecure at C. The denial of existence of the DS is not
     verified.
   - An RRSIG covering the DS RRset, with the parent cut as Signer's Name, MUST
@@ -237,22 +237,22 @@ all VALIDATED, no DS24_APEX_UNAVAILABLE -> DS24_BOOTSTRAP_READY
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DS24_APEX_UNAVAILABLE` | A delegation nameserver gave no `AA` `NOERROR` response to the apex `CDS` or `CDNSKEY` question. |
+| `DS24_APEX_UNAVAILABLE` | A delegation nameserver gave no `AA` `NOERROR` response to the apex `CDS` or `CDNSKEY` question (RFC 9615 section 4.2 step 2). |
 | `DS24_BOOTSTRAP_READY` | Every signaling name validated and every delegation nameserver answered both apex questions. |
-| `DS24_DELEGATION_SECURE` | A parent nameserver returned a DS record for the zone, or fake DS data exists. |
+| `DS24_DELEGATION_SECURE` | A parent nameserver returned a DS record for the zone, or fake DS data exists (RFC 9615 section 4.2 step 1). |
 | `DS24_DELETE_REQUESTED` | Every apex CDS and CDNSKEY record is an RFC 8078 delete record. |
 | `DS24_NO_CDS_CDNSKEY` | No delegation nameserver returned a non-empty apex CDS or CDNSKEY RRset. |
 | `DS24_NO_SIGNAL` | No signaling name carries CDS or CDNSKEY records, and at least one is absent. |
 | `DS24_ONLY_IN_DOMAIN_NS` | Every delegation nameserver name is at or below the zone name. |
 | `DS24_SIGNAL_AT_ZONE_CUT` | A zone cut exists at the signaling name. |
-| `DS24_SIGNAL_CHAIN_BROKEN` | A DS, DNSKEY or RRSIG on the path to the signaling zone fails to validate. |
+| `DS24_SIGNAL_CHAIN_BROKEN` | A DS, DNSKEY or RRSIG on the path to the signaling zone fails to validate (RFC 9615 section 3.1). |
 | `DS24_SIGNAL_MISMATCH` | The signaling RRset of a type differs from the apex RRset of that type on at least one delegation nameserver. |
-| `DS24_SIGNAL_MISSING` | The signaling name of a nameserver is absent while another signaling name carries records. |
+| `DS24_SIGNAL_MISSING` | The signaling name of a nameserver is absent while another signaling name carries records (RFC 9615 section 4.1). |
 | `DS24_SIGNAL_NAME_TOO_LONG` | The signaling name exceeds 255 octets in wire form. |
-| `DS24_SIGNAL_UNSIGNED` | No RRSIG by the signaling zone verifies a non-empty signaling RRset. |
+| `DS24_SIGNAL_UNSIGNED` | No RRSIG by the signaling zone verifies a non-empty signaling RRset (RFC 9615 section 4.1). |
 | `DS24_SIGNAL_VALIDATED` | The signaling name validates from the root and its RRsets equal the apex RRsets. |
-| `DS24_SIGNAL_ZONE_INSECURE` | A zone cut on the path to the signaling zone has no DS. |
-| `DS24_SIGNAL_ZONE_UNREACHABLE` | No server of a zone cut on the path gave a usable answer. |
+| `DS24_SIGNAL_ZONE_INSECURE` | A zone cut on the path to the signaling zone has no DS (RFC 9615 section 3.1). |
+| `DS24_SIGNAL_ZONE_UNREACHABLE` | No server of a zone cut on the path gave a usable answer (RFC 9615 section 4.2 step 3). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a parent (`DS`) or delegation (`CDS`, `CDNSKEY`) nameserver. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a parent (`DS`) or delegation (`CDS`, `CDNSKEY`) nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -303,7 +303,8 @@ carry no arguments.
 ## Severity Levels Per Tag
 A parental agent aborts the procedure of RFC 9615 section 4.2 on every
 WARNING-level condition. A zone that publishes no signal waits for the RFC 8078
-acceptance delay, which `DS07_NO_DS_FOR_SIGNED_ZONE` already reports.
+section 3.3 acceptance delay, which `DS07_NO_DS_FOR_SIGNED_ZONE` already
+reports.
 
 | Tag | Level | Notes |
 | --- | --- | --- |

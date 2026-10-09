@@ -26,8 +26,8 @@ Status: Final
 2. Query authoritative `MX` for zone apex.
 3. If no response, emit `NO_RESPONSE_MX_QUERY`.
 4. Else, for each MX RR in apex answer:
-   - if the exchange is the root name (`.`, the null MX of RFC 7505), emit no
-     tag for that exchange; Zone09 evaluates null MX records;
+   - if the exchange is the root name (`.`, the null MX of RFC 7505 section 3),
+     emit no tag for that exchange; Zone09 evaluates null MX records;
    - query authoritative `A` for the exchange;
    - if the answer section carries a CNAME RR owned by the exchange, emit
      `MX_RECORD_IS_CNAME`;

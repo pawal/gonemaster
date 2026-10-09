@@ -69,9 +69,9 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `AAAA_BAD_RDATA` | A returned AAAA RR had invalid RDATA length. |
-| `AAAA_QUERY_DROPPED` | AAAA query returned no DNS message after successful A-query baseline. |
-| `AAAA_UNEXPECTED_RCODE` | AAAA query returned non-`NOERROR` RCODE after successful A-query baseline. |
+| `AAAA_BAD_RDATA` | A returned AAAA RR had invalid RDATA length; AAAA RDATA is a 128-bit address (RFC 3596 section 2.2). |
+| `AAAA_QUERY_DROPPED` | AAAA query returned no DNS message after successful A-query baseline (RFC 4074 section 4.1). |
+| `AAAA_UNEXPECTED_RCODE` | AAAA query returned non-`NOERROR` RCODE after successful A-query baseline (RFC 4074 section 3). |
 | `AAAA_WELL_PROCESSED` | At least one included nameserver answered the AAAA query with `NOERROR`, and no AAAA-issue tag was triggered. |
 | `A_UNEXPECTED_RCODE` | Initial A-query baseline returned non-`NOERROR` RCODE. |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |

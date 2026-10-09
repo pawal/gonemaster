@@ -18,7 +18,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Read names from [`z.GlueNames`](../../nameserver-resolution.md#gluenames) (delegation) and [`z.ApexNSNames`](../../nameserver-resolution.md#apexnsnames) (child), lowercase each name, and build unique union `allNames`.
 3. Read resolved nameserver list from [`AllNameservers`](../../nameserver-resolution.md#allnameservers), lowercase each nameserver name, and build set `withIP`.
-4. Build sorted `withoutIP` list for names in `allNames` that are not present in `withIP`.
+4. Build sorted `withoutIP` list for names in `allNames` that are not present in `withIP`. Each NS name designates a host (RFC 1035 section 3.3.11).
 5. Emit one of:
    - `CAN_NOT_BE_RESOLVED` when `withoutIP` is non-empty and `withIP` is non-empty.
    - `NO_RESOLUTION` when `withIP` is empty.

@@ -26,7 +26,7 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
    - Send a plain SOA query (DO=0) for the zone name. The DO=0 probe deduplicates against SOA queries other testcases already issue, so it adds no extra traffic.
    - If no response, collect nameserver for `N18_NO_RESPONSE`.
-   - Else collect every EDE option present (a response MAY carry more than one). For each option, sanitize the EXTRA-TEXT and collect `(info_code, extra_text, nameserver)`. EDE is collected irrespective of RCODE.
+   - Else collect every EDE option present (a response MAY carry more than one, RFC 8914 section 3). For each option, sanitize the EXTRA-TEXT and collect `(info_code, extra_text, nameserver)`. EDE is collected irrespective of RCODE.
    - Else, only when `RCODE == NOERROR` and no EDE is present, collect nameserver for `N18_NO_EXTENDED_ERROR`. A non-NOERROR response without EDE is left to other testcases (basic/Nameserver16) and is not bucketed here.
 5. For each unique `(info_code, extra_text)` pair, emit one finding using the class tag selected from the info-code (see classification), with sorted unique `servers`.
 6. Emit `N18_NO_EXTENDED_ERROR` with sorted unique `servers` when non-empty.
@@ -49,11 +49,11 @@ Each observed info-code maps to exactly one class tag. Coverage is complete and 
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `N18_EXTENDED_ERROR_REPORTED` | Server returned a benign/operational EDE info-code. |
-| `N18_FILTERED_RESPONSE` | Server returned a filtering EDE info-code, indicating a policy middlebox in the path. |
+| `N18_FILTERED_RESPONSE` | Server returned a filtering EDE info-code, indicating a policy middlebox in the path (RFC 8914 sections 4.5, 4.16, 4.17 and 4.18). |
 | `N18_NO_EXTENDED_ERROR` | A NOERROR response carried no EDE option (the common healthy case). |
-| `N18_NO_RESPONSE` | The EDE probe produced no DNS response. |
-| `N18_RESOLVER_BEHAVIOR_REPORTED` | Server returned an EDE info-code normally produced by a recursive resolver. |
-| `N18_SERVER_ERROR_REPORTED` | Server reported a server-side problem (prohibited, not authoritative, not supported) via EDE. |
+| `N18_NO_RESPONSE` | The EDE probe produced no DNS response (RFC 8906 section 3.1.1). |
+| `N18_RESOLVER_BEHAVIOR_REPORTED` | Server returned an EDE info-code normally produced by a recursive resolver (RFC 8914 section 3). |
+| `N18_SERVER_ERROR_REPORTED` | Server reported a server-side problem (prohibited, not authoritative, not supported) via EDE (RFC 8914 sections 4.19, 4.21 and 4.22). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

@@ -85,12 +85,12 @@ emit TEST_CASE_END
 | --- | --- |
 | `DS09_ALGO_NOT_SUPPORTED_BY_ZM` | RRSIG verification requires an unsupported algorithm. |
 | `DS09_SOA_RRSIG_VALID` | At least one nameserver returned SOA with RRSIG and all RRSIG checks passed. |
-| `DS09_MISSING_RRSIG_IN_RESPONSE` | SOA response has no answer-section RRSIG records. |
-| `DS09_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY keytag. |
-| `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none verify the SOA signature. |
+| `DS09_MISSING_RRSIG_IN_RESPONSE` | SOA response has no answer-section RRSIG records (RFC 4035 sections 2.2 and 3.1.1). |
+| `DS09_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY keytag (RFC 4035 section 5.3.1). |
+| `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none verify the SOA signature (RFC 4035 section 5.3.3). |
 | `DS09_RSA_EXPONENT_UNSUPPORTED` | SOA RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports (more than 64 bits). |
-| `DS09_SOA_RRSIG_EXPIRED` | SOA-related RRSIG expiration is before test time. |
-| `DS09_SOA_RRSIG_NOT_YET_VALID` | SOA-related RRSIG inception is after test time. |
+| `DS09_SOA_RRSIG_EXPIRED` | SOA-related RRSIG expiration is before test time (RFC 4034 section 3.1.5). |
+| `DS09_SOA_RRSIG_NOT_YET_VALID` | SOA-related RRSIG inception is after test time (RFC 4034 section 3.1.5). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -152,4 +152,4 @@ emit TEST_CASE_END
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one DS09 outcome.
 - Nameservers failing response-shape checks (`Msg`, `NOERROR`, `AA`, apex owner match) are skipped for DS09 findings.
 - If no usable DNSKEY records are found for a nameserver, SOA signing checks are skipped for that nameserver.
-- Large RSA public exponent handling: an RSA DNSKEY the DNS library refuses although RFC 3110 permits it (an exponent of more than 4 bytes or greater than 2^31-1, or a leading zero byte in the exponent or modulus) is verified by gonemaster's own RSA path instead, so the SOA RRSIG passes or fails like any other. Only when the exponent exceeds 64 bits is the finding reclassified from the `ERROR` `DS09_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS09_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS09_SOA_RRSIG_VALID` pass.
+- Large RSA public exponent handling: an RSA DNSKEY the DNS library refuses (an exponent of more than 4 bytes or greater than 2^31-1, which RFC 3110 section 2 permits up to 4096 bits, or a leading zero byte in the exponent or modulus, which RFC 3110 section 2 prohibits) is verified by gonemaster's own RSA path instead, so the SOA RRSIG passes or fails like any other. Only when the exponent exceeds 64 bits is the finding reclassified from the `ERROR` `DS09_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS09_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS09_SOA_RRSIG_VALID` pass.

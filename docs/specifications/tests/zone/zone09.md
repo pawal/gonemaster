@@ -49,7 +49,8 @@ Status: Final
      host name and IP), `mx_rdata` (that key's normalized list) and
      `mail_targets` (that key's mail targets).
    - If exactly one key exists:
-     - evaluate the null-MX conditions on the normalized list:
+     - evaluate the null-MX conditions of RFC 7505 section 3 on the normalized
+       list:
        - `Z09_NULL_MX_WITH_OTHER_MX` when the `.` mail target is one of two or
          more elements;
        - `Z09_NULL_MX_NON_ZERO_PREF` when the null-MX preference is not zero;

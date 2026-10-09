@@ -75,13 +75,13 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `BREAKS_ON_EDNS` | Query with EDNS failed, but fallback query without EDNS got a response. |
+| `BREAKS_ON_EDNS` | Query with EDNS failed, but fallback query without EDNS got a response (RFC 6891 section 7, RFC 8906 section 3.2.1). |
 | `EDNS0_SUPPORT` | At least one included nameserver was evaluated and none produced EDNS error findings. |
-| `EDNS_RESPONSE_WITHOUT_EDNS` | `NOERROR` response to EDNS query omitted OPT record. |
-| `EDNS_VERSION_ERROR` | `NOERROR` response to EDNS query returned OPT version other than `0`. |
+| `EDNS_RESPONSE_WITHOUT_EDNS` | `NOERROR` response to EDNS query omitted OPT record (RFC 6891 section 6.1.1). |
+| `EDNS_VERSION_ERROR` | `NOERROR` response to EDNS query returned OPT version other than `0` (RFC 6891 section 6.1.3, RFC 8906 section 8.2.1). |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `NO_EDNS_SUPPORT` | EDNS query returned `FORMERR` without OPT record. |
+| `NO_EDNS_SUPPORT` | EDNS query returned `FORMERR` without OPT record, the response of a responder that does not implement EDNS (RFC 6891 section 7). |
 | `NO_RESPONSE` | Neither EDNS query nor fallback non-EDNS query returned a DNS message. |
 | `NS_ERROR` | Response did not match the recognized EDNS compliance/error branches. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

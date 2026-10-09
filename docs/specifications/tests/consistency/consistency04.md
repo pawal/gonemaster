@@ -35,10 +35,10 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `INCONSISTENT_NS_TTL` | Authoritative nameservers serve the apex NS RRset with more than one distinct TTL. |
+| `INCONSISTENT_NS_TTL` | Authoritative nameservers serve the apex NS RRset with more than one distinct TTL; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
-| `MULTIPLE_NS_SET` | At least two distinct NS target sets were observed. |
+| `MULTIPLE_NS_SET` | At least two distinct NS target sets were observed; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
 | `NO_RESPONSE` | NS query had no response message from a nameserver. |
 | `NO_RESPONSE_NS_QUERY` | Response did not contain usable NS records for zone apex. |
 | `NS_SET` | A specific NS target set and associated nameservers are reported. |

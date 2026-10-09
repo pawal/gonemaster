@@ -95,11 +95,11 @@ emit TEST_CASE_END
 | --- | --- |
 | `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | RRSIG verification requires an unsupported DNSSEC algorithm. |
 | `DS08_DNSKEY_RRSIG_VALID` | At least one nameserver returned DNSKEY with RRSIG and all RRSIG checks passed. |
-| `DS08_DNSKEY_RRSIG_EXPIRED` | DNSKEY-related RRSIG expiration is before packet test time. |
-| `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | DNSKEY-related RRSIG inception is after packet test time. |
-| `DS08_MISSING_RRSIG_IN_RESPONSE` | DNSKEY answer exists but contains no RRSIG records. |
-| `DS08_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY in DNSKEY RRset. |
-| `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none validate the RRSIG. |
+| `DS08_DNSKEY_RRSIG_EXPIRED` | DNSKEY-related RRSIG expiration is before packet test time (RFC 4034 section 3.1.5). |
+| `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | DNSKEY-related RRSIG inception is after packet test time (RFC 4034 section 3.1.5). |
+| `DS08_MISSING_RRSIG_IN_RESPONSE` | DNSKEY answer exists but contains no RRSIG records (RFC 4035 sections 2.2 and 3.1.1). |
+| `DS08_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY in DNSKEY RRset (RFC 4035 section 5.3.1). |
+| `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none validate the RRSIG (RFC 4035 section 5.3.3). |
 | `DS08_RSA_EXPONENT_UNSUPPORTED` | RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports (more than 64 bits). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |
@@ -161,4 +161,4 @@ emit TEST_CASE_END
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one query outcome.
 - Responses failing shape checks (`Msg`, `NOERROR`, `AA`, apex DNSKEY presence) are silently skipped for DS08 findings.
 - Unsupported algorithm can be detected either before verification (`dnssecAlgorithmSupported`) or during verification (`dns.ErrAlg`).
-- Large RSA public exponent handling: an RSA DNSKEY the DNS library refuses although RFC 3110 permits it (an exponent of more than 4 bytes or greater than 2^31-1, or a leading zero byte in the exponent or modulus) is verified by gonemaster's own RSA path instead, so its RRSIGs pass or fail like any other. Only when the exponent exceeds 64 bits is the finding reclassified from the `ERROR` `DS08_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS08_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS08_DNSKEY_RRSIG_VALID` pass.
+- Large RSA public exponent handling: an RSA DNSKEY the DNS library refuses (an exponent of more than 4 bytes or greater than 2^31-1, which RFC 3110 section 2 permits up to 4096 bits, or a leading zero byte in the exponent or modulus, which RFC 3110 section 2 prohibits) is verified by gonemaster's own RSA path instead, so its RRSIGs pass or fail like any other. Only when the exponent exceeds 64 bits is the finding reclassified from the `ERROR` `DS08_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS08_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS08_DNSKEY_RRSIG_VALID` pass.

@@ -30,7 +30,7 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DIFFERENT_SOURCE_IP` | Query response source IP differs from queried nameserver IP. |
+| `DIFFERENT_SOURCE_IP` | Query response source IP differs from queried nameserver IP (RFC 2181 section 4.1). |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `SAME_SOURCE_IP` | At least one nameserver was included and no source-IP mismatch was found. |

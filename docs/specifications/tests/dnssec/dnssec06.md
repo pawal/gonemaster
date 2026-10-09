@@ -27,7 +27,7 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `EXTRA_PROCESSING_BROKEN` | Response is `NOERROR` but DNSKEY answer does not include both DNSKEY and RRSIG records. |
+| `EXTRA_PROCESSING_BROKEN` | Response is `NOERROR` but DNSKEY answer does not include both DNSKEY and RRSIG records (RFC 4035 section 3.1.1). |
 | `EXTRA_PROCESSING_OK` | DNSKEY answer includes at least one DNSKEY and at least one RRSIG record. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

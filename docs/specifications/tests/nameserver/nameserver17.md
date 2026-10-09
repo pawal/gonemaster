@@ -4,7 +4,7 @@ Status: Final
 
 ## Purpose
 - Probe each authoritative nameserver for DNS Cookie (RFC 7873 / RFC 9018) support and verify the returned Server Cookie is well-formed and accepted by the issuing server.
-- Recognise servers that enforce DNS Cookies (answering a client-only probe with BADCOOKIE plus a fresh, well-formed Server Cookie, RFC 7873 5.2.3 / 5.3) as the strongest cookie posture, rather than discarding them as an RCODE anomaly.
+- Recognise servers that enforce DNS Cookies (answering a client-only probe with BADCOOKIE plus a fresh, well-formed Server Cookie, RFC 7873 sections 5.2.3 and 5.3) as the strongest cookie posture, rather than discarding them as an RCODE anomaly.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -26,15 +26,15 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
    - Query 1 (support and well-formedness): send a UDP-pinned SOA query for the zone name carrying the COOKIE option with only the 8-byte Client Cookie. UDP is pinned because TCP return-routability lets a server skip cookie processing.
      - No response, or a truncated (TC=1) response: collect for `N17_NO_RESPONSE` (a truncated probe is inconclusive and is not retried over TCP).
-     - `BADCOOKIE` (RCODE 23) carrying a well-formed full Server Cookie (validated with the same length and client-echo checks as the NOERROR path): the server enforces DNS Cookies, the strongest posture (RFC 7873 5.2.3 / 5.3). Collect for `N17_COOKIE_ENFORCED` and proceed to query 2 with the returned full cookie.
+     - `BADCOOKIE` (RCODE 23) carrying a well-formed full Server Cookie (validated with the same length and client-echo checks as the NOERROR path): the server enforces DNS Cookies, the strongest posture (RFC 7873 sections 5.2.3 and 5.3). Collect for `N17_COOKIE_ENFORCED` and proceed to query 2 with the returned full cookie.
      - Any other `RCODE != NOERROR` (REFUSED / SERVFAIL / FORMERR, or a `BADCOOKIE` without a well-formed Server Cookie): no cookie verdict (RCODE anomalies are graded by basic/N16).
      - NOERROR, no COOKIE option: collect for `N17_NO_COOKIE`.
      - NOERROR, COOKIE length not in `{8} U [16,40]` bytes, or the client portion does not echo our Client Cookie: collect for `N17_COOKIE_MALFORMED` with the observed `cookie_bytes`.
      - NOERROR, COOKIE exactly 8 bytes (only the Client Cookie echoed): collect for `N17_COOKIE_CLIENT_ONLY`.
-     - NOERROR, well-formed full cookie (16-40 bytes, client portion echoed; 24 bytes = RFC 9018 v1): collect for `N17_COOKIE_SUPPORTED` and proceed to query 2.
+     - NOERROR, well-formed full cookie (16-40 bytes, client portion echoed; 24 bytes = RFC 9018 section 4.4 Version 1): collect for `N17_COOKIE_SUPPORTED` and proceed to query 2.
    - Query 2 (round-trip, for both `N17_COOKIE_SUPPORTED` and `N17_COOKIE_ENFORCED`): re-query with the full cookie returned by query 1.
      - NOERROR: collect for `N17_COOKIE_ROUNDTRIP_OK` (proves the server did not reject its own cookie, not that it validated it).
-     - BADCOOKIE: retry once (query 2b) with the fresh Server Cookie the BADCOOKIE reply carries (RFC 7873 5.3). If query 2b is NOERROR, the server merely rotated its cookie: collect for `N17_COOKIE_ROUNDTRIP_OK`. If query 2b is also BADCOOKIE, collect for `N17_COOKIE_SELF_REJECT`.
+     - BADCOOKIE: retry once (query 2b) with the fresh Server Cookie the BADCOOKIE reply carries (RFC 7873 section 5.3). If query 2b is NOERROR, the server merely rotated its cookie: collect for `N17_COOKIE_ROUNDTRIP_OK`. If query 2b is also BADCOOKIE, collect for `N17_COOKIE_SELF_REJECT`.
 6. Emit `N17_COOKIE_SUPPORTED` with sorted unique `servers` when non-empty.
 7. Emit `N17_COOKIE_ENFORCED` with sorted unique `servers` when non-empty.
 8. Emit `N17_NO_COOKIE` with sorted unique `servers` when non-empty.
@@ -79,14 +79,14 @@ per nameserver (parallel):
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `N17_COOKIE_CLIENT_ONLY` | Server echoed only the 8-byte Client Cookie and returned no Server Cookie. |
+| `N17_COOKIE_CLIENT_ONLY` | Server echoed only the 8-byte Client Cookie and returned no Server Cookie (RFC 7873 section 5.2.3). |
 | `N17_COOKIE_ENFORCED` | Server enforces DNS Cookies: it answered a client-only probe with BADCOOKIE and a well-formed Server Cookie. |
-| `N17_COOKIE_MALFORMED` | Server returned a cookie of an invalid length, or a wrong client-cookie echo. |
+| `N17_COOKIE_MALFORMED` | Server returned a cookie of an invalid length, or a wrong client-cookie echo (RFC 7873 sections 4 and 5.3). |
 | `N17_COOKIE_ROUNDTRIP_OK` | Server did not reject the Server Cookie it issued on a follow-up query. |
-| `N17_COOKIE_SELF_REJECT` | Server rejected with BADCOOKIE, even after the RFC retry, a Server Cookie it had just issued. |
+| `N17_COOKIE_SELF_REJECT` | Server rejected with BADCOOKIE, even after the RFC 7873 section 5.3 retry, a Server Cookie it had just issued (RFC 7873 section 5.2.5). |
 | `N17_COOKIE_SUPPORTED` | Server returned a well-formed full DNS Cookie. |
 | `N17_NO_COOKIE` | Server responded NOERROR but returned no COOKIE option. |
-| `N17_NO_RESPONSE` | Cookie probe produced no DNS response, or a truncated response. |
+| `N17_NO_RESPONSE` | Cookie probe produced no DNS response (RFC 8906 section 3.2.3), or a truncated response. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -132,9 +132,9 @@ per nameserver (parallel):
 
 ## Edge Cases And Limitations
 - "No cookie in the response" is ambiguous: it can mean unsupported, disabled, or silently stripped by the server or a middlebox. It is treated as a negative observation (`N17_NO_COOKIE`, informational), never as proof of misconfiguration.
-- A NOERROR round-trip proves only that the server did not reject the cookie it issued, not that it validated it; a non-enforcing server returns NOERROR without validating (RFC 7873 5.2.3).
-- A single vantage point cannot prove the RFC 9018 SipHash-2-4 construction or anycast secret consistency. `N17_COOKIE_SELF_REJECT` fires only after the RFC-mandated retry and may still reflect transient anycast secret skew rather than a defect; cross-node anycast detection is out of scope.
+- A NOERROR round-trip proves only that the server did not reject the cookie it issued, not that it validated it; a non-enforcing server returns NOERROR without validating (RFC 7873 sections 5.2.3 and 5.2.4).
+- A single vantage point cannot prove the RFC 9018 section 4.4 SipHash-2-4 construction or anycast secret consistency. `N17_COOKIE_SELF_REJECT` fires only after the retry that RFC 7873 section 5.3 recommends and may still reflect transient anycast secret skew rather than a defect; cross-node anycast detection is out of scope.
 - A truncated (TC=1) probe is treated as inconclusive and is not retried over TCP, since TCP return-routability would mask cookie enforcement.
 - The BADCOOKIE carve-out for `N17_COOKIE_ENFORCED` is deliberately narrow: only RCODE 23 carrying a well-formed Server Cookie (correct length and client-cookie echo) qualifies. A BADCOOKIE without a well-formed Server Cookie, and any other non-NOERROR RCODE (REFUSED / SERVFAIL / FORMERR), stay generic anomalies graded by basic/N16, so a transient or malformed BADCOOKIE never produces a cookie verdict here.
-- `N17_COOKIE_ENFORCED` proves only that the server demanded and issued a Server Cookie; the follow-up round-trip (`N17_COOKIE_ROUNDTRIP_OK`) still proves only non-rejection, not cryptographic validation, and a single vantage point cannot prove the RFC 9018 construction.
-- A FORMERR to a valid 8-byte Client Cookie is itself a server defect (RFC 7873 5.2.2), but it is left to basic/N16 and adds no dedicated tag here.
+- `N17_COOKIE_ENFORCED` proves only that the server demanded and issued a Server Cookie; the follow-up round-trip (`N17_COOKIE_ROUNDTRIP_OK`) still proves only non-rejection, not cryptographic validation, and a single vantage point cannot prove the RFC 9018 section 4 construction.
+- A FORMERR to a valid 8-byte Client Cookie is itself a server defect (RFC 7873 section 5.2.2), but it is left to basic/N16 and adds no dedicated tag here.

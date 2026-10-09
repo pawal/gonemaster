@@ -41,14 +41,14 @@ EDNS UDP payload for DNSSEC queries (`constants.EDNSUDPPayloadDNSSECDefault`, 12
       - Otherwise continue at step 2.4.
    4. Issue the probe: one UDP query with DNSSEC enabled, an advertised payload `P`, UDP-to-TCP fallback disabled, a retry count of 1, and the diagnostic flag set so its failure is excluded from server-health bookkeeping. `P` is the smallest multiple of 256 strictly greater than `S`, capped at 4096. Classify:
       - No message: `CN05_LARGE_ANSWER_NO_UDP_ANSWER`.
-      - Truncated: `CN05_SERVER_CAPS_UDP_ANSWER`. The address limits its own UDP answer below `P`, so clients receive a truncated response rather than silence.
+      - Truncated: `CN05_SERVER_CAPS_UDP_ANSWER`. The address limits its own UDP answer below `P` (RFC 9715 section 3.1), so clients receive a truncated response rather than silence.
       - `NOERROR` and not truncated: `CN05_LARGE_ANSWER_DELIVERED_UDP`.
       - Any other RCODE: inconclusive. Emit nothing further for the address.
    5. Loss branch, entered when the reference query yielded no message. Issue the small-answer probe with the option set of Nameserver13 (DNSSEC enabled, EDNS version 0, advertised payload 512, fallback disabled) so it shares that testcase's cache entry. Classify:
       - No message: EDNS queries do not reach the address at all, or the address is unreachable. This is not a size question and is reported by Nameserver02, Nameserver13 and DNSSEC07. Emit nothing.
       - Answered without truncation: the answer fits 512 bytes, so the loss at `D` was not size-dependent. Emit nothing.
       - Answered with truncation: a small answer arrives and the full answer exceeds 512 bytes. Learn `S` with one forced-TCP query. If TCP returns a NOERROR answer with the TC flag set, continue at step 2.6. If TCP returns a NOERROR answer without the TC flag, record `CN05_UDP_LOSS_SIZE_DEPENDENT`. Otherwise emit nothing.
-   6. TCP truncation branch, entered when a `DNSKEY` answer received over TCP carries the TC flag. The advertised payload is a UDP quantity (RFC 6891, section 6.2.3), and a client that receives a TC answer retries over TCP (RFC 2181, section 9), so a truncated TCP answer leaves the client no transport that delivers the RRset. Record `CN05_TCP_ANSWER_TRUNCATED` with `size` set to the length of the truncated TCP answer and `payload` set to `D`. `S` is unknown, so no probe is issued.
+   6. TCP truncation branch, entered when a `DNSKEY` answer received over TCP carries the TC flag. The advertised payload is a UDP quantity (RFC 6891 section 6.2.3), and a client that receives a TC answer retries over TCP (RFC 2181 section 9), so a truncated TCP answer leaves the client no transport that delivers the RRset, defeating the TCP support RFC 7766 section 5 requires. Record `CN05_TCP_ANSWER_TRUNCATED` with `size` set to the length of the truncated TCP answer and `payload` set to `D`. `S` is unknown, so no probe is issued.
 3. Group the recorded per-address outcomes by identical tag, `size` and `payload`, and emit one entry per group with the addresses of that group in `servers`. Emit `CN05_ANSWER_FITS_UDP` once for the addresses that answered over UDP at `D`, with `size` set to the largest `S` among them.
 4. Emit `TEST_CASE_END`.
 
@@ -125,12 +125,12 @@ Q1 yielded no message at payload 1232.
 | Tag | Emitted when |
 | --- | --- |
 | `CN05_ANSWER_FITS_UDP` | The `DNSKEY` answer arrived over UDP, untruncated, within the default advertised payload. |
-| `CN05_ANSWER_NEEDS_TCP` | The `DNSKEY` answer was truncated at the default advertised payload and had to be fetched over TCP. |
+| `CN05_ANSWER_NEEDS_TCP` | The `DNSKEY` answer was truncated at the default advertised payload and had to be fetched over TCP (RFC 2181 section 9). |
 | `CN05_LARGE_ANSWER_DELIVERED_UDP` | The probe received the complete answer over UDP at the larger advertised payload. |
-| `CN05_LARGE_ANSWER_NO_UDP_ANSWER` | The probe received no answer at the larger advertised payload. |
+| `CN05_LARGE_ANSWER_NO_UDP_ANSWER` | The probe received no answer at the larger advertised payload (RFC 10001 section 4.1). |
 | `CN05_SERVER_CAPS_UDP_ANSWER` | The probe received a truncated answer although the larger payload permitted the full one. |
 | `CN05_TCP_ANSWER_TRUNCATED` | The `DNSKEY` answer received over TCP carries the TC flag. |
-| `CN05_UDP_LOSS_SIZE_DEPENDENT` | No answer arrived at the default advertised payload, a 512-byte advertisement was answered with truncation, and TCP delivered the answer. |
+| `CN05_UDP_LOSS_SIZE_DEPENDENT` | No answer arrived at the default advertised payload, a 512-byte advertisement was answered with truncation, and TCP delivered the answer (RFC 10001 section 4.1). |
 | `IPV4_DISABLED` | The address is IPv4 and IPv4 is disabled. |
 | `IPV6_DISABLED` | The address is IPv6 and IPv6 is disabled. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -203,7 +203,7 @@ Q1 yielded no message at payload 1232.
 - IPv6 is more exposed than IPv4: the minimum link MTU is 1280 bytes, routers do not fragment, and fragment filtering is common. A per-family difference is visible in `servers`.
 - `S` is the length of the response as read from the wire when that length is recorded, and an uncompressed estimate otherwise. A restored cache holds messages repacked at save time, so a replayed run may report a `size` that differs from the live run by the compression delta. The choice of `P` is unaffected, since `P` rounds up to a multiple of 256.
 - Undelegated runs and fake delegations return synthesized responses with no transport recorded. An unknown transport is never read as UDP.
-- An address that answers a 1232-byte advertisement with a larger response violates RFC 6891, section 6.2.5. It is reported as delivered, with `payload` 1232 and `size` above it.
+- An address that answers a 1232-byte advertisement with a larger response exceeds the requestor's payload size (RFC 6891 section 6.2.3), which RFC 9715 section 5 lists as a deviation from the DNS standard. It is reported as delivered, with `payload` 1232 and `size` above it.
 - An address that applies the advertised UDP payload to a TCP answer and sets the TC flag on it is reported as `CN05_TCP_ANSWER_TRUNCATED`. The size of the full answer is unknown, so `CN05_ANSWER_NEEDS_TCP` is not recorded for the address and no probe is issued. The truncated TCP answer is the one the transport caches for the run, so other testcases reading the `DNSKEY` RRset from that address see a partial RRset; DNSSEC02 treats a truncated `DNSKEY` answer as inconclusive.
 - An address that ignores the advertised payload entirely and loses both the 1232-byte and the 512-byte answer makes the loss branch conclude that the loss is not size-dependent. This is an accepted false negative.
 - `REFUSED` on the probe, which some addresses return after a burst of queries, is treated as inconclusive rather than as loss.

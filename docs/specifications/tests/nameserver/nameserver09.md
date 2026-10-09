@@ -22,7 +22,7 @@ Status: Final
 4. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 5. For each deduplicated nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, store no mismatch for this nameserver, and skip.
-   - Query `random1` and `random2`.
+   - Query `random1` and `random2`, which name lookup matches case-insensitively (RFC 4343 section 3).
    - If first query has answer RRs:
      - Compare normalized (sorted, lowercased) answer sets.
      - Emit `CASE_QUERY_SAME_ANSWER` when equal, else emit `CASE_QUERY_DIFFERENT_ANSWER` and mark mismatch.

@@ -23,9 +23,9 @@ Status: Final
    - Concatenate [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) then [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
    - Keep the first `(nsname, ip)` seen for each unique IP.
 4. For each unique IP, execute a PTR-check task (parallelized):
-   - Compute reverse lookup owner with `dns.ReverseAddr`.
+   - Compute reverse lookup owner with `dns.ReverseAddr` (RFC 1035 section 3.5, RFC 3596 section 2.5).
    - Send recursive PTR query.
-   - If response has `NOERROR` and a CNAME in answer, follow the first CNAME target with one additional PTR query.
+   - If response has `NOERROR` and a CNAME in answer, follow the first CNAME target with one additional PTR query (RFC 2317 section 4).
    - If a response message exists:
      - If RCODE is not `NOERROR` or PTR answer set is empty, emit `NAMESERVER_IP_WITHOUT_REVERSE` (`nsname`, `ns_ip`).
    - If no response message exists, emit `NO_RESPONSE_PTR_QUERY` (`domain`).
@@ -65,9 +65,9 @@ emit TEST_CASE_END
 | Tag | Emitted when |
 | --- | --- |
 | `CNAME_CHAIN_TOO_LONG` | A discovered NS hostname's CNAME chain exceeds `CNAMEMaxChainLength` while resolving its address. |
-| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address. |
+| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address (RFC 1034 section 5.2.2). |
 | `CNAME_TOO_MANY_RECORDS` | A single answer while resolving a discovered NS hostname carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
-| `NAMESERVER_IP_WITHOUT_REVERSE` | PTR response is present but not successful (`RCODE != NOERROR`) or has no PTR record. |
+| `NAMESERVER_IP_WITHOUT_REVERSE` | PTR response is present but not successful (`RCODE != NOERROR`) or has no PTR record (RFC 1912 section 2.1). |
 | `NAMESERVERS_IP_WITH_REVERSE` | All checked IPs have successful PTR answers and no PTR-query failure tag was emitted. |
 | `NO_RESPONSE_PTR_QUERY` | PTR recursive query returned no response message. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

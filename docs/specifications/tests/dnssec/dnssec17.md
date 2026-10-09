@@ -108,17 +108,17 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DS17_CDNSKEY_INVALID_RRSIG` | CDNSKEY RRSIG keytag matches DNSKEY keytag(s), but signature verification fails. |
-| `DS17_CDNSKEY_IS_NON_SEP` | CDNSKEY record has SEP bit unset. |
-| `DS17_CDNSKEY_IS_NON_ZONE` | CDNSKEY record has zone bit unset. |
-| `DS17_CDNSKEY_MATCHES_NO_DNSKEY` | CDNSKEY keytag matches no DNSKEY keytag. |
+| `DS17_CDNSKEY_INVALID_RRSIG` | CDNSKEY RRSIG keytag matches DNSKEY keytag(s), but signature verification fails (RFC 4035 section 5.3). |
+| `DS17_CDNSKEY_IS_NON_SEP` | CDNSKEY record has SEP bit unset (RFC 4034 section 2.1.1, RFC 6781 section 3.2.3). |
+| `DS17_CDNSKEY_IS_NON_ZONE` | CDNSKEY record has zone bit unset (RFC 4034 sections 2.1.1 and 5.2). |
+| `DS17_CDNSKEY_MATCHES_NO_DNSKEY` | CDNSKEY keytag matches no DNSKEY keytag (RFC 4035 section 2.4). |
 | `DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY` | CDNSKEY RRset has no RRSIG with CDNSKEY keytag. |
-| `DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY` | CDNSKEY RRset has RRSIG keytag not present in DNSKEY RRset. |
-| `DS17_CDNSKEY_UNSIGNED` | CDNSKEY RRset has no RRSIG records. |
+| `DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY` | CDNSKEY RRset has RRSIG keytag not present in DNSKEY RRset (RFC 4035 section 5.3.1). |
+| `DS17_CDNSKEY_UNSIGNED` | CDNSKEY RRset has no RRSIG records (RFC 4035 section 2.2). |
 | `DS17_CDNSKEY_WITHOUT_DNSKEY` | CDNSKEY RRset exists but DNSKEY RRset is missing. |
-| `DS17_DELETE_CDNSKEY` | Nameserver CDNSKEY RRset consists only of delete CDNSKEY record(s). |
-| `DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY` | DNSKEY RRset has no RRSIG with CDNSKEY keytag. |
-| `DS17_MIXED_DELETE_CDNSKEY` | Delete CDNSKEY record is mixed with non-delete CDNSKEY record(s). |
+| `DS17_DELETE_CDNSKEY` | Nameserver CDNSKEY RRset consists only of delete CDNSKEY record(s) (RFC 8078 section 4). |
+| `DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY` | DNSKEY RRset has no RRSIG with CDNSKEY keytag (RFC 4035 section 2.4). |
+| `DS17_MIXED_DELETE_CDNSKEY` | Delete CDNSKEY record is mixed with non-delete CDNSKEY record(s) (RFC 8078 section 4). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`CDNSKEY`, `DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`CDNSKEY`, `DNSKEY`). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

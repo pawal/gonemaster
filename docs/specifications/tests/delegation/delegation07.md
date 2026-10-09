@@ -4,6 +4,7 @@ Status: Final
 
 ## Purpose
 - Compare parent-side and child-side NS name sets and report mismatches.
+- The delegation NS RRs should be exactly the same as the NS RRs at the child apex (RFC 1034 sections 4.2.1 and 4.2.2).
 
 ## Preconditions And Inputs
 - Preconditions:

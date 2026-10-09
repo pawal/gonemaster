@@ -24,7 +24,7 @@ Status: Final
    - For each query type:
      - Require response message, `RCODE=NOERROR`, `AA=true`, at least one answer record of the queried type, and at least one answer-section RRSIG; otherwise skip this query type.
      - On the `DNSKEY` query, collect DNSKEY algorithms from returned DNSKEY records.
-     - For each collected DNSKEY algorithm, check whether any answer-section RRSIG has that algorithm.
+     - For each collected DNSKEY algorithm, check whether any answer-section RRSIG has that algorithm (RFC 4035 section 2.2, RFC 6840 section 5.11).
      - If no matching RRSIG algorithm is found, record a missing-signature-algorithm finding for this query type.
 4. Emit `DS13_ALGO_NOT_SIGNED_DNSKEY`, `DS13_ALGO_NOT_SIGNED_SOA`, and/or `DS13_ALGO_NOT_SIGNED_NS` grouped by algorithm with merged nameserver IP lists.
 5. If at least one DNSKEY algorithm was observed and no algorithm-missing findings were accumulated, emit `DS13_ALL_ALGOS_SIGNED`.

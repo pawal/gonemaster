@@ -109,7 +109,7 @@ emit TEST_CASE_END
 | Tag | Emitted when |
 | --- | --- |
 | `DS11_CONSISTENT_SIGNED` | Parent has DS and every child nameserver serves a signed DNSKEY RRset. |
-| `DS11_DS_BUT_UNSIGNED_ZONE` | Parent has DS but no child nameserver serves a signed DNSKEY RRset, because the RRset is absent or unsigned. |
+| `DS11_DS_BUT_UNSIGNED_ZONE` | Parent has DS but no child nameserver serves a signed DNSKEY RRset, because the RRset is absent or unsigned (RFC 4035 section 2.2). |
 | `DS11_INCONSISTENT_DS` | Parent nameservers disagree on DS existence. |
 | `DS11_INCONSISTENT_SIGNED_ZONE` | Child nameservers disagree on whether the DNSKEY RRset is signed. |
 | `DS11_NS_WITH_SIGNED_ZONE` | Child nameservers serving a signed DNSKEY RRset are listed. |

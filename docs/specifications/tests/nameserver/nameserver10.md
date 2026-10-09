@@ -47,10 +47,10 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `N10_EDNS_RESPONSE_ERROR` | BADVERS condition is met but response does not match expected EDNSv1 error-shape check. |
+| `N10_EDNS_RESPONSE_ERROR` | BADVERS condition is met but response does not match expected EDNSv1 error-shape check (RFC 8906 section 8.2.2). |
 | `N10_EDNS_VERSION_OK` | EDNSv1 probe returned BADVERS with EDNS version `0` and an empty answer section. |
-| `N10_NO_RESPONSE_EDNS1_QUERY` | Nameserver responded to EDNSv0 probe but not to EDNSv1 probe. |
-| `N10_UNEXPECTED_RCODE` | EDNSv1 probe returned response with RCODE not interpreted as BADVERS. |
+| `N10_NO_RESPONSE_EDNS1_QUERY` | Nameserver responded to EDNSv0 probe but not to EDNSv1 probe (RFC 8906 section 3.2.2). |
+| `N10_UNEXPECTED_RCODE` | EDNSv1 probe returned response with RCODE not interpreted as BADVERS, the RCODE for an unimplemented VERSION (RFC 6891 section 6.1.3). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

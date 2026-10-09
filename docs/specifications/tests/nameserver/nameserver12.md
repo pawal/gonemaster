@@ -34,13 +34,13 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `NO_EDNS_SUPPORT` | Response indicates FORMERR EDNS handling fallback path. |
+| `NO_EDNS_SUPPORT` | Response indicates FORMERR EDNS handling fallback path; RFC 6891 section 7 prescribes `FORMERR` without OPT for a responder that does not implement EDNS. |
 | `NO_RESPONSE` | Query with Z flags set produced no DNS response. |
 | `NS_ERROR` | Response did not fit expected success or explicit failure branches. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 | `Z_FLAGS_CLEAR` | At least one nameserver returned the success shape of step 3. |
-| `Z_FLAGS_NOTCLEAR` | Response EDNS Z flags were not cleared to zero. |
+| `Z_FLAGS_NOTCLEAR` | Response EDNS Z flags were not cleared to zero (RFC 6891 section 6.1.4, RFC 8906 section 3.2.4). |
 
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |

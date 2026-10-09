@@ -37,7 +37,7 @@ Status: Final
 | `NO_UPWARD_REFERRAL` | Included nameservers showed no upward-referral evidence. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
-| `UPWARD_REFERRAL` | Authority section in root NS query response contains `NS` records. |
+| `UPWARD_REFERRAL` | Authority section in root NS query response contains `NS` records, an upward referral (RFC 9499 section 4). |
 | `UPWARD_REFERRAL_IRRELEVANT` | Tested zone is root (`.`), so upward-referral check is skipped. |
 
 ## Tag Arguments

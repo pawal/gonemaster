@@ -23,7 +23,7 @@ Status: Final
    - Query SOA for zone apex.
    - No response message -> emit `NO_RESPONSE`.
    - Response without usable SOA record -> emit `NO_RESPONSE_SOA_QUERY`.
-   - Otherwise extract timer tuple `(refresh,retry,expire,minimum)` and store it for that nameserver.
+   - Otherwise extract timer tuple `(refresh,retry,expire,minimum)` (RFC 1035 section 3.3.13) and store it for that nameserver.
 4. If exactly one timer tuple exists, emit `ONE_SOA_TIME_PARAMETER_SET`.
 5. If multiple timer tuples exist:
    - Emit `MULTIPLE_SOA_TIME_PARAMETER_SET`.
@@ -35,7 +35,7 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
-| `MULTIPLE_SOA_TIME_PARAMETER_SET` | At least two distinct SOA timer tuples were observed. |
+| `MULTIPLE_SOA_TIME_PARAMETER_SET` | At least two distinct SOA timer tuples were observed; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
 | `NO_RESPONSE` | SOA query had no response message from a nameserver. |
 | `NO_RESPONSE_SOA_QUERY` | Response did not contain a usable SOA record for zone apex. |
 | `ONE_SOA_TIME_PARAMETER_SET` | Exactly one SOA timer tuple was observed. |

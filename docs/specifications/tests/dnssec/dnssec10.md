@@ -32,7 +32,7 @@ Status: Final
    - Empty answer with NSEC in authority (no NSEC3) => NSEC-NODATA path for RFC 4470 / RFC 9824 white-lies / minimally covering NSEC / compact denial of existence implementations (SOA presence/owner checks, NSEC count/apex-owner checks, signature presence and verification checks; type-list validation is skipped because the synthesized bitmap intentionally excludes the queried type). Treated as NSEC evidence equivalent to NSEC-in-answer for consistency checks.
 5. Run `NSEC3PARAM` query processing:
    - Response-shape failure => `NSEC3PARAM query response error` set.
-   - Non-empty answer with NSEC3PARAM => NSEC3PARAM-in-answer path (apex-owner check applied to every NSEC3PARAM RR in the RRset; multiple NSEC3PARAM RRs are permitted to accommodate parameter rollover).
+   - Non-empty answer with NSEC3PARAM => NSEC3PARAM-in-answer path (apex-owner check applied to every NSEC3PARAM RR in the RRset; multiple NSEC3PARAM RRs are permitted to accommodate parameter rollover, RFC 5155 section 7.3).
    - Non-empty answer without NSEC3PARAM => erroneous-answer set.
    - Empty answer with NSEC in authority => NSEC-NODATA path (SOA presence/owner checks, NSEC owner/type-list checks, signature presence and verification checks).
 6. During NSEC/NSEC3 signature verification:
@@ -96,7 +96,7 @@ query NSEC at apex (DNSSEC=on)
  |             +- none present               -> nsec3MissingSignature
  |             +- per signature (keytag):    -> [signature check]  (see below)
  |
- +- empty answer, NSEC in authority          -> nsecNsecNodata  (RFC 4470 / 9824)
+ +- empty answer, NSEC in authority          -> nsecNsecNodata  (RFC 4470, RFC 9824)
  |   +- SOA missing                          -> nsecNodataMissingSOA
  |   +- SOA owner != apex                    -> nsecNodataWrongSOA
  |   +- NSEC RRs in authority:
@@ -159,7 +159,7 @@ query NSEC3PARAM at apex (DNSSEC=on)
 After the per-nameserver phase, with:
     NSEC_set  = nsecInAnswer  union nsec3paramNsecNodata
     NSEC3_set = nsec3paramInAnswer union nsecNsec3Nodata
-    (nsecInAnswer first absorbs nsecNsecNodata per RFC 4470 / 9824)
+    (nsecInAnswer first absorbs nsecNsecNodata per RFC 4470 and RFC 9824)
 
 1. Consistency and presence (set algebra over evidence sets)
      nsecInAnswer  symdiff nsec3paramNsecNodata, minus opposite-kind set
@@ -213,39 +213,39 @@ After the per-nameserver phase, with:
 | `DS10_ALGO_NOT_SUPPORTED_BY_ZM` | Signature verification required an unsupported algorithm. |
 | `DS10_ERR_MULT_NSEC` | More than one NSEC record was observed where one was expected. |
 | `DS10_ERR_MULT_NSEC3` | More than one NSEC3 record was observed where one was expected. |
-| `DS10_EXPECTED_NSEC_NSEC3_MISSING` | Nameserver had DNSKEY support but did not provide expected NSEC/NSEC3 evidence. |
+| `DS10_EXPECTED_NSEC_NSEC3_MISSING` | Nameserver had DNSKEY support but did not provide expected NSEC/NSEC3 evidence (RFC 4035 section 3.1.3.1, RFC 5155 section 7.2.3). |
 | `DS10_HAS_NSEC` | Zone behavior is consistently NSEC-only for observed nameservers. |
 | `DS10_HAS_NSEC3` | Zone behavior is consistently NSEC3-only for observed nameservers. |
 | `DS10_INCONSISTENT_NSEC` | NSEC evidence is inconsistent across nameservers. |
 | `DS10_INCONSISTENT_NSEC3` | NSEC3 evidence is inconsistent across nameservers. |
 | `DS10_INCONSISTENT_NSEC_NSEC3` | At least one nameserver uses NSEC-only and at least one uses NSEC3-only, with no nameserver exhibiting both simultaneously. |
 | `DS10_MIXED_NSEC_NSEC3` | At least one nameserver shows both NSEC and NSEC3 behavior. |
-| `DS10_NONSTANDARD_NSEC_RESPONSE` | NSEC query returned NSEC in the authority section instead of the answer section (RFC 4470 white-lies / RFC 9824 compact denial). |
+| `DS10_NONSTANDARD_NSEC_RESPONSE` | NSEC query returned NSEC in the authority section instead of the answer section (RFC 4470 white-lies or RFC 9824 section 3.2 compact denial). |
 | `DS10_NSEC3PARAM_GIVES_ERR_ANSWER` | NSEC3PARAM query had unexpected non-empty answer content. |
-| `DS10_NSEC3PARAM_MISMATCHES_APEX` | NSEC3PARAM owner name did not match zone apex. |
+| `DS10_NSEC3PARAM_MISMATCHES_APEX` | NSEC3PARAM owner name did not match zone apex (RFC 5155 section 4). |
 | `DS10_NSEC3PARAM_QUERY_RESPONSE_ERR` | NSEC3PARAM query had no usable authoritative `NOERROR` response. |
-| `DS10_NSEC3_ERR_TYPE_LIST` | NSEC3 type bitmap failed mandatory/forbidden checks. |
-| `DS10_NSEC3_MISMATCHES_APEX` | NSEC3 owner hash/name did not match expected apex semantics. |
-| `DS10_NSEC3_MISSING_SIGNATURE` | NSEC3 RRset had no matching RRSIG coverage. |
-| `DS10_NSEC3_NODATA_MISSING_SOA` | NSEC3 NODATA authority response lacked SOA. |
-| `DS10_NSEC3_NODATA_WRONG_SOA` | NSEC3 NODATA authority response had SOA with wrong owner. |
+| `DS10_NSEC3_ERR_TYPE_LIST` | NSEC3 type bitmap failed mandatory/forbidden checks (RFC 5155 sections 7.1 and 7.2.3). |
+| `DS10_NSEC3_MISMATCHES_APEX` | NSEC3 owner hash/name did not match expected apex semantics (RFC 5155 section 7.2.3). |
+| `DS10_NSEC3_MISSING_SIGNATURE` | NSEC3 RRset had no matching RRSIG coverage (RFC 4035 section 3.1.1). |
+| `DS10_NSEC3_NODATA_MISSING_SOA` | NSEC3 NODATA authority response lacked SOA (RFC 2308 section 3). |
+| `DS10_NSEC3_NODATA_WRONG_SOA` | NSEC3 NODATA authority response had SOA with wrong owner (RFC 2308 section 3). |
 | `DS10_NSEC3_NO_VERIFIED_SIGNATURE` | NSEC3 signatures existed but none verified for affected nameservers. |
-| `DS10_NSEC3_RRSIG_EXPIRED` | NSEC3 RRSIG expired for given keytag. |
-| `DS10_NSEC3_RRSIG_NOT_YET_VALID` | NSEC3 RRSIG not yet valid for given keytag. |
-| `DS10_NSEC3_RRSIG_NO_DNSKEY` | NSEC3 RRSIG keytag had no matching DNSKEY. |
-| `DS10_NSEC3_RRSIG_VERIFY_ERROR` | NSEC3 RRSIG verification failed for given keytag. |
-| `DS10_NSEC_ERR_TYPE_LIST` | NSEC type bitmap failed mandatory/forbidden checks. |
+| `DS10_NSEC3_RRSIG_EXPIRED` | NSEC3 RRSIG expired for given keytag (RFC 4034 section 3.1.5). |
+| `DS10_NSEC3_RRSIG_NOT_YET_VALID` | NSEC3 RRSIG not yet valid for given keytag (RFC 4034 section 3.1.5). |
+| `DS10_NSEC3_RRSIG_NO_DNSKEY` | NSEC3 RRSIG keytag had no matching DNSKEY (RFC 4035 section 5.3.1). |
+| `DS10_NSEC3_RRSIG_VERIFY_ERROR` | NSEC3 RRSIG verification failed for given keytag (RFC 4035 section 5.3.3). |
+| `DS10_NSEC_ERR_TYPE_LIST` | NSEC type bitmap failed mandatory/forbidden checks (RFC 4034 section 4.1.2, RFC 4035 section 2.3). |
 | `DS10_NSEC_GIVES_ERR_ANSWER` | NSEC query had unexpected non-empty answer content. |
-| `DS10_NSEC_MISMATCHES_APEX` | NSEC owner name did not match zone apex. |
-| `DS10_NSEC_MISSING_SIGNATURE` | NSEC RRset had no matching RRSIG coverage. |
-| `DS10_NSEC_NODATA_MISSING_SOA` | NSEC NODATA authority response lacked SOA. |
-| `DS10_NSEC_NODATA_WRONG_SOA` | NSEC NODATA authority response had SOA with wrong owner. |
+| `DS10_NSEC_MISMATCHES_APEX` | NSEC owner name did not match zone apex (RFC 4035 section 3.1.3.1). |
+| `DS10_NSEC_MISSING_SIGNATURE` | NSEC RRset had no matching RRSIG coverage (RFC 4035 section 3.1.1). |
+| `DS10_NSEC_NODATA_MISSING_SOA` | NSEC NODATA authority response lacked SOA (RFC 2308 section 3). |
+| `DS10_NSEC_NODATA_WRONG_SOA` | NSEC NODATA authority response had SOA with wrong owner (RFC 2308 section 3). |
 | `DS10_NSEC_NO_VERIFIED_SIGNATURE` | NSEC signatures existed but none verified for affected nameservers. |
 | `DS10_NSEC_QUERY_RESPONSE_ERR` | NSEC query had no usable authoritative `NOERROR` response. |
-| `DS10_NSEC_RRSIG_EXPIRED` | NSEC RRSIG expired for given keytag. |
-| `DS10_NSEC_RRSIG_NOT_YET_VALID` | NSEC RRSIG not yet valid for given keytag. |
-| `DS10_NSEC_RRSIG_NO_DNSKEY` | NSEC RRSIG keytag had no matching DNSKEY. |
-| `DS10_NSEC_RRSIG_VERIFY_ERROR` | NSEC RRSIG verification failed for given keytag. |
+| `DS10_NSEC_RRSIG_EXPIRED` | NSEC RRSIG expired for given keytag (RFC 4034 section 3.1.5). |
+| `DS10_NSEC_RRSIG_NOT_YET_VALID` | NSEC RRSIG not yet valid for given keytag (RFC 4034 section 3.1.5). |
+| `DS10_NSEC_RRSIG_NO_DNSKEY` | NSEC RRSIG keytag had no matching DNSKEY (RFC 4035 section 5.3.1). |
+| `DS10_NSEC_RRSIG_VERIFY_ERROR` | NSEC RRSIG verification failed for given keytag (RFC 4035 section 5.3.3). |
 | `DS10_SERVER_NO_DNSSEC` | At least one nameserver returned a usable DNSKEY and at least one nameserver returned no usable DNSKEY. |
 | `DS10_ZONE_NO_DNSSEC` | No nameserver returned usable DNSKEY while at least one returned no DNSKEY. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
@@ -359,12 +359,12 @@ After the per-nameserver phase, with:
 
 ## Implementation Notes
 
-The following behaviors are implementation choices, not mandated by RFC 4034/4035/5155/4470/9824:
+The following behaviors are implementation choices, not mandated by RFC 4034, RFC 4035, RFC 5155, RFC 4470 or RFC 9824:
 
-- **Reference time source**: RRSIG validity checks use wall-clock time (`time.Now().UTC()`) as the reference "now".  RFC 4034 requires checking whether signatures are currently valid; using wall-clock time rather than packet timestamps (as `dnssec04` does) is an implementation choice appropriate for aggregate multi-nameserver analysis where a single consistent reference point is preferred.
+- **Reference time source**: RRSIG validity checks use wall-clock time (`time.Now().UTC()`) as the reference "now".  RFC 4034 section 3.1.5 requires checking whether signatures are currently valid; using wall-clock time rather than packet timestamps (as `dnssec04` does) is an implementation choice appropriate for aggregate multi-nameserver analysis where a single consistent reference point is preferred.
 - **Deduplication by IP**: The nameserver set is built by IP address; delegation and zone NS entries sharing the same IP are merged.  First-seen nameserver identity string (`name/ip`) is used in output arguments.  The protocol does not specify how to handle NS records for the same IP from different sources.
 - **`servers` vs `addresses` argument name**: Most DS10 tags use `servers` (nameserver identity strings) while `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `addresses` (raw IPs from the signature verification path).  This asymmetry is an implementation-defined output format.
-- **RFC 4470 / RFC 9824 white-lies NSEC handling**: When the NSEC query returns a NODATA response with NSEC in the authority section (rather than NSEC in the answer section), this is recognized as NSEC evidence from an on-line signing / minimally covering NSEC (RFC 4470) or compact denial of existence (RFC 9824) implementation.  RFC 9824 Section 7.2 explicitly permits dynamically generated NSEC records for owner names that don't exist or are ENTs, relaxing the RFC 4035 constraint.  The synthesized NSEC record's type bitmap intentionally excludes the queried type (NSEC) and may include normally-forbidden types (NSEC3PARAM), so type-list validation is skipped for this record.  All other checks (SOA, count, apex owner, signature) are performed normally.  For consistency purposes this evidence is treated identically to NSEC-in-answer.
+- **RFC 4470 / RFC 9824 white-lies NSEC handling**: When the NSEC query returns a NODATA response with NSEC in the authority section (rather than NSEC in the answer section), this is recognized as NSEC evidence from an on-line signing / minimally covering NSEC (RFC 4470) or compact denial of existence (RFC 9824) implementation.  RFC 9824 section 7.2 explicitly permits dynamically generated NSEC records for owner names that don't exist or are ENTs, relaxing the RFC 4035 section 2.3 constraint.  The synthesized NSEC record's type bitmap intentionally excludes the queried type (NSEC) and may include normally-forbidden types (NSEC3PARAM), so type-list validation is skipped for this record.  All other checks (SOA, count, apex owner, signature) are performed normally.  For consistency purposes this evidence is treated identically to NSEC-in-answer.
 
 ## Edge Cases And Limitations
 - Nameserver processing is deduplicated by IP; all DS10 output tags except `DS10_ALGO_NOT_SUPPORTED_BY_ZM` report `servers` as nameserver identity strings (`name/ip`) rather than raw IPs.

@@ -53,7 +53,7 @@ Status: Final
     - Each non-DELETE CDNSKEY's `KeyTag()` must appear in `dsKeytagSet`; otherwise the comparison is a mismatch.
     - Collect `digestTypes` from the parent DS RRset, keeping only the types this implementation can recompute (SHA-1, SHA-256, SHA-384). DS records of any other digest type, GOST and SM3 among them, are excluded from the comparison: a digest that cannot be recomputed cannot establish either a match or a mismatch.
     - If no DS record remains after that exclusion, the content comparison is indeterminate and emits `DS18_CDNSKEY_MATCHES_DS`, since the keytag check above is the only evidence available and a rollover must not be inferred from an uncomputable digest.
-    - For each non-DELETE CDNSKEY × digestType, compute a DS-equivalent digest using `DNSKEY.ToDS(digestType)`.
+    - For each non-DELETE CDNSKEY × digestType, compute a DS-equivalent digest using `DNSKEY.ToDS(digestType)` (RFC 7344 section 6.2).
     - If every CDNSKEY's keytag is in `dsKeytagSet`, every remaining parent DS entry is covered by some CDNSKEY-derived digest, and every CDNSKEY contributes at least one matching DS entry, emit `DS18_CDNSKEY_MATCHES_DS` with `cdnskey_keytags` and `ds_keytags`.
     - Otherwise emit `DS18_CDNSKEY_ROLLOVER_SIGNALED` with `cdnskey_keytags` and `ds_keytags`.
 15. **Soft rollover signals** (evaluated whenever DNSKEY records are available, using first representative nameserver):
@@ -186,17 +186,17 @@ The bonus criterion `cds_cdnskey_published` in `scoring/bonus.go` treats `DS18_N
 | Tag | Emitted when |
 | --- | --- |
 | `DS18_CDS_MATCHES_DS` | CDS RRset content equals the parent DS RRset. Steady-state confirmation. |
-| `DS18_CDS_ROLLOVER_SIGNALED` | CDS RRset content differs from parent DS. Parent is being asked to change its DS. |
+| `DS18_CDS_ROLLOVER_SIGNALED` | CDS RRset content differs from parent DS. Parent is being asked to change its DS (RFC 8078 section 2.1). |
 | `DS18_CDNSKEY_MATCHES_DS` | CDNSKEY digests (using parent DS digest types) equal the parent DS RRset. |
 | `DS18_CDNSKEY_ROLLOVER_SIGNALED` | CDNSKEY digests differ from parent DS. |
 | `DS18_MATCH_CDNSKEY_RRSIG_DS` | CDNSKEY RRset is signed by a DS-linked DNSKEY keytag at at least one nameserver. |
 | `DS18_MATCH_CDS_RRSIG_DS` | CDS RRset is signed by a DS-linked DNSKEY keytag at at least one nameserver. |
-| `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | No DS-linked DNSKEY keytag matches any CDNSKEY RRSIG keytag for nameserver. |
-| `DS18_NO_MATCH_CDS_RRSIG_DS` | No DS-linked DNSKEY keytag matches any CDS RRSIG keytag for nameserver. |
+| `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | No DS-linked DNSKEY keytag matches any CDNSKEY RRSIG keytag for nameserver (RFC 7344 section 4.1). |
+| `DS18_NO_MATCH_CDS_RRSIG_DS` | No DS-linked DNSKEY keytag matches any CDS RRSIG keytag for nameserver (RFC 7344 section 4.1). |
 | `DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE` | No CDS/CDNSKEY RRset found but other rollover evidence is visible. On-demand publication model. |
 | `DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG` | DNSKEY RRset is signed by more than one KSK keytag. Double-signature rollover phase. |
 | `DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS` | Child has a SEP DNSKEY keytag with no matching DS at the parent. Pre-publication phase. |
-| `DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY` | Parent DS keytag has no matching DNSKEY at the child. Post-removal phase. |
+| `DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY` | Parent DS keytag has no matching DNSKEY at the child (RFC 4035 section 2.4). Post-removal phase. |
 | `DS18_ROLLOVER_EVIDENCE_MULTI_KSK` | Child DNSKEY RRset contains more than one SEP-flagged key. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for queried parent/child rrtypes. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for queried parent/child rrtypes. |
@@ -268,6 +268,6 @@ The bonus criterion `cds_cdnskey_published` in `scoring/bonus.go` treats `DS18_N
 - Content comparison (steps 13-14) and soft signals (step 15) use only the first representative nameserver per RRset type; inconsistencies across nameservers are flagged separately by DNSSEC15.
 - A nameserver that publishes only DELETE-sentinel CDS/CDNSKEY records (Algorithm == 0) is treated as having no comparable content and is skipped for steps 13-14 in favour of the next nameserver. If every nameserver carries only DELETE sentinels, neither `MATCHES_DS` nor `ROLLOVER_SIGNALED` is emitted; DNSSEC16/17 covers the DELETE flow.
 - Soft rollover signals (step 15) run regardless of CDS/CDNSKEY presence whenever DNSKEY records are available (and DS records are present, per the outer guard).
-- CDNSKEY digest comparison reuses only digest types already present in the parent DS RRset; no new digest types are introduced. If the parent publishes DS in multiple digest types and the child's CDS RRset omits some types, the canonical sets differ and `DS18_CDS_ROLLOVER_SIGNALED` fires. Per RFC 7344 the CDS RRset is the operator's complete request, so reduced digest-type coverage is a legitimate change.
+- CDNSKEY digest comparison reuses only digest types already present in the parent DS RRset; no new digest types are introduced. If the parent publishes DS in multiple digest types and the child's CDS RRset omits some types, the canonical sets differ and `DS18_CDS_ROLLOVER_SIGNALED` fires. Per RFC 7344 section 3 the CDS RRset is the operator's complete request, so reduced digest-type coverage is a legitimate change.
 - Parent DS collection deduplicates by DS content fields and ignores duplicates across parent nameservers.
 - Nameserver evaluation is deduplicated by IP on both parent and child sides.

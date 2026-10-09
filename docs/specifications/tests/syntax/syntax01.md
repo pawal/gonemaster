@@ -23,7 +23,7 @@ Status: Final
 | Tag | Emitted when |
 | --- | --- |
 | `ONLY_ALLOWED_CHARS` | All domain labels contain only `A-Z`, `a-z`, `0-9`, and `-`. |
-| `NON_ALLOWED_CHARS` | At least one domain label contains a disallowed character. |
+| `NON_ALLOWED_CHARS` | At least one domain label contains a disallowed character (RFC 1035 section 2.3.1). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

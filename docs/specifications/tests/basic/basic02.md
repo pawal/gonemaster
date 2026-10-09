@@ -88,9 +88,9 @@ emit TEST_CASE_END
 | `B02_AUTH_RESPONSE_SOA` | At least one nameserver returns authoritative SOA for child zone. |
 | `B02_NO_DELEGATION` | No delegation NS names are found. |
 | `B02_NO_WORKING_NS` | No nameserver qualifies as authoritative SOA responder. |
-| `B02_NS_BROKEN` | Nameserver response is NOERROR+AA but lacks SOA answer for child name. |
-| `B02_NS_NOT_AUTH` | Nameserver responds but AA is not set. |
-| `B02_NS_NO_IP_ADDR` | Nameserver name could not be resolved into an IP address. |
+| `B02_NS_BROKEN` | Nameserver response is NOERROR+AA but lacks SOA answer for child name (RFC 1034 section 4.2.1). |
+| `B02_NS_NOT_AUTH` | Nameserver responds but AA is not set (RFC 1912 section 2.8). |
+| `B02_NS_NO_IP_ADDR` | Nameserver name could not be resolved into an IP address (RFC 2181 section 10.3). |
 | `B02_NS_NO_RESPONSE` | Nameserver probe returns no response packet. |
 | `B02_UNEXPECTED_RCODE` | Nameserver response rcode is not `NOERROR`. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for SOA probe. |

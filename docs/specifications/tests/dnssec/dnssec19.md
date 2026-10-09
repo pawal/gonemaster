@@ -31,12 +31,12 @@ Status: Final
    - Else classify nameserver as `Responds With DNSKEY`, and for each DNSKEY record:
      - Compute keytag.
      - Parse key material based on algorithm type:
-       - RSA (algorithms 1, 5, 7, 8, 10): extract modulus N and exponent e per RFC 3110.
-       - DSA (algorithms 3, 6): extract Y value per RFC 2536.
-       - ECDSA P-256 (algorithm 13): extract X coordinate (first 32 bytes of 64-byte key) per RFC 6605.
-       - ECDSA P-384 (algorithm 14): extract X coordinate (first 48 bytes of 96-byte key) per RFC 6605.
-       - Ed25519 (algorithm 15): convert 32-byte raw key to integer per RFC 8080.
-       - Ed448 (algorithm 16): convert 57-byte raw key to integer per RFC 8080.
+       - RSA (algorithms 1, 5, 7, 8, 10): extract modulus N and exponent e per RFC 3110 section 2.
+       - DSA (algorithms 3, 6): extract Y value per RFC 2536 section 2.
+       - ECDSA P-256 (algorithm 13): extract X coordinate (first 32 bytes of 64-byte key) per RFC 6605 section 4.
+       - ECDSA P-384 (algorithm 14): extract X coordinate (first 48 bytes of 96-byte key) per RFC 6605 section 4.
+       - Ed25519 (algorithm 15): convert 32-byte raw key to integer per RFC 8080 section 3.
+       - Ed448 (algorithm 16): convert 57-byte raw key to integer per RFC 8080 section 3.
      - If key material cannot be parsed, skip the key (do not emit a tag).
      - If RSA key, run the following checks:
        - **fermat**: Fermat factorization (100 rounds). Detects close-prime vulnerabilities.
@@ -118,7 +118,7 @@ emit TEST_CASE_END
 | `DS19_BADKEY_FERMAT` | At least one RSA DNSKEY has a modulus factorable via Fermat factorization (close primes). |
 | `DS19_BADKEY_PATTERN` | At least one RSA DNSKEY has a modulus with a suspicious repeating byte pattern (16 identical consecutive bytes). |
 | `DS19_BADKEY_ROCA` | At least one RSA DNSKEY is vulnerable to the ROCA attack (CVE-2017-15361). |
-| `DS19_BADKEY_RSA_INVALID` | At least one RSA DNSKEY has invalid parameters (exponent e < 3 or e >= modulus N). |
+| `DS19_BADKEY_RSA_INVALID` | At least one RSA DNSKEY has invalid parameters (exponent e < 3 or e >= modulus N; RFC 8017 section 3.1). |
 | `DS19_BADKEY_SMALL_FACTORS` | At least one RSA DNSKEY has a modulus with small prime factors (<= 65537). |
 | `DS19_BADKEY_SMALL_D` | At least one RSA DNSKEY has a private exponent recoverable via Wiener's continued fractions attack. |
 | `DS19_KEY_OK` | At least one DNSKEY passed all enabled badkey checks with no findings. |

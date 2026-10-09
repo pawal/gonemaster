@@ -23,7 +23,7 @@ Status: Final
    - Query SOA for zone apex.
    - No response message -> emit `NO_RESPONSE`.
    - Response without usable SOA record -> emit `NO_RESPONSE_SOA_QUERY`.
-   - Otherwise extract lowercase SOA MNAME and store it for that nameserver.
+   - Otherwise extract lowercase SOA MNAME (RFC 1035 section 3.3.13) and store it for that nameserver.
 4. If exactly one MNAME value exists, emit `ONE_SOA_MNAME`.
 5. If multiple MNAME values exist:
    - Emit `MULTIPLE_SOA_MNAMES`.
@@ -35,7 +35,7 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
-| `MULTIPLE_SOA_MNAMES` | At least two distinct SOA MNAME values were observed. |
+| `MULTIPLE_SOA_MNAMES` | At least two distinct SOA MNAME values were observed; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
 | `NO_RESPONSE` | SOA query had no response message from a nameserver. |
 | `NO_RESPONSE_SOA_QUERY` | Response did not contain a usable SOA record for zone apex. |
 | `ONE_SOA_MNAME` | Exactly one SOA MNAME value was observed. |

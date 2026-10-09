@@ -24,7 +24,7 @@ Status: Final
    - skip disabled transports;
    - return the first response that has SOA in answer and `AA=true`.
 3. If no qualifying SOA response is found, emit `NO_RESPONSE_SOA_QUERY`.
-4. Else, take SOA MNAME (`soa.Ns`) without trailing dot and evaluate both query types `A` and `AAAA`:
+4. Else, take SOA MNAME (`soa.Ns`, RFC 1035 section 3.3.13) without trailing dot and evaluate both query types `A` and `AAAA`:
    - recurse for MNAME and query type;
    - if recurse result is missing, skip this query type;
    - increment `addresses` counter when answer contains queried type for original MNAME or final question name;
@@ -37,7 +37,7 @@ Status: Final
 | Tag | Emitted when |
 | --- | --- |
 | `MNAME_HAS_NO_ADDRESS` | Neither `A` nor `AAAA` lookup produced an address answer for SOA MNAME. |
-| `MNAME_IS_CNAME` | SOA MNAME lookup shows alias behavior (CNAME RR or rewritten final query name). |
+| `MNAME_IS_CNAME` | SOA MNAME lookup shows alias behavior (CNAME RR or rewritten final query name); a domain name in RDATA should point at the canonical name, not an alias (RFC 1034 section 3.6.2). |
 | `MNAME_IS_NOT_CNAME` | SOA MNAME lookup did not show alias behavior for that query-type evaluation. |
 | `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

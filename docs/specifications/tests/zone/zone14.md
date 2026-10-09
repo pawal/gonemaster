@@ -101,12 +101,12 @@ emit TEST_CASE_END
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `Z14_DUPLICATE_SCHEME_HASH` | Two or more ZONEMD records on the same nameserver share the same `(Scheme, Hash)` pair. |
+| `Z14_DUPLICATE_SCHEME_HASH` | Two or more ZONEMD records on the same nameserver share the same `(Scheme, Hash)` pair (RFC 8976 section 2.5). |
 | `Z14_INCONSISTENT_ZONEMD` | ZONEMD content differs across authoritative nameservers. |
 | `Z14_MIXED_PRESENCE` | ZONEMD present on some nameservers but absent on others. |
 | `Z14_NO_ZONEMD` | No ZONEMD record found at zone apex (consolidated across all nameservers without ZONEMD). |
-| `Z14_SERIAL_MISMATCH` | ZONEMD `Serial` differs from the current SOA serial of the same nameserver. |
-| `Z14_UNSUPPORTED_HASH` | ZONEMD hash algorithm is outside `{1 = SHA-384, 2 = SHA-512}` (consolidated per `(ns, hash)` pair). |
+| `Z14_SERIAL_MISMATCH` | ZONEMD `Serial` differs from the current SOA serial of the same nameserver (RFC 8976 sections 2.2.1 and 4). |
+| `Z14_UNSUPPORTED_HASH` | ZONEMD hash algorithm is outside `{1 = SHA-384, 2 = SHA-512}` (RFC 8976 section 2.2.3; consolidated per `(ns, hash)` pair). |
 | `Z14_ZONEMD_FOUND` | ZONEMD record found at zone apex (consolidated per distinct record content). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
@@ -150,9 +150,9 @@ emit TEST_CASE_END
 | `Z14_DUPLICATE_SCHEME_HASH` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z14_INCONSISTENT_ZONEMD` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z14_MIXED_PRESENCE` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
-| `Z14_NO_ZONEMD` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). ZONEMD is optional per RFC 8976. |
+| `Z14_NO_ZONEMD` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). ZONEMD is optional per RFC 8976 section 1. |
 | `Z14_SERIAL_MISMATCH` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
-| `Z14_UNSUPPORTED_HASH` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). RFC 8976 permits private-use values, but standard verifiers cannot process anything outside `{1, 2}`. |
+| `Z14_UNSUPPORTED_HASH` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). RFC 8976 section 2.5 permits private-use values, but standard verifiers cannot process anything outside `{1, 2}`. |
 | `Z14_ZONEMD_FOUND` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
@@ -164,9 +164,9 @@ emit TEST_CASE_END
   - `no`
 
 ## Edge Cases And Limitations
-- ZONEMD is an optional zone apex record per RFC 8976; `Z14_NO_ZONEMD` is informational only and does not indicate a problem.
+- ZONEMD is an optional zone apex record per RFC 8976 section 1; `Z14_NO_ZONEMD` is informational only and does not indicate a problem.
 - Only authoritative NOERROR responses are evaluated. Nameservers returning non-NOERROR or non-AA responses are skipped silently.
-- Multiple ZONEMD records with distinct `(Scheme, Hash)` pairs at the zone apex are valid per RFC 8976 §2.2.4 and emit one `Z14_ZONEMD_FOUND` per distinct record content; only repeated `(Scheme, Hash)` pairs produce `Z14_DUPLICATE_SCHEME_HASH`.
+- Multiple ZONEMD records with distinct `(Scheme, Hash)` pairs at the zone apex are valid per RFC 8976 section 2.5 and emit one `Z14_ZONEMD_FOUND` per distinct record content; only repeated `(Scheme, Hash)` pairs produce `Z14_DUPLICATE_SCHEME_HASH`.
 - Hash algorithm `1` (SHA-384) MUST be supported by verifiers; algorithm `2` (SHA-512) SHOULD be supported. Any other value (reserved `0` and `255`, unassigned `3-239`, private-use `240-254`) emits `Z14_UNSUPPORTED_HASH` once per `(ns, hash)` pair; the underlying records are still surfaced via `Z14_ZONEMD_FOUND` so the digest content remains visible. `Scheme` values outside `{1 = SIMPLE}` are not flagged separately; only the hash algorithm is gated, since `Scheme` only affects canonicalization and the digest itself is not verified by this testcase.
 - `Digest` content is **not** verified. Only structural fields (`Serial`, `Scheme`, `Hash`, presence) and cross-nameserver content equality are evaluated. Full digest verification would require performing an AXFR and recomputing the digest over the canonical zone, which is out of scope for this testcase.
 - `Z14_SERIAL_MISMATCH` is only evaluated when the SOA query to the same nameserver succeeds and returns a SOA record. If the SOA query fails, no mismatch is reported for that nameserver.

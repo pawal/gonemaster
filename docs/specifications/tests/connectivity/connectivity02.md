@@ -22,14 +22,14 @@ Status: Final
 3. For each nameserver (parallelized):
    - If transport for this nameserver IP version is disabled:
      - Emit `IPV4_DISABLED` or `IPV6_DISABLED` for each rrtype (`SOA`, `NS`) and skip queries for that nameserver.
-   - Else query SOA and NS for child zone over TCP (`UseVC=true`).
+   - Else query SOA and NS for child zone over TCP (`UseVC=true`), a transport every DNS server MUST service (RFC 9210 section 3).
    - If both responses are absent, emit `CN02_NO_RESPONSE_TCP`.
-   - Otherwise evaluate SOA and NS responses independently:
+   - Otherwise evaluate SOA and NS responses independently; a server for the zone answers both from the apex NS RRset and SOA RR (RFC 1034 sections 4.2.1 and 4.3.2):
      - No response -> `CN02_NO_RESPONSE_<QTYPE>_QUERY_TCP`.
      - `RCODE != NOERROR` -> `CN02_UNEXPECTED_RCODE_<QTYPE>_QUERY_TCP`.
      - No `<QTYPE>` record in answer -> `CN02_MISSING_<QTYPE>_RECORD_TCP`.
      - First answer owner name differs from child zone -> `CN02_WRONG_<QTYPE>_RECORD_TCP`.
-     - AA flag unset -> `CN02_<QTYPE>_RECORD_NOT_AA_TCP`.
+     - AA flag unset (RFC 1035 section 4.1.1) -> `CN02_<QTYPE>_RECORD_NOT_AA_TCP`.
    - If all checks passed, record nameserver as ok.
 4. If any nameservers passed all checks, emit one `CN02_OK_TCP` with `servers` listing them all.
 5. Emit `TEST_CASE_END`.

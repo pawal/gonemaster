@@ -26,7 +26,7 @@ Status: Final
    - `AA=true`;
    - at least one SOA RR for the zone name exists.
 4. From accepted SOA answers, collect:
-   - SOA MNAME values;
+   - SOA MNAME values, which name the primary server for the zone (RFC 1035 section 3.3.13, RFC 2181 section 7.3);
    - SOA serial values from child nameservers;
    - source nameserver IPs where MNAME is `localhost` or `.`.
 5. Emit:
@@ -44,7 +44,7 @@ Status: Final
        - If SOA present but `AA=false`, emit `Z01_MNAME_NOT_AUTHORITATIVE`.
        - If SOA present and `AA=true`, store returned serial for master comparison.
    - If no MNAME address was resolved, emit `Z01_MNAME_NOT_RESOLVE` (subject to the implementation caveat documented below).
-7. If at least one authoritative MNAME serial was collected, compare each collected MNAME serial against serials gathered from child nameservers using RFC1982 ordering:
+7. If at least one authoritative MNAME serial was collected, compare each collected MNAME serial against serials gathered from child nameservers using RFC 1982 section 3.2 ordering:
    - If any child nameserver serial is greater than the candidate MNAME serial, classify as not master.
    - Otherwise classify as master.
 8. Emit:
@@ -125,7 +125,7 @@ emit TEST_CASE_END
 | `Z01_MNAME_IS_MASTER` | One or more MNAME host/IP pairs are inferred to be master by serial comparison. |
 | `Z01_MNAME_MISSING_SOA_RECORD` | A direct SOA query to an MNAME host/IP responds without SOA in answer. |
 | `Z01_MNAME_NOT_AUTHORITATIVE` | A direct SOA query to an MNAME host/IP returns SOA but is not authoritative (`AA=false`). |
-| `Z01_MNAME_NOT_IN_NS_LIST` | MNAME hostname is not listed among child NS names ([`z.ApexNSNames`](../../nameserver-resolution.md#apexnsnames)). |
+| `Z01_MNAME_NOT_IN_NS_LIST` | MNAME hostname is not listed among child NS names ([`z.ApexNSNames`](../../nameserver-resolution.md#apexnsnames)); RFC 1996 section 2.1 makes that NS RR optional. |
 | `Z01_MNAME_NOT_MASTER` | One or more MNAME host/IP pairs have a serial lower than at least one child nameserver serial. |
 | `Z01_MNAME_NOT_RESOLVE` | MNAME hostname cannot be resolved to any address. |
 | `Z01_MNAME_NO_RESPONSE` | A direct SOA query to an MNAME host/IP receives no response. |

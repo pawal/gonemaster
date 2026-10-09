@@ -23,7 +23,7 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DISCOURAGED_DOUBLE_DASH` | A non-ACE label has `--` in positions 3 and 4. |
+| `DISCOURAGED_DOUBLE_DASH` | A non-ACE label has `--` in positions 3 and 4 (RFC 5890 section 2.3.1). |
 | `NO_DOUBLE_DASH` | Domain labels exist and no discouraged double dash is found. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

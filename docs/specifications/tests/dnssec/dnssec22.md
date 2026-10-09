@@ -197,11 +197,12 @@ cut, for a cut X itself serves. It queries `M DS` at X with DNSSEC enabled
   - Locate the NSEC record whose owner is M, or the NSEC3 record whose owner
     matches the hash of M computed with the salt and iteration count of that
     record.
-  - Type bitmap with the NS bit and without the DS bit: `insecure`.
+  - Type bitmap with the NS bit and without the DS bit: `insecure` (RFC 4035
+    section 5.2, RFC 5155 section 8.6).
   - Type bitmap with both the NS bit and the DS bit: the bitmap contradicts the
     NODATA, `indeterminate`.
   - Type bitmap without the NS bit: `not a cut`. RFC 5155 section 8.9 and RFC
-    4035 section 5.2 make the NS bit the statement of the parent zone that a
+    6840 section 4.4 make the NS bit the statement of the parent zone that a
     zone cut exists at the name.
   - No record matching M: the closest encloser CE is the longest proper
     ancestor of M whose hash matches an NSEC3 record of the response, and the
@@ -327,13 +328,13 @@ emit TEST_CASE_END
 | Tag | Emitted when |
 | --- | --- |
 | `DS22_NO_IN_DOMAIN_NS` | No nameserver name of the zone is in-domain, the root zone included. |
-| `DS22_NS_ADDRESS_CHAIN_BROKEN` | The expected signer is a zone cut below the zone apex on the same nameserver, and its DS matches no DNSKEY, or its DNSKEY or DS RRSIG does not verify. |
+| `DS22_NS_ADDRESS_CHAIN_BROKEN` | The expected signer is a zone cut below the zone apex on the same nameserver, and its DS matches no DNSKEY, or its DNSKEY or DS RRSIG does not verify (RFC 4035 section 5.2). |
 | `DS22_NS_ADDRESS_INSECURE` | The name lies below an insecure delegation served by the same nameserver. |
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | The address records are signed by a name the nameserver serves as a zone apex, while the NSEC or NSEC3 record matching that name in the enclosing zone carries no NS bit, so no zone cut is proven. |
-| `DS22_NS_ADDRESS_RRSIG_EXPIRED` | The expiration of the RRSIG covering the address records is in the past. |
+| `DS22_NS_ADDRESS_RRSIG_EXPIRED` | The expiration of the RRSIG covering the address records is in the past (RFC 4035 section 5.3.1). |
 | `DS22_NS_ADDRESS_REFERRED` | The name lies below a delegation whose DS validates, and no nameserver of the delegated zone was reachable for it: no `NS` name of the referral carries glue, no such nameserver answered the `DNSKEY` question authoritatively, or the referral came from a nameserver of the delegated zone itself. |
-| `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | The RRSIG covering the address records does not verify against the DNSKEY RRset of the zone that must sign the name: bad signature, inception in the future, no DNSKEY with the keytag, or a signer that is neither the expected zone nor an orphan apex. |
-| `DS22_NS_ADDRESS_UNSIGNED` | The address records, or the NODATA proof standing for them, carry no RRSIG and no insecure delegation lies between the name and the zone apex. |
+| `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | The RRSIG covering the address records does not verify against the DNSKEY RRset of the zone that must sign the name: bad signature, inception in the future, no DNSKEY with the keytag, or a signer that is neither the expected zone nor an orphan apex (RFC 4035 sections 5.3.1 and 5.3.3). |
+| `DS22_NS_ADDRESS_UNSIGNED` | The address records, or the NODATA proof standing for them, carry no RRSIG and no insecure delegation lies between the name and the zone apex (RFC 4035 sections 2.2 and 3.1.1). |
 | `DS22_NS_ADDRESS_VALIDATES` | At least one in-domain address RRset validated and no ERROR-level `DS22_*` tag was emitted. |
 | `DS22_ZONE_NOT_SECURE` | No child nameserver returned an apex DNSKEY RRset, or no parent nameserver returned a DS RRset for the zone. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`A`). |
@@ -515,12 +516,14 @@ Implementation-defined choices, none of them mandated by the protocol:
 - Related tests:
   - `engine/test/dnssec/dnssec22_test.go`.
 - References:
-  - RFC 1034, RFC 1035 (zone cuts, delegation).
+  - RFC 1034 section 4.2 (zone cuts, delegation).
   - RFC 2181 section 10.3 (no alias at a nameserver name).
-  - RFC 4033, RFC 4034, RFC 4035 (DNSSEC, NSEC type bitmap, authenticating a
+  - RFC 4033 section 2 (DNSSEC terms, island of security), RFC 4034 section
+    4.1.2 (NSEC type bitmap), RFC 4035 sections 5.2 and 5.4 (authenticating a
     referral and a negative response).
   - RFC 5155 (NSEC3, opt-out, proving the absence of a DS).
-  - RFC 9471 (glue for in-domain nameserver names).
-  - RFC 9499 section 7 (in-domain, sibling domain, zone cut) and section 10
-    (signed zone, insecure delegation, island of security, and the secure,
-    insecure, bogus and indeterminate validation states).
+  - RFC 6840 section 4.4 (insecure delegation proofs).
+  - RFC 9471 section 3.1 (glue for in-domain nameserver names).
+  - RFC 9499 section 7 (in-domain, sibling domain, zone cut), section 10
+    (signed zone, insecure delegation) and section 11 (the secure, insecure,
+    bogus and indeterminate validation states).

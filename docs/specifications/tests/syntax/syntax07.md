@@ -28,9 +28,9 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `MNAME_DISCOURAGED_DOUBLE_DASH` | MNAME has non-ACE `--` in positions 3 and 4. |
-| `MNAME_NON_ALLOWED_CHARS` | MNAME has disallowed characters. |
-| `MNAME_NUMERIC_TLD` | MNAME rightmost label is numeric-only. |
+| `MNAME_DISCOURAGED_DOUBLE_DASH` | MNAME has non-ACE `--` in positions 3 and 4 (RFC 5890 section 2.3.1). |
+| `MNAME_NON_ALLOWED_CHARS` | MNAME has disallowed characters (RFC 1035 section 2.3.1). |
+| `MNAME_NUMERIC_TLD` | MNAME rightmost label is numeric-only (RFC 1123 section 2.1, RFC 3696 section 2). |
 | `MNAME_SYNTAX_OK` | MNAME passes all implemented checks. |
 | `NO_RESPONSE_SOA_QUERY` | No usable SOA answer is obtained. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

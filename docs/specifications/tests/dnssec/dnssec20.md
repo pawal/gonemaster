@@ -29,7 +29,7 @@ Status: Final
    - Query `NSEC` (DNSSEC enabled) to obtain the apex type bitmap:
      - If an NSEC record for the apex is present in the answer section, extract its type bitmap (NSEC zone).
      - Else if an NSEC3 record matching the apex hash is present in the authority section, extract its type bitmap (NSEC3 zone).
-     - An NSEC or NSEC3 record whose covering RRSIG records all carry a Signer's Name other than the zone name belongs to the parent zone (RFC 4034, section 3.1.7) and MUST be ignored. A record without covering RRSIG records is accepted.
+     - An NSEC or NSEC3 record whose covering RRSIG records all carry a Signer's Name other than the zone name belongs to the parent zone (RFC 4034 section 3.1.7) and MUST be ignored. A record without covering RRSIG records is accepted.
    - If no bitmap obtained from the NSEC query, try `NSEC3PARAM` query and look for an NSEC record in the authority section (NODATA response). The same signer rule applies.
    - If no bitmap could be obtained, classify nameserver as `no_bitmap` and skip.
    - For each probed type (A, AAAA, MX, TXT):
@@ -98,8 +98,8 @@ emit TEST_CASE_END
 | `DS20_BITMAP_OK` | All probed types present in the zone are correctly represented in the NSEC/NSEC3 type bitmap on all responding nameservers. |
 | `DS20_NO_BITMAP` | Nameserver has DNSKEY but no NSEC/NSEC3 bitmap could be obtained for the apex. |
 | `DS20_NO_DNSSEC` | No nameserver returned a usable DNSKEY; bitmap check skipped. |
-| `DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE` | An existing RR type at the apex is missing from the NSEC3 type bitmap. Enables cache poisoning via RFC 8198. |
-| `DS20_NSEC_BITMAP_MISMATCHES_RRTYPE` | An existing RR type at the apex is missing from the NSEC type bitmap. Enables cache poisoning via RFC 8198. |
+| `DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE` | An existing RR type at the apex is missing from the NSEC3 type bitmap (RFC 5155 section 7.1). Enables cache poisoning via RFC 8198. |
+| `DS20_NSEC_BITMAP_MISMATCHES_RRTYPE` | An existing RR type at the apex is missing from the NSEC type bitmap (RFC 4034 section 4.1.2). Enables cache poisoning via RFC 8198. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -159,7 +159,7 @@ emit TEST_CASE_END
 - Related tests:
   - `engine/test/dnssec/dnssec_test.go` (TestDNSSEC20BitmapOK, TestDNSSEC20NSECSubsetBitmap, TestDNSSEC20ParentSideNSECIgnored, TestDNSSEC20ParentSideNSEC3Ignored, TestDNSSEC20NSEC3SubsetBitmap, TestDNSSEC20NoDNSSEC)
 - References:
-  - RFC 4034 (NSEC type bitmap format)
-  - RFC 5155 (NSEC3 type bitmap format)
+  - RFC 4034 section 4.1.2 (NSEC type bitmap format)
+  - RFC 5155 section 3.2.1 (NSEC3 type bitmap format)
   - RFC 8198 (Aggressive Use of DNSSEC-Validated Cache)
   - Petr Špaček, "NSEC* type bitmap discrepancies", OARC 35, 2021-11-30

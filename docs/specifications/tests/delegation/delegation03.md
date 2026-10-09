@@ -72,8 +72,8 @@ emit TEST_CASE_END
 | Tag | Emitted when |
 | --- | --- |
 | `REFERRAL_SIZE_OK` | Synthesized packed referral size is within the 512-byte non-EDNS UDP limit. |
-| `REFERRAL_SIZE_LARGE` | Synthesized packed referral size exceeds 512 bytes but fits within the 1232-byte EDNS payload size. |
-| `REFERRAL_SIZE_TOO_LARGE` | Synthesized packed referral size exceeds the 1232-byte EDNS payload size. |
+| `REFERRAL_SIZE_LARGE` | Synthesized packed referral size exceeds 512 bytes, the UDP limit without EDNS (RFC 1035 section 4.2.1), but fits within the 1232-byte EDNS payload size. |
+| `REFERRAL_SIZE_TOO_LARGE` | Synthesized packed referral size exceeds the 1232-byte EDNS payload size (RFC 9715 appendix A). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

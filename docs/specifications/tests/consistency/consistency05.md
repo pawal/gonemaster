@@ -48,14 +48,14 @@ Status: Final
    - Referral responses trigger recursive fallback lookup and use resulting answer data if available.
    - Otherwise accumulate child authoritative `owner/ip` pairs.
 11. If no in-domain address lookup path was usable for any in-domain NS name, emit `CHILD_ZONE_LAME`, emit `TEST_CASE_END`, and return.
-12. Compare in-domain glue against child address data, per NS name. Only names carrying at least one glue address take part; a name with no glue anywhere in the union is not compared, and is reported as missing glue by Delegation01 instead. For each such name, in sorted order:
+12. Compare in-domain glue against child address data (RFC 1034 section 4.2.2), per NS name. Only names carrying at least one glue address take part; a name with no glue anywhere in the union is not compared, and is reported as missing glue by Delegation01 instead. For each such name, in sorted order:
    - Child serves no address record for the name -> emit `MISSING_ADDRESS_CHILD` with `ns`, and compare nothing further for that name.
    - Otherwise, glue addresses the child does not serve -> emit `IN_DOMAIN_ADDR_MISMATCH` with `ns`, `parent_servers` holding only those unconfirmed glue addresses, and `zone_servers` holding the child addresses for that name.
    - Otherwise, child addresses absent from that name's glue accumulate into the aggregate `EXTRA_ADDRESS_CHILD`. A name with an in-domain mismatch contributes nothing, since its `zone_servers` already lists the child addresses.
 13. For each not-in-domain NS name in extended glue:
    - Recurse A and AAAA, build child/public `owner/ip` set.
    - A lookup is settled when it returns NOERROR with answer records, or NXDOMAIN or NODATA with AA set. Glue addresses of a family whose lookup is not settled are not compared.
-   - If any compared parent glue item for that name is missing from child/public set, emit `NOT_IN_DOMAIN_ADDR_MISMATCH`.
+   - If any compared parent glue item for that name is missing from child/public set, emit `NOT_IN_DOMAIN_ADDR_MISMATCH` (RFC 1034 section 4.2.2).
 14. If no address fault was found, emit `ADDRESSES_MATCH`. A delegation carrying no glue at all reaches this point with nothing to disagree about and is reported as matching. The delegation NS-set tags from step 6 do not affect this guard.
 15. Emit `TEST_CASE_END`.
 
@@ -159,7 +159,7 @@ emit TEST_CASE_END
 | `EXTRA_ADDRESS_CHILD` | For names that have glue and no in-domain mismatch, the child serves addresses not present in that name's glue. |
 | `IN_DOMAIN_ADDR_MISMATCH` | An in-domain name's glue contains addresses the child does not serve, while the child serves at least one address for it. Emitted once per affected name. |
 | `MISSING_ADDRESS_CHILD` | An in-domain name has glue in the delegation but the child zone serves no address record for it. Emitted once per affected name. |
-| `MULTIPLE_DELEGATION_NS_SET` | Responding parent nameservers serve more than one distinct delegation NS name set. |
+| `MULTIPLE_DELEGATION_NS_SET` | Responding parent nameservers serve more than one distinct delegation NS name set; RFC 1034 section 4.3.5 distributes zone changes to every authoritative server. |
 | `NO_RESPONSE` | A child nameserver did not return a response for an in-domain A/AAAA lookup. |
 | `NOT_IN_DOMAIN_ADDR_MISMATCH` | Not-in-domain glue contains addresses not found in a settled recursive A/AAAA lookup. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -226,7 +226,7 @@ The delegation comparison is bounded by what the protocol lets a server omit wit
 
 Deployed parents do omit in-domain referral glue with TC clear, contrary to RFC 9471 section 3.1, so neither lawful trimming nor a compliant TC signal can be assumed. Two consequences follow:
 
-- **Cross-parent equality uses the authority section only**. An incomplete NS RRset can reach the client only together with TC=1, so a difference observed between TC-clear authority sections is real. Glue may arrive incomplete with no signal at all, so it cannot key a cross-parent equality check; glue faults are instead reported from the union of glue across all parents, where omission can only hide a fault and never invent one.
+- **Cross-parent equality uses the authority section only**. An incomplete NS RRset can reach the client only together with TC=1 (RFC 2181 section 5.1), so a difference observed between TC-clear authority sections is real. Glue may arrive incomplete with no signal at all, so it cannot key a cross-parent equality check; glue faults are instead reported from the union of glue across all parents, where omission can only hide a fault and never invent one.
 - **TC-set responses are skipped by this testcase**, not only by the transport. Truncated responses are normally replaced by a TCP retry (`resolver.defaults.fallback`), but with fallback disabled the truncated UDP response is returned as is, and per RFC 2181 section 9 its partial authority section would otherwise fabricate a set difference.
 
 The same asymmetry governs the address comparison:
@@ -241,7 +241,7 @@ The same asymmetry governs the address comparison:
 - The delegation NS-set comparison is silent when all responding parents agree; there is no positive confirmation tag, and `ADDRESSES_MATCH` remains governed only by the address comparisons.
 - Glue trimmed from the additional section, whether lawfully or not, does not split the delegation, because the per-parent key holds NS names only.
 - A parent that is also authoritative for the child zone answers from the answer section instead of referring. `arpa` is the live case: the root servers serve it directly. Such responses are not usable referrals and contribute no delegation set and no glue.
-- The root zone is its own parent, so a test of `.` sends priming queries. Per RFC 9609 the responses are answers and not referrals, so they are not usable referrals: a test of the root produces no delegation NS-set finding.
+- The root zone is its own parent, so a test of `.` sends priming queries. Per RFC 9609 section 4.1 the responses are answers and not referrals, so they are not usable referrals: a test of the root produces no delegation NS-set finding.
 - Undelegated tests produce synthetic, identical delegations, so the delegation NS-set comparison stays silent there.
 - `CHILD_ZONE_LAME` short-circuits testcase execution and suppresses later mismatch checks when no usable in-domain address lookup path was found.
 - In-domain mismatch reporting is per NS name: a zone with several names carrying wrong glue produces one `IN_DOMAIN_ADDR_MISMATCH` per name, each naming only that name's unconfirmed addresses.

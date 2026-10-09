@@ -142,6 +142,8 @@ filtered to that pair. `from_grade` and `to_grade`, or `from_level` and
 
 The page leads with a provenance banner naming both engine versions, both
 profile names, the tag vocabulary delta and the scoring configuration state.
+When the scoring configuration state is unknown, the banner names the
+snapshot that did not record it.
 Below it, cohort-change tag rows render inline, while engine-driven rows and
 unattributable rows sit behind their own disclosures with their counts
 visible. A Movers tab lists each moving domain with its score delta, the part

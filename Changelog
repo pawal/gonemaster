@@ -13,6 +13,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - tools: `spec-check` fails on a stale possible-tags inventory
 - analysis-ui: trends draw one line chart per bucket on a date axis with engine changes marked; the stacked bars move to `view=stacked`
+- analysis-ui: the diff page and the report export name the snapshot whose scoring configuration was not recorded
 
 ### Fixed
 

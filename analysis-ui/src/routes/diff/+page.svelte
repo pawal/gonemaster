@@ -31,7 +31,8 @@
     reportFilename,
     reportToMarkdown,
     signedNumber,
-    splitTagsByClassification
+    splitTagsByClassification,
+    unrecordedScoringSnapshot
   } from "$lib/report";
   import type { DiffEntry, DomainCategory, ReportTagEntry, TagDiffEntry } from "$lib/api";
   import type { LayoutData } from "../+layout";
@@ -352,8 +353,10 @@
         {:else if header.scoring_config_changed === "false"}
           Scoring configuration unchanged.
         {:else}
-          Scoring configuration provenance is unknown, so a score move cannot
-          be fully attributed.
+          The scoring configuration was not recorded for
+          {unrecordedScoringSnapshot(header)}, so a score move cannot be fully
+          attributed. It is recorded when a batch finishes; a snapshot rebuilt
+          from stored runs, or captured by an older server, has none.
         {/if}
       </p>
       {#if header.tag_floor}

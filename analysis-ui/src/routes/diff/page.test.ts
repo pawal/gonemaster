@@ -279,6 +279,8 @@ describe("diff report", () => {
         ...base,
         header: {
           ...base.header,
+          from: { ...base.header.from, scoring_config_hash: undefined },
+          to: { ...base.header.to, scoring_config_hash: "default" },
           vocabulary: { ...base.header.vocabulary, from_available: false },
           scoring_config_changed: "unknown"
         }
@@ -286,7 +288,8 @@ describe("diff report", () => {
     });
     const banner = container.querySelector(".provenance");
     expect(banner?.textContent).toContain("tag vocabulary is unknown");
-    expect(banner?.textContent).toContain("provenance is unknown");
+    expect(banner?.textContent).toContain("The scoring configuration was not recorded for");
+    expect(banner?.textContent).toContain("the From snapshot, so a score move");
   });
 
   it("counts the movers by cause and lists the clusters", () => {

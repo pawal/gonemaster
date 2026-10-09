@@ -7,6 +7,7 @@ import type {
   DomainCategory,
   ReportCluster,
   ReportDomain,
+  ReportHeader,
   ReportResponse,
   ReportTagEntry
 } from "./api";
@@ -105,10 +106,23 @@ function mdTable(headers: string[], rows: (string | number | null | undefined)[]
   ];
 }
 
-function scoringLine(state: "true" | "false" | "unknown"): string {
+// The snapshot whose scoring configuration was not recorded at capture.
+export function unrecordedScoringSnapshot(header: ReportHeader): string {
+  const from = !header.from.scoring_config_hash;
+  const to = !header.to.scoring_config_hash;
+  if (from && !to) return "the From snapshot";
+  if (to && !from) return "the To snapshot";
+  return "either snapshot";
+}
+
+function scoringLine(header: ReportHeader): string {
+  const state = header.scoring_config_changed;
   if (state === "true") return "Scoring configuration changed between the two snapshots.";
   if (state === "false") return "Scoring configuration unchanged.";
-  return "Scoring configuration provenance unknown; a score move cannot be fully attributed.";
+  return (
+    `Scoring configuration not recorded for ${unrecordedScoringSnapshot(header)}; ` +
+    "a score move cannot be fully attributed."
+  );
 }
 
 function vocabularyLine(report: ReportResponse): string {
@@ -144,7 +158,7 @@ export function reportToMarkdown(report: ReportResponse): string {
     ""
   );
   lines.push(`- ${vocabularyLine(report)}`);
-  lines.push(`- ${scoringLine(header.scoring_config_changed)}`);
+  lines.push(`- ${scoringLine(header)}`);
   if (header.tag_floor) {
     lines.push(`- Findings below ${header.tag_floor} are not covered by the per-domain lists.`);
   }

@@ -83,15 +83,15 @@ Emit (once):
 For each MNAME (not "localhost", not "."):
 
    MNAME not in z.ApexNSNames child NS name set
-      -> Z01_MNAME_NOT_IN_NS_LIST (nsname)
+      -> Z01_MNAME_NOT_IN_NS_LIST (ns)
 
    resolve MNAME via recursor (A and AAAA)
       no addresses across A/AAAA (subject to cumulative foundIP caveat)
-         -> Z01_MNAME_NOT_RESOLVE (nsname)
+         -> Z01_MNAME_NOT_RESOLVE (ns)
       addresses found:
          per address:
             address == 127.0.0.1 or ::1
-               -> Z01_MNAME_HAS_LOCALHOST_ADDR (nsname, ns_ip)
+               -> Z01_MNAME_HAS_LOCALHOST_ADDR (ns, address)
             otherwise: direct query SOA at z.Name to (mname/ip)
                resp.Msg == nil      -> Z01_MNAME_NO_RESPONSE        (ns, address)
                RCODE != NOERROR     -> Z01_MNAME_UNEXPECTED_RCODE   (ns, address, rcode)
@@ -136,20 +136,20 @@ emit TEST_CASE_END
 | --- | --- | --- | --- |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Zone01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Zone01`). |
-| `Z01_MNAME_HAS_LOCALHOST_ADDR` | `nsname` | `string` | SOA MNAME hostname. |
-| `Z01_MNAME_HAS_LOCALHOST_ADDR` | `ns_ip` | `string` | Localhost IP address for that MNAME (`127.0.0.1` or `::1`). |
+| `Z01_MNAME_HAS_LOCALHOST_ADDR` | `ns` | `string` | SOA MNAME hostname. |
+| `Z01_MNAME_HAS_LOCALHOST_ADDR` | `address` | `string` | Localhost IP address for that MNAME (`127.0.0.1` or `::1`). |
 | `Z01_MNAME_IS_DOT` | `addresses` | `array<string>` | Structured source child nameserver IPs returning MNAME as dot. |
 | `Z01_MNAME_IS_LOCALHOST` | `addresses` | `array<string>` | Structured source child nameserver IPs returning MNAME as localhost. |
-| `Z01_MNAME_IS_MASTER` ns/address` list. |
+| `Z01_MNAME_IS_MASTER` | `servers` | `array<object>` | Structured nameserver `{ns,address}` object list of MNAME host/IP pairs inferred to be master. |
 | `Z01_MNAME_MISSING_SOA_RECORD` | `ns` | `string` | Queried MNAME endpoint (`ns` name only; use `address` for IP) that returned no SOA in answer. |
 | `Z01_MNAME_MISSING_SOA_RECORD` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z01_MNAME_NOT_AUTHORITATIVE` | `ns` | `string` | Queried MNAME endpoint (`ns` name only; use `address` for IP) that returned non-authoritative answer. |
 | `Z01_MNAME_NOT_AUTHORITATIVE` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `Z01_MNAME_NOT_IN_NS_LIST` | `nsname` | `string` | MNAME hostname absent from child NS set. |
-| `Z01_MNAME_NOT_MASTER` ns/address` list. |
+| `Z01_MNAME_NOT_IN_NS_LIST` | `ns` | `string` | MNAME hostname absent from child NS set. |
+| `Z01_MNAME_NOT_MASTER` | `servers` | `array<object>` | Structured nameserver `{ns,address}` object list of MNAME host/IP pairs with a lower serial. |
 | `Z01_MNAME_NOT_MASTER` | `soaserial` | `uint32` | Highest serial among non-master candidates in the emitted set. |
 | `Z01_MNAME_NOT_MASTER` | `soaserial_list` | `string` | Semicolon-delimited unique child nameserver serial values used for comparison. |
-| `Z01_MNAME_NOT_RESOLVE` | `nsname` | `string` | MNAME hostname that did not resolve. |
+| `Z01_MNAME_NOT_RESOLVE` | `ns` | `string` | MNAME hostname that did not resolve. |
 | `Z01_MNAME_NO_RESPONSE` | `ns` | `string` | Queried MNAME endpoint (`ns` name only; use `address` for IP) with no response. |
 | `Z01_MNAME_NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z01_MNAME_UNEXPECTED_RCODE` | `ns` | `string` | Queried MNAME endpoint (`ns` name only; use `address` for IP). |

@@ -1305,7 +1305,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	} else if checkedCount > 0 {
-		// Servers answered SOA but none returned a usable MX response.
+		// Servers were queried but none returned a usable MX response.
 		if err := appendLog(ctx, &results, testcase, "Z09_NO_SERVERS_MX_RESPONSE", map[string]any{}); err != nil {
 			return results, err
 		}

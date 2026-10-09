@@ -144,11 +144,11 @@ emit TEST_CASE_END
 | `Z09_MISSING_MAIL_TARGET` | No authoritative MX RRset was found and zone is not exempt (non-root, non-TLD, non-`.arpa`). |
 | `Z09_MX_DATA` | MX mailtarget data is reported for one reporting group. |
 | `Z09_MX_FOUND` | At least one authoritative nameserver IP returned MX RRset. |
-| `Z09_NON_AUTH_MX_RESPONSE` | At least one nameserver IP returned non-authoritative MX response after SOA gating. |
+| `Z09_NON_AUTH_MX_RESPONSE` | At least one nameserver IP returned non-authoritative MX response. |
 | `Z09_NO_MX_FOUND` | At least one authoritative nameserver IP returned no MX RRset. |
 | `Z09_NO_MX_FOUND_OR_EXPECTED` | No MX RRset was found for a zone not expected to host mail (root, TLD, or under `.arpa`). |
-| `Z09_NO_RESPONSE_MX_QUERY` | At least one nameserver IP gave no MX response after SOA gating. |
-| `Z09_NO_SERVERS_MX_RESPONSE` | No server returned a usable MX response after SOA gating. |
+| `Z09_NO_RESPONSE_MX_QUERY` | At least one nameserver IP gave no MX response. |
+| `Z09_NO_SERVERS_MX_RESPONSE` | At least one nameserver was queried and none returned a usable MX response. |
 | `Z09_NULL_MX_NON_ZERO_PREF` | Null MX (`.` mailtarget) was returned with non-zero preference. |
 | `Z09_NULL_MX_WITH_OTHER_MX` | Null MX (`.` mailtarget) is mixed with other MX records. |
 | `Z09_ROOT_EMAIL_DOMAIN` | Root zone has non-null MX data. |

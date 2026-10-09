@@ -203,9 +203,16 @@ cut, for a cut X itself serves. It queries `M DS` at X with DNSSEC enabled
   - Type bitmap without the NS bit: `not a cut`. RFC 5155 section 8.9 and RFC
     4035 section 5.2 make the NS bit the statement of the parent zone that a
     zone cut exists at the name.
-  - No NSEC and no NSEC3 record: the enclosing zone is unsigned, which is valid
-    only below an insecure delegation. Return `not a cut` and let the walk
-    decide from an ancestor.
+  - No record matching M: the closest encloser CE is the longest proper
+    ancestor of M whose hash matches an NSEC3 record of the response, and the
+    next closer name is the ancestor of M, or M itself, one label below CE
+    (RFC 5155 section 1.3). An NSEC3 record with the Opt-Out flag set that
+    covers the hash of the next closer name yields `insecure`: RFC 5155
+    sections 8.3 and 8.6 accept this proof for an unsigned delegation the
+    parent omits from its NSEC3 chain.
+  - Otherwise: `not a cut`. With no NSEC and no NSEC3 record the enclosing
+    zone is unsigned, which is valid only below an insecure delegation, and
+    the walk decides from an ancestor.
 - `AA` `NXDOMAIN`: `not a cut`.
 
 Every result is memoized per (X, M), `indeterminate` included, and reused by
@@ -424,6 +431,10 @@ Scoring takes the severity default in the `dnssec` dimension. No
   `DS` question there settles every name in the subtree. This is the shape of
   `de`, whose nameserver names live in the delegated zone `nic.de`, and of
   `dj`, whose names live in the insecurely delegated `djibtelecom.dj`.
+- A nameserver that serves both sides of an insecure delegation answers the
+  name inside the child and `M DS` from the parent. Under NSEC3 Opt-Out the
+  parent holds no NSEC3 record for M, and the covering span is the proof. This
+  is the shape of `uk`, whose names live in `nic.uk` on the same nameservers.
 - An `NS` name of a referral without glue is not resolved. A cut whose `NS`
   names all lack glue yields `DS22_NS_ADDRESS_REFERRED` for every name below
   it.

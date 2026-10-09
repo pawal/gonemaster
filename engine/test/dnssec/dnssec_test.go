@@ -6129,6 +6129,15 @@ func nsec3Record(name string, zoneName string, types ...uint16) *dns.NSEC3 {
 	return nsec3At(dnsutil.NSEC3Name(dnsutil.Fqdn(name), "", 0)+"."+zoneName, "", 0, types...)
 }
 
+// nsec3Span builds an unsalted NSEC3 in zoneName spanning the hashes from to next.
+func nsec3Span(zoneName string, from string, next string, flags uint8) *dns.NSEC3 {
+	rr := nsec3At(from+"."+zoneName, "", 0, dns.TypeNS, dns.TypeDS, dns.TypeRRSIG)
+	rr.Flags = flags
+	rr.HashLength = 20
+	rr.NextDomain = next
+	return rr
+}
+
 func answerPacket(owner string, qtype uint16, answers ...dns.RR) packet.Packet {
 	return tctest.Response(tctest.Question(owner, qtype), tctest.Secure(),
 		tctest.Answers(answers...))

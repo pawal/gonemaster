@@ -7432,6 +7432,20 @@ func nsec3OwnerMatchesName(rr *dns.NSEC3, name dnsname.Name) bool {
 	return strings.EqualFold(hash, labels[0])
 }
 
+// nsec3FlagOptOut is the Opt-Out bit of the NSEC3 flags field (RFC 5155 section 3.1.2.1).
+const nsec3FlagOptOut = 1
+
+// nsec3Covers reports whether the hash of name lies strictly inside the span of rr.
+func nsec3Covers(rr *dns.NSEC3, name dnsname.Name) bool {
+	hash := strings.ToLower(dnsutil.NSEC3Name(name.FQDN(), rr.Salt, rr.Iterations))
+	labels := dnsname.New(rr.Hdr.Name).Labels()
+	if hash == "" || len(labels) == 0 {
+		return false
+	}
+	span := dnssec23Record{key: strings.ToLower(labels[0]), nextKey: strings.ToLower(rr.NextDomain)}
+	return span.covers(hash, strings.Compare)
+}
+
 func filterRRSIGByType(rrs []dns.RR, typeCovered uint16) []*dns.RRSIG {
 	var out []*dns.RRSIG
 	for _, rr := range rrs {
@@ -9269,15 +9283,36 @@ func dnssec22CutFromDenial(name dnsname.Name, resp packet.Packet) dnssec22CutSta
 		}
 		return dnssec22CutFromBitmap(nsec.TypeBitMap)
 	}
+	var nsec3s []*dns.NSEC3
 	for _, rr := range resp.GetRecords("NSEC3", "authority") {
 		nsec3, ok := rr.(*dns.NSEC3)
-		if !ok || !nsec3OwnerMatchesName(nsec3, name) {
+		if !ok {
 			continue
 		}
-		return dnssec22CutFromBitmap(nsec3.TypeBitMap)
+		if nsec3OwnerMatchesName(nsec3, name) {
+			return dnssec22CutFromBitmap(nsec3.TypeBitMap)
+		}
+		nsec3s = append(nsec3s, nsec3)
+	}
+	if dnssec22OptOutCovers(name, nsec3s) {
+		return dnssec22InsecureCut
 	}
 	// An unsigned enclosing zone proves nothing here; an ancestor decides.
 	return dnssec22NotACut
+}
+
+// dnssec22OptOutCovers reports whether an Opt-Out NSEC3 covers the next closer name of name (RFC 5155 section 8.6).
+func dnssec22OptOutCovers(name dnsname.Name, records []*dns.NSEC3) bool {
+	next := name
+	for encloser, ok := name.NextHigher(); ok; encloser, ok = encloser.NextHigher() {
+		if slices.ContainsFunc(records, func(rr *dns.NSEC3) bool { return nsec3OwnerMatchesName(rr, encloser) }) {
+			return slices.ContainsFunc(records, func(rr *dns.NSEC3) bool {
+				return rr.Flags&nsec3FlagOptOut != 0 && nsec3Covers(rr, next)
+			})
+		}
+		next = encloser
+	}
+	return false
 }
 
 // dnssec22CutFromBitmap maps the NSEC or NSEC3 type bitmap onto a zone cut status.

@@ -155,6 +155,41 @@ func TestDNSSEC22CutInsecure(t *testing.T) {
 	}
 }
 
+// An Opt-Out span covering the next closer name proves an insecure delegation.
+func TestDNSSEC22CutOptOut(t *testing.T) {
+	apex := nsec3Record("example", "example", dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG)
+	cases := []struct {
+		name   string
+		cut    string
+		denial []dns.RR
+		want   dnssec22CutStatus
+	}{
+		{"span covers the name", "ns.example", []dns.RR{apex,
+			nsec3Span("example", "k0000000000000000000000000000000", "l0000000000000000000000000000000", 1)}, dnssec22InsecureCut},
+		{"span covers the next closer name", "a.ent.example", []dns.RR{apex,
+			nsec3Span("example", "n0000000000000000000000000000000", "o0000000000000000000000000000000", 1)}, dnssec22InsecureCut},
+		{"span covers the name, not the next closer name", "a.ent.example", []dns.RR{apex,
+			nsec3Span("example", "t0000000000000000000000000000000", "u0000000000000000000000000000000", 1)}, dnssec22NotACut},
+		{"span without the Opt-Out flag", "ns.example", []dns.RR{apex,
+			nsec3Span("example", "k0000000000000000000000000000000", "l0000000000000000000000000000000", 0)}, dnssec22NotACut},
+		{"no closest encloser", "ns.example", []dns.RR{
+			nsec3Span("example", "k0000000000000000000000000000000", "l0000000000000000000000000000000", 1)}, dnssec22NotACut},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			f := newDS22Fixture(t)
+			f.answers[ds22Key(tc.cut, "DS")] = tctest.Wire(t, tctest.Response(
+				tctest.Question(tc.cut, dns.TypeDS), tctest.Secure(), tctest.Authority(tc.denial...)))
+
+			cut := f.walker(t, ctx).cut(ctx, dnsname.New(tc.cut))
+			if cut.status != tc.want {
+				t.Fatalf("status = %d, want %d", cut.status, tc.want)
+			}
+		})
+	}
+}
+
 func TestDNSSEC22CutNotACut(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -633,18 +668,36 @@ func TestDNSSEC22SecureZoneCutValidates(t *testing.T) {
 
 // Below an insecure delegation the address records are unsigned by design.
 func TestDNSSEC22InsecureDelegation(t *testing.T) {
-	ctx := tctest.Context(t)
-	f := newDS22Fixture(t)
-	f.secureZone(t, ctx)
-	f.unsignedAddress(t, "ns1.sub.example")
-	f.denyDS("ns1.sub.example", tctest.SOARR("sub.example"))
-	f.denyDS("sub.example", nsecRecord("sub.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC))
-	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+	cases := []struct {
+		name   string
+		denial []dns.RR
+	}{
+		{"NSEC with the NS bit", []dns.RR{nsecRecord("sub.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC)}},
+		{"NSEC3 Opt-Out span", []dns.RR{nsec3Record("example", "example", dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG),
+			nsec3Span("example", "10000000000000000000000000000000", "20000000000000000000000000000000", 1)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			f := newDS22Fixture(t)
+			f.secureZone(t, ctx)
+			f.unsignedAddress(t, "ns1.sub.example")
+			f.denyDS("ns1.sub.example", tctest.SOARR("sub.example"))
+			f.denyDS("sub.example", tc.denial...)
+			ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
 
-	entries := f.run(t, ctx, "ns1.sub.example")
-	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_INSECURE")
-	tctest.RequireArg(t, entry, "ns", "ns1.sub.example")
-	tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_UNSIGNED", "DS22_NS_ADDRESS_VALIDATES")
+			entries := f.run(t, ctx, "ns1.sub.example")
+			entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_INSECURE")
+			tctest.RequireArg(t, entry, "ns", "ns1.sub.example")
+			tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_UNSIGNED", "DS22_NS_ADDRESS_VALIDATES")
+			// Each zone cut probe of the walk is asked once.
+			for _, want := range []string{"ns1.sub.example/DS", "sub.example/DS"} {
+				if got := f.counts[want]; got != 1 {
+					t.Fatalf("%s questions = %d, want 1", want, got)
+				}
+			}
+		})
+	}
 }
 
 // Unsigned address records in the signed zone itself are bogus.

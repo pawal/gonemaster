@@ -18,6 +18,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - engine, server: a panic in a run fails that run, not the process
+- dnssec22: a name below an NSEC3 Opt-Out delegation is insecure, not unsigned
 
 ## [v1.7.19] - 2026-10-05
 

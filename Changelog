@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.20] - 2026-10-09
+
+The cohort report and the analysis diff page show grade and worst-level transitions, and dnssec22 accepts an NSEC3 Opt-Out proof of an insecure delegation.
 
 ### Added
 

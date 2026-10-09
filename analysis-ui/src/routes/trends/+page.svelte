@@ -8,9 +8,9 @@
   import { domainsGradeHref, domainsPostureHref, domainsSeverityHref, tagHref } from "$lib/entityLinks";
   import { downloadCSV, type ExportColumn } from "$lib/exporters";
   import { formatCount, levelTone, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
-  import { computeTagMovers, pinnedSeries } from "$lib/trends";
+  import { TREND_CATEGORIES, computeTagMovers, pinnedSeries } from "$lib/trends";
   import type { LayoutData } from "../+layout";
-  import { TREND_CATEGORIES, type TrendsPageData } from "./+page";
+  import type { TrendsPageData } from "./+page";
 
   let { data }: { data: TrendsPageData } = $props();
 

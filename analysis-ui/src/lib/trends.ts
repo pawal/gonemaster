@@ -4,6 +4,16 @@
 
 import type { TrendPoint, TopTagEntry } from "./api";
 
+// Trend categories; keys match server/analysis_fact_categories.go.
+export const TREND_CATEGORIES = [
+  { key: "severity", label: "Domain health" },
+  { key: "grade", label: "Grade distribution" },
+  { key: "dnssec_posture", label: "DNSSEC posture" },
+  { key: "dnskey_algo", label: "DNSKEY algorithms" }
+] as const;
+
+export type TrendCategoryKey = (typeof TREND_CATEGORIES)[number]["key"];
+
 export type SeriesLike = {
   slug: string;
   label: string;

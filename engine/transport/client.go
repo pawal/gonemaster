@@ -352,7 +352,8 @@ func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Cli
 	}
 
 	if ctx == nil || ctx.Done() == nil {
-		return client.ExchangeWithConn(ctx, wireMsg, conn)
+		resp, rtt, err := client.ExchangeWithConn(ctx, wireMsg, conn)
+		return checkQuestion(wireMsg, resp, rtt, err)
 	}
 
 	done := make(chan struct{})
@@ -371,7 +372,23 @@ func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Cli
 	if cerr := ctx.Err(); cerr != nil {
 		return nil, 0, cerr
 	}
-	return resp, rtt, err
+	return checkQuestion(wireMsg, resp, rtt, err)
+}
+
+// ErrQuestionMismatch reports a reply whose question differs from the query.
+var ErrQuestionMismatch = errors.New("reply question does not match the query")
+
+// checkQuestion refuses a reply that answers another question (RFC 5452 section 9.1).
+func checkQuestion(query, resp *dns.Msg, rtt time.Duration, err error) (*dns.Msg, time.Duration, error) {
+	if err != nil || resp == nil || len(resp.Question) == 0 || len(query.Question) == 0 {
+		return resp, rtt, err
+	}
+	q, r := query.Question[0], resp.Question[0]
+	if dns.RRToType(q) != dns.RRToType(r) || q.Header().Class != r.Header().Class ||
+		!dns.EqualName(q.Header().Name, r.Header().Name) {
+		return nil, rtt, ErrQuestionMismatch
+	}
+	return resp, rtt, nil
 }
 
 func prepareWireMessage(msg *dns.Msg, useTCP bool) (*dns.Msg, error) {
@@ -381,6 +398,8 @@ func prepareWireMessage(msg *dns.Msg, useTCP bool) (*dns.Msg, error) {
 
 	wireMsg := msg.Copy()
 	if len(wireMsg.Data) == 0 {
+		// An unpredictable ID per attempt (RFC 5452 section 9.2).
+		wireMsg.ID = dns.ID()
 		if err := wireMsg.Pack(); err != nil {
 			return nil, err
 		}

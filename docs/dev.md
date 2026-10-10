@@ -216,6 +216,11 @@ func main() {
   `resolver.defaults.negative_cache_ttl` (CLI flags `--positive-cache-ttl` and
   `--negative-cache-ttl`). These settings are intended for global response
   caching and reuse across runs.
+- Every attempt, a TCP fallback included, carries an unpredictable message
+  ID (RFC 5452 section 9.2). A reply whose question differs from the query
+  in name, ignoring ASCII case, or in type or class is invalid (RFC 5452
+  section 9.1) and fails the attempt; a reply without a question section is
+  accepted.
 - Query timing and fallback behavior can be tuned with:
   - `resolver.defaults.timeout` (`--timeout`, seconds per attempt)
   - `resolver.defaults.retry` (`--retry`, retry count)

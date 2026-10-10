@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1273,5 +1274,92 @@ func TestPrepareMessageCheckingDisabledDoesNotClearCallerBit(t *testing.T) {
 	}
 	if msg.CheckingDisabled != true {
 		t.Error("prepareMessage mutated the caller's message")
+	}
+}
+
+// stubQueryIDs makes dns.ID return ids in order.
+func stubQueryIDs(t *testing.T, ids ...uint16) {
+	t.Helper()
+	orig := dns.ID
+	var n atomic.Int32
+	dns.ID = func() uint16 { return ids[int(n.Add(1)-1)%len(ids)] }
+	t.Cleanup(func() { dns.ID = orig })
+}
+
+func TestPrepareWireMessageDrawsIDPerCall(t *testing.T) {
+	stubQueryIDs(t, 0x1234, 0x5678)
+	msg := BuildQuery("id-per-call.example.", dns.TypeA)
+
+	var got []uint16
+	for range 2 {
+		wire, err := prepareWireMessage(msg, false)
+		if err != nil {
+			t.Fatalf("prepare: %v", err)
+		}
+		got = append(got, binary.BigEndian.Uint16(wire.Data))
+	}
+	if want := []uint16{0x1234, 0x5678}; !slices.Equal(got, want) {
+		t.Fatalf("wire IDs %#x, want %#x", got, want)
+	}
+	if msg.ID != 0 {
+		t.Fatalf("caller's message ID changed to %#x", msg.ID)
+	}
+}
+
+func TestExchangeSendsDrawnID(t *testing.T) {
+	stubQueryIDs(t, 0xbeef)
+	queries := make(chan *dns.Msg, 1)
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		select {
+		case queries <- req:
+		default:
+		}
+		writeSimpleAResponse(w, req)
+	})
+	defer shutdown()
+
+	client := &Client{}
+	client.SetRetries(0)
+	client.SetTimeout(time.Second)
+	if _, err := client.Exchange(t.Context(), addr, BuildQuery("drawn-id.example.", dns.TypeA)); err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+	if got := receivedQuery(t, queries).ID; got != 0xbeef {
+		t.Fatalf("wire ID %#x, want 0xbeef", got)
+	}
+}
+
+func TestExchangeChecksReplyQuestion(t *testing.T) {
+	const qname = "question-match.example."
+	tests := []struct {
+		name     string
+		question []dns.RR
+		want     error
+	}{
+		{"same", BuildQuery(qname, dns.TypeA).Question, nil},
+		{"name in other case", BuildQuery("QUESTION-Match.Example.", dns.TypeA).Question, nil},
+		{"no question", nil, nil},
+		{"other name", BuildQuery("other.example.", dns.TypeA).Question, ErrQuestionMismatch},
+		{"other type", BuildQuery(qname, dns.TypeAAAA).Question, ErrQuestionMismatch},
+		{"other class", BuildQueryWithClass(qname, dns.TypeA, dns.ClassCHAOS).Question, ErrQuestionMismatch},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+				resp := new(dns.Msg)
+				dnsutil.SetReply(resp, req)
+				resp.Question = tt.question
+				_, _ = resp.WriteTo(w)
+			})
+			defer shutdown()
+
+			client := &Client{}
+			client.SetRetries(0)
+			client.SetTimeout(time.Second)
+			_, err := client.Exchange(t.Context(), addr, BuildQuery(qname, dns.TypeA))
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("err = %v, want %v", err, tt.want)
+			}
+		})
 	}
 }

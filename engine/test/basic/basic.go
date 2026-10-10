@@ -660,10 +660,16 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 		} else {
-			parent, _ := z.Name.NextHigher()
+			next, _ := z.Name.NextHigher()
+			super := next.String()
+			if len(parentFound) == 1 {
+				for parent := range parentFound {
+					super = parent
+				}
+			}
 			if err := appendLog(ctx, &results, testcase, "B01_NO_CHILD", map[string]any{
 				"domain_child": z.Name.String(),
-				"domain_super": parent.String(),
+				"domain_super": super,
 			}); err != nil {
 				return results, err
 			}

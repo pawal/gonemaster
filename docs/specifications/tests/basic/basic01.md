@@ -37,7 +37,7 @@ Status: Final
 7. Emit child/delegation status:
    - `B01_CHILD_FOUND` when delegation or authoritative SOA evidence exists (including delegations recovered via the NXDOMAIN-contradiction probe).
    - `B01_INCONSISTENT_DELEGATION` for inconsistent parent-side results.
-   - `B01_NO_CHILD` (normal mode) or `B01_CHILD_NOT_EXIST` (fake-address mode) when child evidence is absent.
+   - `B01_NO_CHILD` (normal mode) or `B01_CHILD_NOT_EXIST` (fake-address mode) when child evidence is absent. `domain_super` is the parent zone when exactly one was found, otherwise the next-higher name.
 8. Emit alias findings:
    - `B01_CHILD_IS_ALIAS` per detected DNAME target.
    - `B01_INCONSISTENT_ALIAS` when multiple alias targets are found.
@@ -142,6 +142,8 @@ For each remaining label (BFS from "." down toward child):
      delegationFound empty AND aaSOA empty AND aaDname empty
        +- fake-addresses                   -> B01_CHILD_NOT_EXIST (domain)
        +- otherwise                        -> B01_NO_CHILD (domain_child, domain_super)
+                                              domain_super: the one parentFound zone,
+                                              else z.Name.NextHigher()
 
 3. Alias
      aaDname non-empty:
@@ -192,7 +194,7 @@ For each remaining label (BFS from "." down toward child):
 | `B01_INCONSISTENT_DELEGATION` | `domain_child` | `string` | Child zone name. |
 | `B01_INCONSISTENT_DELEGATION` | `servers` | `array<object>` | Structured nameserver list tied to inconsistency. |
 | `B01_NO_CHILD` | `domain_child` | `string` | Child zone name. |
-| `B01_NO_CHILD` | `domain_super` | `string` | Next-higher domain suggested for testing. |
+| `B01_NO_CHILD` | `domain_super` | `string` | Zone suggested for testing: the parent zone when exactly one was found, otherwise the next-higher name. |
 | `B01_PARENT_DISREGARDED` | `-` | `-` | No arguments. |
 | `B01_PARENT_FOUND` | `domain` | `string` | Parent zone name candidate. |
 | `B01_PARENT_FOUND` | `servers` | `array<object>` | Structured nameserver list returning parent evidence. |
@@ -284,5 +286,6 @@ The following behaviors are implementation choices, not mandated by RFC 1034 or 
 - A missing recursor causes testcase execution error before completion.
 - Loop-protection fallback is defensive; when triggered it logs `LOOP_PROTECTION` and terminates the testcase early.
 - Child existence outcomes differ between normal and fake-address modes (`B01_NO_CHILD` vs `B01_CHILD_NOT_EXIST`).
+- `domain_super` is the closest enclosing zone the walk proved, not a name derived from the child. Below a missing intermediate name, and for a reverse name under `ip6.arpa` (RFC 3596 section 2.5), the next-higher name is not a zone.
 - When a parent nameserver returns authoritative NXDOMAIN at an intermediate empty non-terminal (RFC 8020 violation) but also has a delegation at the child, the per-label SOA walk would normally stop on that NS without ever reaching the child. Basic01 issues one extra SOA probe at the child name; if that probe returns a referral, the directly-observed delegation is treated as valid evidence (added to `delegationFound`, so `B01_CHILD_FOUND` fires and downstream test cases run against the real child nameservers), and `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` is emitted to flag the contradiction. Ordinary recursive resolvers reach the data the same way because they typically query only the child name and follow the referral directly.
 - Nameserver list argument order is deterministic because lists are sorted before join.

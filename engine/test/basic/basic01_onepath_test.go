@@ -201,3 +201,37 @@ func TestBasic01ProbesEveryRootForTLD(t *testing.T) {
 		}
 	}
 }
+
+// B01_NO_CHILD suggests the one parent found, else the next-higher name.
+func TestBasic01NoChildSuggestsParentZone(t *testing.T) {
+	missing := func(tctest.Query) packet.Packet { return nxdomainAAPacket() }
+	deniesExample := func(q tctest.Query) packet.Packet {
+		if q.Name == "." {
+			return onePathHealthyRoot(q)
+		}
+		return nxdomainAAPacket()
+	}
+	tests := []struct {
+		name    string
+		broken  map[string]tctest.Handler
+		parents []string
+		want    string
+	}{
+		{"one parent", nil, []string{"example"}, "example"},
+		{"two parents", map[string]tctest.Handler{"ns3.root": deniesExample}, []string{".", "example"}, "child.example"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, _ := runBasic01OnePath(t, "a.child.example", tc.broken, missing, false)
+
+			parents := slices.Sorted(slices.Values(tctest.ArgValues(entries, "B01_PARENT_FOUND", "domain")))
+			if !slices.Equal(parents, tc.parents) {
+				t.Fatalf("parents = %v, want %v", parents, tc.parents)
+			}
+			noChild := tctest.RequireTag(t, entries, "B01_NO_CHILD")
+			if got := noChild.Args["domain_super"]; got != tc.want {
+				t.Fatalf("domain_super = %#v, want %q", got, tc.want)
+			}
+		})
+	}
+}

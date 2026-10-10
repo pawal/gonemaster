@@ -951,8 +951,8 @@ func TestBasic01ParentNXDomainNoDelegation(t *testing.T) {
 	if noChild.Args["domain_child"] != "child.mid.example" {
 		t.Fatalf("expected domain_child=child.mid.example, got %#v", noChild.Args["domain_child"])
 	}
-	if noChild.Args["domain_super"] != "mid.example" {
-		t.Fatalf("expected domain_super=mid.example, got %#v", noChild.Args["domain_super"])
+	if noChild.Args["domain_super"] != "example" {
+		t.Fatalf("expected domain_super=example, got %#v", noChild.Args["domain_super"])
 	}
 }
 

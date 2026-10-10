@@ -19,6 +19,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/normalization"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/scoring"
 )
@@ -291,6 +292,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if strings.TrimSpace(domain) == "" {
 		fs.Usage()
 		return 3
+	}
+	if errs, normalized := normalization.NormalizeTarget(strings.TrimSpace(domain)); len(errs) > 0 {
+		fmt.Fprintln(errOut, errs[0].Message())
+		return 3
+	} else {
+		domain = normalized
 	}
 
 	thresholds, thresholdErr := parseSeverityThresholds(warningLevel, criticalLevel)

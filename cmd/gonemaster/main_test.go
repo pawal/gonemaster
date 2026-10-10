@@ -177,6 +177,24 @@ func TestRunAcceptsPositionalDomainWithFlags(t *testing.T) {
 	}
 }
 
+func TestRunTestsAnAddressAsItsReverseName(t *testing.T) {
+	tests := []struct{ input, want string }{
+		{"192.0.2.1", "1.2.0.192.in-addr.arpa"},
+		{"2001:db8::1", "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			var captured engine.RunRequest
+			enginetest.Capture(t, &runEngine, &captured)
+
+			clitest.Run(t, run, tc.input).RequireCode(t, 0)
+			if captured.Domain != tc.want {
+				t.Fatalf("Domain = %q, want %q", captured.Domain, tc.want)
+			}
+		})
+	}
+}
+
 func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
 	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if req.LogCallback == nil {

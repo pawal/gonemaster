@@ -52,7 +52,7 @@ manage the job queue, and query the domain/tag/run/entry analysis APIs.
 Submit a single test job.
 
 **--domain** *DOMAIN*
-: Zone to test (required).
+: Zone to test (required). An IP address is tested as its reverse name.
 
 **--min-level** *LEVEL*
 : Minimum severity level.
@@ -71,7 +71,7 @@ Submit a single test job.
 Submit a batch of test jobs.
 
 **--domain** *DOMAIN*
-: Zone to test (repeatable).
+: Zone to test (repeatable). An IP address is tested as its reverse name.
 
 **--file** *PATH*
 : File with one domain per line (repeatable).

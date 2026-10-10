@@ -17,7 +17,7 @@ func registerWriteTools(srv *mcp.Server, api *Client) {
 }
 
 type batchEnqueueInput struct {
-	Domains []string `json:"domains,omitempty" jsonschema:"domains to enqueue; provide this or from_tag"`
+	Domains []string `json:"domains,omitempty" jsonschema:"domains to enqueue, an IP address as its reverse name; provide this or from_tag"`
 	FromTag string   `json:"from_tag,omitempty" jsonschema:"enqueue every domain belonging to this existing tag"`
 	Profile string   `json:"profile,omitempty" jsonschema:"test profile name; omit for the default"`
 	Tags    []string `json:"tags,omitempty" jsonschema:"tags to apply to the submitted domains"`

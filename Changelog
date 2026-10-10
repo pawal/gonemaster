@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- cli, server: an IP address given as the domain is tested as its reverse name under `in-addr.arpa` or `ip6.arpa`
+
 ### Changed
 
 - docs: testcase specs cite the RFC section behind each protocol check and correct wrong citations
@@ -11,6 +15,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - basic01: `B01_NO_CHILD` suggests the parent zone the walk found, not the next-higher name
+- cli: gonemaster-nagios tests an IDN as its A-label
 - docs: the zone01 and zone09 specs match the emitted arguments and the MX query flow
 - docs: testcase specs document the emitted argument keys and types instead of retired ones
 

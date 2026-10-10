@@ -697,7 +697,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--domain is required (or pass DOMAIN as a positional argument)")
 		return 2
 	}
-	if errs, normalized := normalization.NormalizeName(domain); len(errs) > 0 {
+	if errs, normalized := normalization.NormalizeTarget(domain); len(errs) > 0 {
 		fmt.Fprintln(errOut, errs[0].Message())
 		return 2
 	} else if normalized != "" {

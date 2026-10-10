@@ -2116,6 +2116,7 @@ paths:
     get:
       tags: [Public]
       summary: Lookup delegation information for a domain
+      description: An IP address is looked up as its reverse name.
       operationId: publicLookupDomain
       parameters:
         - $ref: '#/components/parameters/DomainPath'
@@ -2862,6 +2863,7 @@ components:
       properties:
         domain:
           type: string
+          description: Zone to test. An IPv4 or IPv6 address is tested as its reverse name (RFC 1035 section 3.5, RFC 3596 section 2.5).
         tests:
           type: array
           description: >-
@@ -2907,6 +2909,7 @@ components:
       properties:
         domains:
           type: array
+          description: Zones to test. An IP address is tested as its reverse name.
           items:
             type: string
         from_tag:

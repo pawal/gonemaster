@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -127,6 +128,41 @@ func TestCreateJobMinLevel(t *testing.T) {
 	}
 	if stored.MinLevel != "WARNING" {
 		t.Fatalf("expected min_level WARNING, got %q", stored.MinLevel)
+	}
+}
+
+func TestAddressDomainBecomesReverseName(t *testing.T) {
+	tests := []struct{ input, want string }{
+		{"192.0.2.1", "1.2.0.192.in-addr.arpa"},
+		{"2001:db8::1", "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			srv := newTestServer(t)
+			var looked string
+			srv.delegationLookup = func(_ context.Context, domain string) DelegationInfo {
+				looked = domain
+				return DelegationInfo{}
+			}
+
+			job := mustJSON[Job](t, doJSON(t, srv, http.MethodPost, "/api/v1/jobs", fmt.Sprintf(`{"domain":%q}`, tc.input)), http.StatusCreated)
+			pub := mustJSON[PublicJobView](t, doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", fmt.Sprintf(`{"domain":%q}`, tc.input)), http.StatusCreated)
+			batch := mustJSON[JobBatchResponse](t, doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", fmt.Sprintf(`{"domains":[%q]}`, tc.input)), http.StatusAccepted)
+			wantStatus(t, doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/"+tc.input, nil), http.StatusOK)
+			if len(batch.JobIDs) != 1 {
+				t.Fatalf("batch job ids = %v, want one", batch.JobIDs)
+			}
+			batched, ok := srv.store.Get(batch.JobIDs[0])
+			if !ok {
+				t.Fatalf("batch job %s not stored", batch.JobIDs[0])
+			}
+
+			for surface, got := range map[string]string{"job": job.Domain, "public": pub.Domain, "batch": batched.Domain, "lookup": looked} {
+				if got != tc.want {
+					t.Errorf("%s domain = %q, want %q", surface, got, tc.want)
+				}
+			}
+		})
 	}
 }
 

@@ -19,7 +19,7 @@ Results are printed with severity levels and can be output in several formats.
 ### Target
 
 **--domain** *DOMAIN*
-: Zone name to test (also accepted as a positional argument).
+: Zone name to test (also accepted as a positional argument). An IP address is tested as its reverse name.
 
 **--module** *MODULE*
 : Run only the named module (e.g., dnssec, nameserver).

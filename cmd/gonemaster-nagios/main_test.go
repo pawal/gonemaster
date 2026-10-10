@@ -188,6 +188,7 @@ func runRejectCases(t *testing.T, cases []rejectCase) {
 
 func TestRunRejectsInvalidFlags(t *testing.T) {
 	runRejectCases(t, []rejectCase{
+		{"invalid domain", []string{"-H", "bad!label.com"}, "with a character not permitted"},
 		{"invalid source-addr4", []string{"--domain", "example.com", "--source-addr4", "not-an-ip"}, "--source-addr4 must be a valid IPv4 address"},
 		{"invalid source-addr6", []string{"--domain", "example.com", "--source-addr6", "192.0.2.5"}, "--source-addr6 must be a valid IPv6 address"},
 		{"unknown warning level", []string{"--domain", "example.com", "--warning", "bogus"}, "--warning must be one of"},
@@ -218,6 +219,25 @@ func TestRunPassesExclude(t *testing.T) {
 	clitest.Run(t, run, "-H", "example.com", "--exclude", "dnssec10", "--exclude", "zone01,Basic03").RequireCode(t, 0)
 	if want := []string{"dnssec10", "zone01,Basic03"}; !slices.Equal(captured.Exclude, want) {
 		t.Fatalf("Exclude = %v, want %v", captured.Exclude, want)
+	}
+}
+
+func TestRunNormalizesTheDomain(t *testing.T) {
+	tests := []struct{ input, want string }{
+		{"192.0.2.1", "1.2.0.192.in-addr.arpa"},
+		{"2001:db8::1", "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa"},
+		{"räksmörgås.se", "xn--rksmrgs-5wao1o.se"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			var captured engine.RunRequest
+			enginetest.Capture(t, &runEngine, &captured)
+
+			clitest.Run(t, run, "-H", tc.input).RequireCode(t, 0)
+			if captured.Domain != tc.want {
+				t.Fatalf("Domain = %q, want %q", captured.Domain, tc.want)
+			}
+		})
 	}
 }
 

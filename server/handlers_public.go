@@ -126,7 +126,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	domain := strings.TrimSpace(req.Domain)
-	if errs, normalized := normalization.NormalizeName(domain); len(errs) > 0 {
+	if errs, normalized := normalization.NormalizeTarget(domain); len(errs) > 0 {
 		writeError(w, http.StatusBadRequest, "invalid_domain", errs[0].Message(), nil)
 		return
 	} else {

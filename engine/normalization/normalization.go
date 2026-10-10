@@ -1,9 +1,11 @@
 package normalization
 
 import (
+	"net/netip"
 	"regexp"
 	"strings"
 
+	"codeberg.org/miekg/dns/dnsutil"
 	"golang.org/x/net/idna"
 )
 
@@ -133,4 +135,12 @@ func NormalizeName(name string) ([]Error, string) {
 	}
 
 	return nil, finalName
+}
+
+// NormalizeTarget normalizes a test target; an IP address becomes its reverse name.
+func NormalizeTarget(name string) ([]Error, string) {
+	if addr, err := netip.ParseAddr(name); err == nil && addr.Zone() == "" {
+		return nil, strings.TrimSuffix(dnsutil.ReverseAddr(addr), ".")
+	}
+	return NormalizeName(name)
 }

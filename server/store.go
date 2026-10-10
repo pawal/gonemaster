@@ -765,9 +765,9 @@ func (s *InMemoryJobStore) GetResult(jobID string) (JobResult, bool) {
 }
 
 // GetOrCreateDomain returns the domain for name, creating it if necessary.
-// name is normalized (lowercased, Unicode labels converted to ACE) before storage.
+// name is normalized (lowercased, Unicode labels to ACE, an IP address to its reverse name) before storage.
 func (s *InMemoryJobStore) GetOrCreateDomain(name string) (Domain, error) {
-	errs, normalized := normalization.NormalizeName(strings.TrimSpace(name))
+	errs, normalized := normalization.NormalizeTarget(strings.TrimSpace(name))
 	if len(errs) > 0 {
 		return Domain{}, fmt.Errorf("invalid domain name %q: %s", name, errs[0].Message())
 	}

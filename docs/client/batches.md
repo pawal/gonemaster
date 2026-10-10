@@ -21,7 +21,7 @@ domain and run records.
 
 Input options:
 
-- `--domain DOMAIN`, repeatable
+- `--domain DOMAIN`, repeatable; an IP address is tested as its reverse name
 - `--file PATH`, repeatable
 - `--stdin`
 - `--from-tag TAG`

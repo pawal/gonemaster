@@ -29,7 +29,7 @@ gonemaster-nagios --domain example.com --profile ./profile.json
 ```
 
 ## Core Nagios-style options
-- `-H`, `--hostname` Zone name to test (preferred)
+- `-H`, `--hostname` Zone name to test (preferred). An IDN is tested as its A-label, an IP address as its reverse name
 - `-d`, `--domain` DNS-specific alias for the zone name
 - `-w`, `--warning` Highest Gonemaster severity that should map to Nagios WARNING. Default: `WARNING`
 - `-c`, `--critical` Highest Gonemaster severity that should map to Nagios CRITICAL. Default: `ERROR`

@@ -52,7 +52,7 @@ notifications when the client passes a progress token.
 
 | Input | Default | Notes |
 |---|---|---|
-| `domain` | required | |
+| `domain` | required | An IP address is tested as its reverse name. |
 | `profile_id` | the default profile | An id from `profile_list`. |
 | `timeout_seconds` | 120 | Maximum 600. On timeout the error names the run id; fetch it later with `run_get`. |
 | `lang` | `en` | Language of the rendered messages. |

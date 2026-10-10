@@ -17,7 +17,8 @@ use with Nagios, Icinga, Sensu, and similar monitoring systems.
 ## OPTIONS
 
 **-H**, **--hostname** *DOMAIN*
-: Zone name to test (preferred).
+: Zone name to test (preferred). An IDN is tested as its A-label, an IP
+  address as its reverse name.
 
 **-d**, **--domain** *DOMAIN*
 : DNS-specific alias for the zone name.

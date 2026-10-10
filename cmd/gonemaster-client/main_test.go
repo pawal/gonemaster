@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
-	"codeberg.org/pawal/gonemaster/engine/normalization"
 	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
@@ -73,31 +72,36 @@ func TestRunVersion(t *testing.T) {
 }
 
 func TestJobsCreateSendsNormalizedDomain(t *testing.T) {
-	var gotDomain string
-	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if r.Method != http.MethodPost {
-			t.Fatalf("expected POST, got %s", r.Method)
-		}
-		if r.URL.Path != "/api/v1/jobs" {
-			t.Fatalf("expected /api/v1/jobs, got %s", r.URL.Path)
-		}
-		var req jobCreateRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Fatalf("decode request: %v", err)
-		}
-		gotDomain = req.Domain
-		body := fmt.Sprintf(`{"id":"job_1","domain":"%s","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}`, req.Domain)
-		return apitest.JSONResponse(http.StatusCreated, body), nil
-	}))
-
-	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "jobs", "create", "--domain", "räksmörgås.se")
-	res.RequireCode(t, 0)
-	errs, normalized := normalization.NormalizeName("räksmörgås.se")
-	if len(errs) != 0 {
-		t.Fatalf("normalization errors: %v", errs)
+	tests := []struct{ input, want string }{
+		{"räksmörgås.se", "xn--rksmrgs-5wao1o.se"},
+		{"192.0.2.1", "1.2.0.192.in-addr.arpa"},
+		{"2001:db8::1", "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa"},
 	}
-	if gotDomain != normalized {
-		t.Fatalf("expected domain %q, got %q", normalized, gotDomain)
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			var gotDomain string
+			apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				if r.Method != http.MethodPost {
+					t.Fatalf("expected POST, got %s", r.Method)
+				}
+				if r.URL.Path != "/api/v1/jobs" {
+					t.Fatalf("expected /api/v1/jobs, got %s", r.URL.Path)
+				}
+				var req jobCreateRequest
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					t.Fatalf("decode request: %v", err)
+				}
+				gotDomain = req.Domain
+				body := fmt.Sprintf(`{"id":"job_1","domain":"%s","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}`, req.Domain)
+				return apitest.JSONResponse(http.StatusCreated, body), nil
+			}))
+
+			res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "jobs", "create", "--domain", tc.input)
+			res.RequireCode(t, 0)
+			if gotDomain != tc.want {
+				t.Fatalf("expected domain %q, got %q", tc.want, gotDomain)
+			}
+		})
 	}
 }
 

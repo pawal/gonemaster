@@ -70,7 +70,7 @@ func registerReadTools(srv *mcp.Server, api *Client) {
 }
 
 type testDomainInput struct {
-	Domain         string `json:"domain" jsonschema:"the domain name to test, e.g. example.com"`
+	Domain         string `json:"domain" jsonschema:"the domain name to test, e.g. example.com; an IP address tests its reverse name"`
 	ProfileID      int64  `json:"profile_id,omitempty" jsonschema:"optional test profile id (see profile_list); omit for the default profile"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds to wait for the test (default 120, max 600)"`
 	Lang           string `json:"lang,omitempty" jsonschema:"language for rendered messages (default en)"`

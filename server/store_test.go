@@ -457,6 +457,18 @@ func TestInMemoryJobStoreGetOrCreateDomainNormalizesName(t *testing.T) {
 	}
 }
 
+func TestGetOrCreateDomainStoresAnAddressAsItsReverseName(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		d, err := s.GetOrCreateDomain("2001:db8::1")
+		if err != nil {
+			t.Fatalf("GetOrCreateDomain: %v", err)
+		}
+		if d.Name != "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa" {
+			t.Fatalf("name = %q, want the ip6.arpa name", d.Name)
+		}
+	})
+}
+
 func TestInMemoryJobStoreUpdateDomainLatestMissingReturnsError(t *testing.T) {
 	store := NewInMemoryJobStore()
 	err := store.UpdateDomainLatest(9999, "run-x", time.Now().UTC(), "succeeded", "")

@@ -55,6 +55,43 @@ func TestNormalizeNameCases(t *testing.T) {
 	}
 }
 
+func TestNormalizeTarget(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantTag  string
+		wantName string
+	}{
+		{"ipv4", "192.0.2.1", "", "1.2.0.192.in-addr.arpa"},
+		{"ipv6", "2001:DB8::1", "", "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa"},
+		{"ipv4-mapped", "::ffff:192.0.2.1", "", "1.0.2.0.0.0.0.c.f.f.f.f.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa"},
+		{"zone-id", "fe80::1%eth0", "INVALID_ASCII", ""},
+		{"three-labels", "1.2.3", "", "1.2.3"},
+		{"name", "Example.COM", "", "example.com"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs, out := NormalizeTarget(tc.input)
+			if tc.wantTag != "" {
+				if len(errs) == 0 {
+					t.Fatalf("expected error %q", tc.wantTag)
+				}
+				if errs[0].Tag != tc.wantTag {
+					t.Fatalf("expected tag %q, got %q", tc.wantTag, errs[0].Tag)
+				}
+				return
+			}
+			if len(errs) != 0 {
+				t.Fatalf("unexpected errors: %v", errs)
+			}
+			if out != tc.wantName {
+				t.Fatalf("expected %q, got %q", tc.wantName, out)
+			}
+		})
+	}
+}
+
 func TestTrimSpace(t *testing.T) {
 	input := "\u00A0example.com\u2003"
 	out := TrimSpace(input)

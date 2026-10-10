@@ -1807,7 +1807,7 @@ func normalizeDomain(value string) (string, error) {
 	if trimmed == "" {
 		return "", fmt.Errorf("domain is required")
 	}
-	if errs, normalized := normalization.NormalizeName(trimmed); len(errs) > 0 {
+	if errs, normalized := normalization.NormalizeTarget(trimmed); len(errs) > 0 {
 		return "", fmt.Errorf("invalid domain: %s", errs[0].Message())
 	} else {
 		return normalized, nil

@@ -3,7 +3,9 @@
 This page documents `gonemaster`, the direct local test runner. It runs the
 engine in the current process without `gonemaster-server`.
 
-`gonemaster` normalizes IDN domains to IDNA A-labels before use.
+`gonemaster` normalizes IDN domains to IDNA A-labels before use. An IPv4 or
+IPv6 address is tested as its reverse name under `in-addr.arpa` (RFC 1035
+section 3.5) or `ip6.arpa` (RFC 3596 section 2.5).
 
 *This page is for the local runner only.* The server client is documented under
 [client/](../client/README.md), including job and batch operations.

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>CLI :: Gonemaster</title><link>https://pawal.codeberg.page/gonemaster/cli/index.html</link><description>This page documents gonemaster, the direct local test runner. It runs the engine in the current process without gonemaster-server.
+gonemaster normalizes IDN domains to IDNA A-labels before use.
+This page is for the local runner only. The server client is documented under client/ , including job and batch operations.
+Installation Install the CLI with Go:
+go install codeberg.org/pawal/gonemaster/cmd/gonemaster@latest For local development from a checkout:
+go build -o gonemaster ./cmd/gonemaster Synopsis gonemaster [flags] [DOMAIN] Notes:</description><generator>Hugo</generator><language>en-us</language><atom:link href="https://pawal.codeberg.page/gonemaster/cli/index.xml" rel="self" type="application/rss+xml"/></channel></rss>

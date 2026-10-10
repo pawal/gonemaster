@@ -76,5 +76,6 @@ Status: Final
 
 ## Edge Cases And Limitations
 - If response is missing or question section is empty, no case-behavior tag is emitted for that nameserver.
+- A reply whose question differs from the query in name, ignoring ASCII case, or in type or class is invalid (RFC 5452 section 9.1) and counts as a missing response.
 - Only the first question entry in the response is evaluated.
 - Classification is based on exact string comparison against the randomized query name.

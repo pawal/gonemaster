@@ -67,6 +67,14 @@ Scope:
 | `covered` | `string` | Owner name of the NSEC or NSEC3 record that lies inside the interval of `owner`, lowercased. | |
 | `next` | `string` | Next field of the record at `owner`. | Next Hashed Owner Name in base32hex for NSEC3, Next Domain Name for NSEC. |
 
+## Limit Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `bound` | `string` | Name of an implementation-defined bound. | Values in [nameserver-resolution.md](nameserver-resolution.md#fan-out-limits). |
+| `limit` | `int` | Value of the bound or configured limit. | |
+| `count` | `int` | Number of items counted. | Beside `limit`, the count the limit applies to. |
+
 ## Temporal Keys
 
 | Key | Type | Meaning | Notes |

@@ -162,3 +162,41 @@ downstream tests would be empty; Basic01 names the same condition with
 `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`.
 
 Source: `engine/nsdiscovery/parent.go`.
+
+## Fan-out Limits
+
+A run bounds the nameserver names and addresses it takes from DNS
+responses, after RFC 1034 section 5.3.3, which requires a resolver to bound
+the packets it sends even when the data it follows is misconfigured. The
+bounds have no protocol counterpart; their values are implementation
+defined.
+
+| Bound | Value | Set |
+|---|---|---|
+| `ns_names_per_zone` | 32 | The NS names of one zone: [GlueNames](#gluenames), [ApexNSNames](#apexnsnames), the apex NS names of `Zone.NS`, a referral the recursor follows, an NS RRset of the parent walk, and the names of [DelegationNameservers](#delegationnameservers) and [ZoneNameservers](#zonenameservers). |
+| `addresses_per_ns` | 16 | The addresses of one NS name, from glue or from address resolution. |
+| `addresses_per_run` | 512 | The distinct nameserver addresses one run queries. |
+
+A set of names is lowercased and a set of addresses is taken as is; either
+set is deduplicated, sorted in byte order of the presentation form, and cut
+after the bound. A name or address past the cut is absent from the set and is
+not queried through it.
+
+The run bound counts an address when the run first queries it, before any
+cache is read. A query to a further address is not sent and reads as no
+response. When the run queries in parallel, which addresses fall past this
+bound depends on the order of the queries.
+
+When a bound cuts a set, the run logs `LIMIT_REACHED` in module `SYSTEM` at
+level `NOTICE`. The entry does not change the score. It is logged at most
+once per testcase, bound and name, in the testcase whose work first cuts the
+set; a set computed once per run reports its cut once.
+
+| Argument | Type | Meaning |
+|---|---|---|
+| `bound` | `string` | The bound, as named in the table above. |
+| `limit` | `int` | The value of the bound. |
+| `count` | `int` | The size of the set before the cut; for `addresses_per_run`, the bound plus one. |
+| `domain` | `string` | The zone whose names, or the NS name whose addresses, the bound cut; for `addresses_per_run`, the NS name of the first query not sent. |
+
+Source: `engine/nameserver/limits.go`.

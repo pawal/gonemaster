@@ -142,7 +142,15 @@ func credentialToken(r *http.Request) string {
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ts := s.authTokens()
-		if !ts.enabled || authExemptPath(r.URL.Path) {
+		if !ts.enabled {
+			if !openModeHostAllowed(r.Host, s.liveConfig()) {
+				writeError(w, http.StatusForbidden, "host_not_allowed", "host is not a name of this server", nil)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
+		if authExemptPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}

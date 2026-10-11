@@ -111,6 +111,49 @@ func TestAuthMiddlewareOpenModeAllows(t *testing.T) {
 	}
 }
 
+func TestOpenModeHostCheck(t *testing.T) {
+	cases := []struct {
+		name   string
+		cfg    func(*Config)
+		method string
+		path   string
+		host   string
+		want   int
+	}{
+		{"loopback address", nil, http.MethodGet, "/api/v1/locales", "127.0.0.1:8080", http.StatusOK},
+		{"loopback IPv6", nil, http.MethodGet, "/api/v1/locales", "[::1]:8080", http.StatusOK},
+		{"other address", nil, http.MethodGet, "/api/v1/locales", "192.0.2.10:8080", http.StatusOK},
+		{"localhost", nil, http.MethodGet, "/api/v1/locales", "localhost:8080", http.StatusOK},
+		{"localhost subdomain", nil, http.MethodGet, "/api/v1/locales", "app.localhost", http.StatusOK},
+		{"listen host", func(c *Config) { c.ListenAddr = "gm.internal:8080" }, http.MethodGet, "/api/v1/locales", "gm.internal:8080", http.StatusOK},
+		{"public_url host", func(c *Config) { c.PublicURL = "https://gm.example/" }, http.MethodGet, "/api/v1/locales", "GM.example.", http.StatusOK},
+		{"foreign host", nil, http.MethodGet, "/api/v1/locales", "evil.example", http.StatusForbidden},
+		{"foreign host write", nil, http.MethodPost, "/api/v1/jobs", "evil.example:8080", http.StatusForbidden},
+		{"foreign host mcp", func(c *Config) { c.MCPEnabled = true }, http.MethodPost, "/api/v1/mcp", "evil.example", http.StatusForbidden},
+		{"foreign host with public_url", func(c *Config) { c.PublicURL = "https://gm.example/" }, http.MethodGet, "/api/v1/locales", "evil.example", http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var opts []srvOpt
+			if tc.cfg != nil {
+				opts = append(opts, withConfig(tc.cfg))
+			}
+			resp := doJSON(t, newTestServer(t, opts...), tc.method, tc.path, nil, withHost(tc.host))
+			if tc.want == http.StatusForbidden {
+				wantErrorCode(t, resp, http.StatusForbidden, "host_not_allowed")
+				return
+			}
+			wantStatus(t, resp, tc.want)
+		})
+	}
+}
+
+func TestTokenModeSkipsHostCheck(t *testing.T) {
+	tok := "gm_hosttest"
+	bearer := withHeader("Authorization", "Bearer "+tok)
+	wantStatus(t, doJSON(t, tokenServer(t, tok), http.MethodGet, "/api/v1/locales", nil, withHost("evil.example"), bearer), http.StatusOK)
+}
+
 func TestAuthMiddlewareTokenMode(t *testing.T) {
 	tok := "gm_mwtest"
 	s := tokenServer(t, tok)

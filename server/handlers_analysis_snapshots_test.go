@@ -280,8 +280,7 @@ func TestAdminSnapshotCSRFOriginMatrix(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
 		csrfOriginMatrix(t, http.StatusOK, func(t *testing.T, opts ...reqOpt) *httptest.ResponseRecorder {
-			return f.call(http.MethodPost, path, `{"label":"relabel"}`,
-				append([]reqOpt{withHost("example.com")}, opts...)...)
+			return f.call(http.MethodPost, path, `{"label":"relabel"}`, opts...)
 		})
 	})
 }

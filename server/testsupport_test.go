@@ -81,6 +81,8 @@ func doJSON(t testing.TB, srv *Server, method string, path string, body any, opt
 func doHandler(t testing.TB, h http.Handler, method string, path string, body any, opts ...reqOpt) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, requestBody(t, body))
+	// A local client, which the open mode Host check admits.
+	req.Host = "localhost"
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

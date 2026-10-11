@@ -196,7 +196,7 @@ func TestCSRFOriginMatrixSendsAbsentSameAndCrossOrigin(t *testing.T) {
 		return doHandler(t, handler, http.MethodPost, "/api/v1/jobs", `{}`, opts...)
 	})
 
-	want := []string{"", "http://example.com", "https://evil.example"}
+	want := []string{"", "http://localhost", "https://evil.example"}
 	if !slices.Equal(seen, want) {
 		t.Fatalf("origins sent = %v, want %v", seen, want)
 	}

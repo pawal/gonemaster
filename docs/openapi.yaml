@@ -8,6 +8,10 @@ info:
     A request with a method other than GET, HEAD or OPTIONS MUST carry no `Origin`
     header or the origin of the request itself; any other `Origin` is answered
     `403` with the code `csrf_origin_mismatch`.
+
+    In open mode, a request MUST carry a `Host` that is an IP address, `localhost`
+    or a name under it, the host of `listen_addr`, or the host of `public_url`; any
+    other `Host` is answered `403` with the code `host_not_allowed`.
 servers:
   - url: http://localhost:8080/api/v1
     description: Local development (API base)

@@ -80,7 +80,7 @@ write, and logs and ignores a stored value outside them.
 | `read_timeout` | Per-connection read timeout (default 30s). |
 | `write_timeout` | Per-connection write timeout (default 60s). Must exceed `public_api.analysis_request_timeout`. |
 | `idle_timeout` | Idle keep-alive timeout (default 60s). |
-| `auth.admin_tokens` | Admin token hashes. Empty (default) is open mode. See [authentication.md](authentication.md). |
+| `auth.admin_tokens` | Admin token hashes. Empty (default) is open mode, where the admin API accepts only the `Host` names listed in [authentication.md](authentication.md#host-names-in-open-mode). See [authentication.md](authentication.md). |
 | `auth.protect_public` | Requires an admin token on `/public/`, `/analysis/` and `/pub/api/v1/` too. Default `false`; MUST NOT be `true` without `auth.admin_tokens`. See [authentication.md](authentication.md#protect-the-public-surfaces). |
 | `public_api.allow_private_undelegated_ip` | Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated NS targets on the public API. Default `false`; enable on private/internal deployments. |
 | `public_api.allow_non_global_targets` | Permit querying non-globally-reachable nameserver addresses. Default `false`, which clamps the engine guard on for every job so no caller-selected profile can relax it; set `true` on private/internal deployments. Complements (does not replace) `allow_private_undelegated_ip`: that flag is admission-time input validation, this is the query-time guard. A public instance that wants to run private undelegated tests must set both. The guard also covers the RIPE whois sources of the profile `asn_db`, so an internal whois mirror requires `true`. |

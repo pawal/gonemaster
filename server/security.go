@@ -74,6 +74,32 @@ func validateCSRFOrigin(r *http.Request, trusted []netip.Prefix) error {
 	return nil
 }
 
+// openModeHostAllowed reports whether host is an IP literal, a localhost name, the listen host or the public_url host.
+func openModeHostAllowed(host string, cfg Config) bool {
+	name := host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		name = h
+	}
+	name = strings.TrimSuffix(strings.ToLower(strings.Trim(name, "[]")), ".")
+	// Browsers always send Host.
+	if name == "" {
+		return true
+	}
+	if _, err := netip.ParseAddr(name); err == nil {
+		return true
+	}
+	if name == "localhost" || strings.HasSuffix(name, ".localhost") {
+		return true
+	}
+	if h, _, err := net.SplitHostPort(cfg.ListenAddr); err == nil && strings.EqualFold(h, name) {
+		return true
+	}
+	if u, err := url.Parse(cfg.PublicURL); err == nil && strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), name) {
+		return u.Hostname() != ""
+	}
+	return false
+}
+
 func (s *Server) enforceCSRF(w http.ResponseWriter, r *http.Request) bool {
 	if err := validateCSRFOrigin(r, s.trustedProxies); err != nil {
 		writeError(w, http.StatusForbidden, "csrf_origin_mismatch", err.Error(), nil)

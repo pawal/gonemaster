@@ -138,6 +138,16 @@ answers any other request with `403` and the code `csrf_origin_mismatch`
 before it routes the request. Clients that send no `Origin`, such as
 `gonemaster-client` and MCP clients, are not affected.
 
+## Host names in open mode
+
+In open mode, a request to `/api/v1`, `/api/v1/mcp` included, MUST carry a
+`Host` that names the server: an IP address, `localhost` or a name under
+`localhost`, the host of `listen_addr`, or the host of `public_url`. The server
+answers any other request with `403` and the code `host_not_allowed`. This
+refuses a page that resolves its own name to the server's address (DNS
+rebinding). A deployment that serves the admin API under another name in open
+mode MUST set `public_url` to that name. Token mode does not check `Host`.
+
 ## Protect the public surfaces
 
 `auth.protect_public` puts the public UI (`/public/`), the analysis UI

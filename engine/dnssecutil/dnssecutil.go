@@ -119,6 +119,17 @@ func rsaModulusBits(key *dns.DNSKEY) int {
 	return n.BitLen()
 }
 
+// rsaModulusBelowLibrary reports a 512 to 1023-bit modulus, which RFC 3110 §3 permits and crypto/rsa refuses.
+func rsaModulusBelowLibrary(key *dns.DNSKEY) bool {
+	switch key.Algorithm {
+	case dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512:
+	default:
+		return false
+	}
+	bits := rsaModulusBits(key)
+	return bits >= 512 && bits < 1024
+}
+
 // rsaMaxLibraryExponent is crypto/rsa's exponent cap, mirrored from the library.
 const rsaMaxLibraryExponent = 1<<31 - 1
 
@@ -179,7 +190,7 @@ func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) 
 		}
 		copies = append(copies, rr.Clone())
 	}
-	if RSAExponentBeyondLocalVerifier(key) {
+	if RSAExponentBeyondLocalVerifier(key) || rsaModulusBelowLibrary(key) {
 		return verifyLargeExponentRSA(&local, copies, keyCopy)
 	}
 	// The hook shares the library's default branch with every unverifiable

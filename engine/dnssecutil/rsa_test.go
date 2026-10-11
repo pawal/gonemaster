@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 	"net/netip"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -138,6 +139,34 @@ func TestVerifyRRSIGLargeExponentGenerated(t *testing.T) {
 			err := dnssecutil.VerifyRRSIG(sig, rrset, kp.Key, now)
 			if err == nil || errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 				t.Errorf("changed record: err = %v, want a plain verification failure", err)
+			}
+		})
+	}
+}
+
+// RFC 3110 §3 permits moduli from 512 bits; crypto/rsa refuses those under 1024.
+func TestVerifyRRSIGShortModulus(t *testing.T) {
+	now := time.Now().UTC()
+	for _, bits := range []int{512, 768} {
+		t.Run(strconv.Itoa(bits), func(t *testing.T) {
+			kp := dnstest.GenRSAKeyWithExponent(t, "example.test", big.NewInt(65537), bits, false)
+			if got := dnssecutil.KeySize(kp.Key); got != bits {
+				t.Fatalf("KeySize = %d, want %d", got, bits)
+			}
+			a := &dns.A{Hdr: dns.Header{Name: "example.test.", Class: dns.ClassINET, TTL: 300}}
+			a.Addr = netip.MustParseAddr("192.0.2.1")
+			rrset := []dns.RR{a}
+			sig := dnstest.SignRRset(t, kp, rrset, "example.test", "example.test", now.Add(-time.Hour), now.Add(time.Hour))
+			if err := dnssecutil.VerifyRRSIG(sig, rrset, kp.Key, now); err != nil {
+				t.Fatalf("%d-bit signature should verify: %v", bits, err)
+			}
+			// The day the library verifies this key by itself, the local path can go.
+			if err := sig.Verify(kp.Key, rrset, &dns.SignOption{}); err == nil {
+				t.Errorf("library Verify accepted a %d-bit key: reconsider rsaModulusBelowLibrary", bits)
+			}
+			a.Addr = netip.MustParseAddr("192.0.2.2")
+			if err := dnssecutil.VerifyRRSIG(sig, rrset, kp.Key, now); err == nil {
+				t.Error("changed record: the signature still verifies")
 			}
 		})
 	}

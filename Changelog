@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- dnssecutil: RSA keys of 512 to 1023 bits verify, as RFC 3110 permits
+
 ## [v1.7.21] - 2026-10-11
 
 Queries carry a random message ID, nameserver fan-out is capped, and an IP address is tested as its reverse name.

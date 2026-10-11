@@ -53,7 +53,7 @@ func RSAExponentBits(key *dns.DNSKEY) int {
 	return e.BitLen()
 }
 
-// verifyLargeExponentRSA verifies in math/big what crypto/rsa refuses for its exponent.
+// verifyLargeExponentRSA verifies in math/big what crypto/rsa refuses for its exponent or modulus size.
 func verifyLargeExponentRSA(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY) error {
 	if sig.KeyTag != KeyTag(key) || sig.Hdr.Class != key.Hdr.Class || sig.Algorithm != key.Algorithm ||
 		key.Flags&dns.FlagZONE == 0 || key.Protocol != 3 || !dns.EqualName(sig.SignerName, key.Hdr.Name) {

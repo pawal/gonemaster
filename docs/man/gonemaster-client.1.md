@@ -401,7 +401,9 @@ Retrieve and display test results.
 : Aggregate results across jobs.
 
 **--split-dir** *PATH*
-: Write per-job results to separate files in a directory.
+: Write per-job results to separate files in a directory, one file per
+  requested job ID with the extension of the format. A file name that leaves
+  the directory is an error.
 
 ## EXAMPLES
 

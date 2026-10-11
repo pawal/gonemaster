@@ -1496,12 +1496,18 @@ func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions
 		if err := os.MkdirAll(splitDir, 0o755); err != nil {
 			return err
 		}
-		for _, result := range results {
-			ext := outputExt(opts.format)
-			path := filepath.Join(splitDir, result.JobID+ext)
-			file, err := os.Create(path)
+		// Server supplied names stay inside splitDir.
+		root, err := os.OpenRoot(splitDir)
+		if err != nil {
+			return err
+		}
+		defer root.Close()
+		for i, result := range results {
+			name := ids[i] + outputExt(opts.format)
+			path := cliterm.Sanitize(filepath.Join(splitDir, name))
+			file, err := root.Create(name)
 			if err != nil {
-				return err
+				return errors.New(cliterm.Sanitize(err.Error()))
 			}
 			if err := renderResultsToWriter(opts, view, levelSet, false, true, []jobResult{result}, domains, scoreOpts, file); err != nil {
 				_ = file.Close()

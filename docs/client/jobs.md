@@ -81,7 +81,9 @@ Output options:
 - `--levels NOTICE,WARNING,ERROR,CRITICAL`
 - `--aggregate`
 - `--per-job`
-- `--split-dir PATH`
+- `--split-dir PATH`, one file per requested job ID, named after the ID with
+  the extension of the format (`.txt`, `.json`, `.jsonl`); an ID that names a
+  path outside `PATH` is an error
 - `--score`
 - `--no-score`
 - `--scoring-config PATH`

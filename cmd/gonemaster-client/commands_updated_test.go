@@ -3,6 +3,9 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -148,4 +151,54 @@ func TestJobsResultsFallsBackToRunResult(t *testing.T) {
 	}))
 	res := clitest.Run(t, run, "--format", "json", "jobs", "results", "run_1")
 	res.RequireCode(t, 0)
+}
+
+// ── jobs results --split-dir: server supplied names ───────────────────────────
+
+func TestJobsResultsSplitDirStaysInside(t *testing.T) {
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		switch {
+		case r.URL.Path == "/api/v1/jobs":
+			return apitest.JSONResponse(http.StatusOK, `{"items":[{"id":"../escape"}],"total":1}`), nil
+		case strings.HasSuffix(r.URL.Path, "/result"):
+			return apitest.JSONResponse(http.StatusOK, `{"job_id":"../../other","entries":[]}`), nil
+		default:
+			return apitest.JSONResponse(http.StatusOK, `{"id":"job_1","domain":"example.com","status":"succeeded"}`), nil
+		}
+	}))
+	cases := []struct {
+		name     string
+		args     []string
+		wantCode int
+		wantFile string
+	}{
+		{"requested id", []string{"job_1"}, 0, "job_1.json"},
+		{"listed id", []string{"--all"}, 2, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			parent := t.TempDir()
+			dir := filepath.Join(parent, "split")
+			args := append([]string{"--format", "json", "jobs", "results", "--split-dir", dir}, tc.args...)
+			clitest.Run(t, run, args...).RequireCode(t, tc.wantCode)
+			if entries, err := os.ReadDir(parent); err != nil || len(entries) != 1 || entries[0].Name() != "split" {
+				t.Fatalf("parent holds %v (%v), want only split", entries, err)
+			}
+			files, err := os.ReadDir(dir)
+			if err != nil {
+				t.Fatalf("read split dir: %v", err)
+			}
+			var names []string
+			for _, f := range files {
+				names = append(names, f.Name())
+			}
+			var want []string
+			if tc.wantFile != "" {
+				want = []string{tc.wantFile}
+			}
+			if !slices.Equal(names, want) {
+				t.Fatalf("split dir holds %v, want %v", names, want)
+			}
+		})
+	}
 }

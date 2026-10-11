@@ -23,6 +23,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - engine: queries carry a random message ID per attempt, and a reply whose question differs from the query is refused
 - server: a job that runs longer than `job_timeout_minutes` (default 20) fails with `timed out`
+- engine: a run follows at most 32 NS names per zone, 16 addresses per name and 512 addresses, and logs `LIMIT_REACHED` when it cuts a set
 - server: in open mode the admin API refuses a `Host` that does not name the server; set `public_url` to serve it under another name
 - client: `jobs results --split-dir` names files after the requested job ID and never writes outside the directory
 - deps: bump undici to 7.30.0 and source-map-js to 1.2.2 to fix npm advisories in UI dev dependencies

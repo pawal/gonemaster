@@ -4025,6 +4025,10 @@ msgctxt "SYSTEM:IPV6_AUTO_DISABLED"
 msgid "IPv6 automatically disabled: {reason}."
 msgstr "IPv6 desactivado automáticamente: {reason}."
 
+msgctxt "SYSTEM:LIMIT_REACHED"
+msgid "Limit {bound} of {limit} reached at {domain} with {count} found; the remainder is not tested."
+msgstr "Se alcanzó el límite {bound} de {limit} en {domain} con {count} encontrados; el resto no se prueba."
+
 msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr "La llamada al registro de operación murió con el error: {exception}"

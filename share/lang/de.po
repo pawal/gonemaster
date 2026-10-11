@@ -3335,6 +3335,10 @@ msgctxt "SYSTEM:IPV6_AUTO_DISABLED"
 msgid "IPv6 automatically disabled: {reason}."
 msgstr "IPv6 wurde automatisch deaktiviert: {reason}."
 
+msgctxt "SYSTEM:LIMIT_REACHED"
+msgid "Limit {bound} of {limit} reached at {domain} with {count} found; the remainder is not tested."
+msgstr "Grenze {bound} von {limit} bei {domain} erreicht, {count} gefunden; der Rest wird nicht getestet."
+
 msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr "Der Logger-Callback ist mit einem Fehler abgebrochen: {exception}."

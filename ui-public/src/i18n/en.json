@@ -1121,5 +1121,7 @@
   "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.header": "Unknown EDNS option ignored",
   "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.desc": "Your nameservers ignore an EDNS option they do not understand and answer the query normally, as RFC 6891 section 6.1.2 requires. A new EDNS option can therefore be deployed without breaking resolution of your zone.",
   "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.header": "Small EDNS buffer handled",
-  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "Your nameservers answer a DNSSEC query that allows only 512 bytes of payload without errors, and a truncated answer keeps its EDNS record. A resolver therefore knows to retry the query over TCP with EDNS."
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "Your nameservers answer a DNSSEC query that allows only 512 bytes of payload without errors, and a truncated answer keeps its EDNS record. A resolver therefore knows to retry the query over TCP with EDNS.",
+  "pub.tag.system.LIMIT_REACHED.header": "Not every nameserver tested",
+  "pub.tag.system.LIMIT_REACHED.desc": "Your domain, or a zone above it, lists more nameservers or more addresses than one test run follows: at most 32 nameserver names per zone, 16 addresses per name and 512 addresses in total. The run tested the first ones in sorted order and skipped the rest, so the results say nothing about the skipped servers. This finding does not change the score."
 }

@@ -3833,6 +3833,10 @@ msgctxt "SYSTEM:IPV6_AUTO_DISABLED"
 msgid "IPv6 automatically disabled: {reason}."
 msgstr "IPv6 automatisk deaktiveret: {reason}."
 
+msgctxt "SYSTEM:LIMIT_REACHED"
+msgid "Limit {bound} of {limit} reached at {domain} with {count} found; the remainder is not tested."
+msgstr "Grænsen {bound} på {limit} er nået ved {domain} med {count} fundet; resten testes ikke."
+
 msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr ""

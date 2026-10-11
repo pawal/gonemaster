@@ -3927,6 +3927,10 @@ msgctxt "SYSTEM:IPV6_AUTO_DISABLED"
 msgid "IPv6 automatically disabled: {reason}."
 msgstr "IPv6 poistettu automaattisesti käytöstä: {reason}."
 
+msgctxt "SYSTEM:LIMIT_REACHED"
+msgid "Limit {bound} of {limit} reached at {domain} with {count} found; the remainder is not tested."
+msgstr "Raja {bound} ({limit}) saavutettiin kohteessa {domain}, löytyi {count}; loppua ei testata."
+
 msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr "Tallentimen takaisinkutsu loppui virheeseen: {exception}"

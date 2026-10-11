@@ -49,6 +49,33 @@ func TestDelegationNameserversUndelegated(t *testing.T) {
 	}
 }
 
+func TestDelegationNameserversCapsNamesAndAddresses(t *testing.T) {
+	ctx, _, log := testhelpers.Context(t)
+	data := map[string][]string{}
+	for i := range 100 {
+		data[fmt.Sprintf("ns%03d.example", i)] = []string{fmt.Sprintf("192.0.2.%d", i+1)}
+	}
+	for i := range 19 {
+		data["ns000.example"] = append(data["ns000.example"], fmt.Sprintf("198.51.100.%d", i+1))
+	}
+	z := newZone(t, "example", nstest.Recursor(t, map[string]map[string][]string{"example": data}))
+
+	items, err := DelegationNameservers(ctx, &z)
+	if err != nil {
+		t.Fatalf("DelegationNameservers: %v", err)
+	}
+	perName := map[string]int{}
+	for _, item := range items {
+		perName[item.Name.String()]++
+	}
+	if len(perName) != 32 || perName["ns000.example"] != 16 || perName["ns031.example"] != 1 || perName["ns032.example"] != 0 {
+		t.Fatalf("items per name = %v, want ns000 to ns031 with 16 addresses for ns000", perName)
+	}
+	if n := dnstest.CountTag(log.Entries(), "LIMIT_REACHED"); n != 2 {
+		t.Fatalf("LIMIT_REACHED entries = %d, want 2", n)
+	}
+}
+
 func TestZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true

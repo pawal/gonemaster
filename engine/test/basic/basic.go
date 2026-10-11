@@ -289,6 +289,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 				}
 			}
+			nameserver.CapNSMap(ctx, zoneName, rrsNS)
 			if onePath && zoneName == "." {
 				// The hints list the roots; their names are only resolved on the full walk.
 				clear(rrsNS)
@@ -313,7 +314,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 				}
 
-				for _, addr := range addrs {
+				for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
 					if handledServers[zoneName] != nil && handledServers[zoneName][addr.String()] {
 						continue
 					}
@@ -397,6 +398,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								}
 							}
 						}
+						nameserver.CapNSMap(ctx, strings.ToLower(intermediate.String()), rrsNSBis)
 
 						for nsName, addrs := range rrsNSBis {
 							if len(addrs) == 0 {
@@ -417,7 +419,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								}
 							}
 
-							for _, addr := range addrs {
+							for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
 								if handledServers[intermediate.String()] != nil && handledServers[intermediate.String()][addr.String()] {
 									continue
 								}
@@ -483,6 +485,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								}
 							}
 						}
+						nameserver.CapNSMap(ctx, strings.ToLower(intermediate.String()), rrsNSBis)
 
 						for nsName, addrs := range rrsNSBis {
 							if len(addrs) == 0 {
@@ -503,7 +506,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								}
 							}
 
-							for _, addr := range addrs {
+							for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
 								if handledServers[intermediate.String()] != nil && handledServers[intermediate.String()][addr.String()] {
 									continue
 								}

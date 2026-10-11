@@ -30,6 +30,16 @@ func TestHasTagAndEntryByTag(t *testing.T) {
 	}
 }
 
+func TestCountTag(t *testing.T) {
+	entries := []*logger.Entry{entry("A", nil), nil, entry("B", nil), entry("A", nil)}
+	if got := CountTag(entries, "A"); got != 2 {
+		t.Fatalf("CountTag(A) = %d, want 2", got)
+	}
+	if got := CountTag(entries, "MISSING"); got != 0 {
+		t.Fatalf("CountTag(MISSING) = %d, want 0", got)
+	}
+}
+
 func TestTagsSkipsNilEntries(t *testing.T) {
 	got := Tags([]*logger.Entry{entry("A", nil), nil, entry("B", nil)})
 	if strings.Join(got, ",") != "A,B" {

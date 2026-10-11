@@ -430,6 +430,7 @@ type CacheStore struct {
 	queryRefused      map[string]int
 	axfrMu            sync.Mutex
 	axfrCache         map[string]*axfrRecord
+	limits            *runLimits
 }
 
 // NewCacheStore creates an empty nameserver cache store.
@@ -446,6 +447,7 @@ func NewCacheStore() *CacheStore {
 		queryTimes:        map[string][]time.Duration{},
 		queryTimeouts:     map[string]int{},
 		queryRefused:      map[string]int{},
+		limits:            newRunLimits(),
 	}
 }
 
@@ -691,6 +693,7 @@ func (c *CacheStore) SnapshotForRun() *CacheStore {
 		queryTimes:    map[string][]time.Duration{},
 		queryTimeouts: map[string]int{},
 		queryRefused:  map[string]int{},
+		limits:        newRunLimits(),
 	}
 	return snapshot
 }

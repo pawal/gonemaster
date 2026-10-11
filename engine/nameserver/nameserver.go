@@ -199,6 +199,10 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if (ns.state == nil || ns.state.queryFunc == nil) && !prof.NoNetwork && ns.blockNonGlobal(ctx, prof, runLog, cacheKey) {
 		return packet.Packet{}, nil
 	}
+	if !ns.cache.admitAddress(ns.Address) {
+		limitReached(runLog, ns.cache, BoundRunAddresses, ns.NameString(), MaxRunAddresses, MaxRunAddresses+1)
+		return packet.Packet{}, nil
+	}
 	if ns.state != nil {
 		if cached, ok := ns.state.cache.get(cacheKey); ok {
 			if cached == nil {

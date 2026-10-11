@@ -608,7 +608,8 @@ func TestSystemTagsAreScoreNeutral(t *testing.T) {
 	// SYSTEM entries map to no scoring category.
 	base := []Entry{{Module: "BASIC", Tag: "B01_OK", Level: "NOTICE"}}
 	withGuard := append(append([]Entry{}, base...),
-		Entry{Module: "System", Tag: "NON_GLOBAL_QUERY_BLOCKED", Level: "NOTICE"})
+		Entry{Module: "System", Tag: "NON_GLOBAL_QUERY_BLOCKED", Level: "NOTICE"},
+		Entry{Module: "System", Tag: "LIMIT_REACHED", Level: "NOTICE"})
 
 	rBase := Compute("example.se", base, cfg)
 	rGuard := Compute("example.se", withGuard, cfg)

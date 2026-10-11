@@ -5,7 +5,6 @@ import (
 	"maps"
 	"net/netip"
 	"slices"
-	"sort"
 	"strings"
 
 	dns "codeberg.org/miekg/dns"
@@ -31,7 +30,7 @@ func validNS(resp packet.Packet, name dnsname.Name) bool {
 	return len(answer) == len(resp.GetRecordsForName("NS", name, "answer"))
 }
 
-func nsMapFromResponse(resp packet.Packet, owner dnsname.Name, section string) map[string][]netip.Addr {
+func nsMapFromResponse(ctx context.Context, resp packet.Packet, owner dnsname.Name, section string) map[string][]netip.Addr {
 	out := map[string][]netip.Addr{}
 	for _, rr := range resp.GetRecordsForName("NS", owner, section) {
 		if nsRR, ok := rr.(*dns.NS); ok {
@@ -49,6 +48,7 @@ func nsMapFromResponse(resp packet.Packet, owner dnsname.Name, section string) m
 			}
 		}
 	}
+	nameserver.CapNSMap(ctx, strings.ToLower(owner.String()), out)
 	return out
 }
 
@@ -139,31 +139,30 @@ func queryPacket(ctx context.Context, ns nameserver.Nameserver, name string, qty
 	return resp
 }
 
-func uniqueAddrs(addrs []netip.Addr) []netip.Addr {
-	seen := map[string]netip.Addr{}
-	for _, addr := range addrs {
-		seen[addr.String()] = addr
-	}
-	out := make([]netip.Addr, 0, len(seen))
-	for _, addr := range seen {
-		out = append(out, addr)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].String() < out[j].String()
-	})
-	return out
-}
-
-func uniqueSortedItems(items []NSItem) []NSItem {
+// uniqueSortedItems deduplicates and sorts items and cuts them to the fan-out bounds of domain.
+func uniqueSortedItems(ctx context.Context, domain string, items []NSItem) []NSItem {
 	seen := map[string]NSItem{}
+	addrs := map[string][]netip.Addr{}
 	for _, item := range items {
 		seen[item.String()] = item
+		name := strings.ToLower(item.Name.String())
+		if item.HasAddress {
+			addrs[name] = append(addrs[name], item.Address)
+		} else if _, ok := addrs[name]; !ok {
+			addrs[name] = nil
+		}
 	}
+	nameserver.CapNSMap(ctx, domain, addrs)
 	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]NSItem, 0, len(keys))
 	for _, key := range keys {
-		out = append(out, seen[key])
+		item := seen[key]
+		kept, ok := addrs[strings.ToLower(item.Name.String())]
+		if !ok || item.HasAddress && !slices.Contains(kept, item.Address) {
+			continue
+		}
+		out = append(out, item)
 	}
 	return out
 }

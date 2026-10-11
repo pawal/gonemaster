@@ -264,7 +264,7 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 				continue
 			}
 
-			rrsNS := nsMapFromResponse(pNS, dnsname.New(zoneKey), "answer")
+			rrsNS := nsMapFromResponse(ctx, pNS, dnsname.New(zoneKey), "answer")
 			if onePath && zoneKey == "." {
 				// The hints list the roots; their names are only resolved on the full walk.
 				clear(rrsNS)
@@ -279,7 +279,7 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 						rrsNS[nsName] = append(rrsNS[nsName], collectAddrs(resp, qtype, dnsname.New(nsName))...)
 					}
 				}
-				for _, addr := range uniqueAddrs(rrsNS[nsName]) {
+				for _, addr := range nameserver.CapAddresses(ctx, nsName, rrsNS[nsName]) {
 					next, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
 					if err != nil {
 						continue
@@ -320,7 +320,7 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 							continue
 						}
 
-						rrsNSBis := nsMapFromResponse(pNS, intermediate, "answer")
+						rrsNSBis := nsMapFromResponse(ctx, pNS, intermediate, "answer")
 						for nsName := range rrsNSBis {
 							if len(rrsNSBis[nsName]) == 0 {
 								for _, qtype := range []string{"A", "AAAA"} {
@@ -331,7 +331,7 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 									rrsNSBis[nsName] = append(rrsNSBis[nsName], collectAddrs(resp, qtype, dnsname.New(nsName))...)
 								}
 							}
-							for _, addr := range uniqueAddrs(rrsNSBis[nsName]) {
+							for _, addr := range nameserver.CapAddresses(ctx, nsName, rrsNSBis[nsName]) {
 								next, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
 								if err != nil {
 									continue
@@ -345,7 +345,7 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 					if strings.EqualFold(intermediate.String(), z.Name.String()) {
 						parentNS = append(parentNS, ns)
 					} else {
-						rrsNSBis := nsMapFromResponse(pSOA, intermediate, "authority")
+						rrsNSBis := nsMapFromResponse(ctx, pSOA, intermediate, "authority")
 						for nsName := range rrsNSBis {
 							if len(rrsNSBis[nsName]) == 0 {
 								for _, qtype := range []string{"A", "AAAA"} {
@@ -356,7 +356,7 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 									rrsNSBis[nsName] = append(rrsNSBis[nsName], collectAddrs(resp, qtype, dnsname.New(nsName))...)
 								}
 							}
-							for _, addr := range uniqueAddrs(rrsNSBis[nsName]) {
+							for _, addr := range nameserver.CapAddresses(ctx, nsName, rrsNSBis[nsName]) {
 								next, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
 								if err != nil {
 									continue

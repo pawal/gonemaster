@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"fmt"
 	"net"
 	"slices"
 	"strings"
@@ -233,5 +234,60 @@ func TestBasic01NoChildSuggestsParentZone(t *testing.T) {
 				t.Fatalf("domain_super = %#v, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// A parent zone referred with 40 NS names is walked through the first 32 only.
+func TestBasic01WalkCapsNSNames(t *testing.T) {
+	ctx, prof, log := testhelpers.Context(t)
+	prof.Net.IPv6 = false
+	var names []string
+	var glue []dns.RR
+	var referral []nsEntry
+	for i := range 40 {
+		names = append(names, fmt.Sprintf("ns%02d.example", i))
+		glue = append(glue, tctest.ARR(names[i], fmt.Sprintf("192.0.2.%d", 100+i)))
+		referral = append(referral, nsEntry{name: names[i], addr: net.IPv4(192, 0, 2, byte(100+i))})
+	}
+	r := tctest.Recursor(t, map[string]map[string][]string{".": {"ns1.root": {"192.0.2.1"}}})
+	tctest.NSOn(t, ctx, r, "ns1.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		switch {
+		case q.Name == "." && q.Type == "SOA":
+			return soaPacket(".", "ns1.root", "hostmaster.root")
+		case q.Name == "." && q.Type == "NS":
+			return nsPacketMulti(".", "ns1.root")
+		case strings.EqualFold(q.Name, "example") && q.Type == "SOA":
+			return referralPacketMulti("example", referral)
+		}
+		return packet.Packet{}
+	})
+	queried := make([]atomic.Int32, len(names))
+	for i, name := range names {
+		tctest.NSOn(t, ctx, r, name, fmt.Sprintf("192.0.2.%d", 100+i), func(q tctest.Query) packet.Packet {
+			queried[i].Add(1)
+			switch {
+			case strings.EqualFold(q.Name, "example") && q.Type == "SOA":
+				return soaPacket("example", "ns00.example", "hostmaster.example")
+			case strings.EqualFold(q.Name, "example") && q.Type == "NS":
+				return tctest.Response(tctest.Answers(tctest.NSRRs("example", names...)...), tctest.Additional(glue...))
+			case strings.EqualFold(q.Name, "child.example"):
+				return delegatedChild(q)
+			}
+			return packet.Packet{}
+		})
+	}
+
+	entries, err := Basic01(ctx, tctest.Zone(t, "child.example", r))
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+	if queried[31].Load() == 0 || queried[32].Load() != 0 || queried[39].Load() != 0 {
+		t.Fatalf("queries to ns31 %d, ns32 %d, ns39 %d; want ns31 probed, ns32 and ns39 not", queried[31].Load(), queried[32].Load(), queried[39].Load())
+	}
+	if !slices.Contains(tctest.Tags(entries), "B01_CHILD_FOUND") {
+		t.Fatalf("tags = %v, want B01_CHILD_FOUND", tctest.Tags(entries))
+	}
+	if !slices.Contains(tctest.Tags(log.Entries()), "LIMIT_REACHED") {
+		t.Fatalf("run log tags = %v, want LIMIT_REACHED", tctest.Tags(log.Entries()))
 	}
 }

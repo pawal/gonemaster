@@ -153,7 +153,7 @@ func (z *Zone) GlueNames(ctx context.Context) ([]dnsname.Name, error) {
 		seen[nsName.String()] = nsName
 	}
 
-	keys := slices.Sorted(maps.Keys(seen))
+	keys := nameserver.CapNames(ctx, z.Name.String(), slices.Sorted(maps.Keys(seen)))
 	var names []dnsname.Name
 	for _, key := range keys {
 		names = append(names, seen[key])
@@ -278,7 +278,7 @@ func (z *Zone) NSNames(ctx context.Context) ([]dnsname.Name, error) {
 		nsName := dnsname.New(strings.ToLower(nsRR.Ns))
 		seen[nsName.String()] = nsName
 	}
-	keys := slices.Sorted(maps.Keys(seen))
+	keys := nameserver.CapNames(ctx, z.Name.String(), slices.Sorted(maps.Keys(seen)))
 	var names []dnsname.Name
 	for _, key := range keys {
 		names = append(names, seen[key])
@@ -317,7 +317,7 @@ func (z *Zone) ApexNSNames(ctx context.Context) ([]dnsname.Name, error) {
 		}
 	}
 
-	keys := slices.Sorted(maps.Keys(seen))
+	keys := nameserver.CapNames(ctx, z.Name.String(), slices.Sorted(maps.Keys(seen)))
 	out := make([]dnsname.Name, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, seen[key])

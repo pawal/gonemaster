@@ -2,7 +2,9 @@ package zone
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
+	"slices"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
@@ -254,6 +256,34 @@ func TestZoneApexNSNamesDedupAndSort(t *testing.T) {
 		if name.String() != want[i] {
 			t.Fatalf("expected %q at %d, got %q", want[i], i, name.String())
 		}
+	}
+}
+
+func TestZoneApexNSNamesCapsNames(t *testing.T) {
+	ctx, prof, log := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+
+	r := nstest.RootRecursor(t, map[string][]string{"a.root": {"192.0.2.1"}})
+	var nsNames []string
+	for i := range 40 {
+		nsNames = append(nsNames, fmt.Sprintf("ns%02d.example", i))
+	}
+	apexSetNSHook(ctx, t, r, "a.root", "192.0.2.1", ".", nsNames...)
+	z := newZone(t, ".", r)
+
+	names, err := z.ApexNSNames(ctx)
+	if err != nil {
+		t.Fatalf("ApexNSNames: %v", err)
+	}
+	var got []string
+	for _, name := range names {
+		got = append(got, name.String())
+	}
+	if !slices.Equal(got, nsNames[:32]) {
+		t.Fatalf("ApexNSNames = %v, want ns00 to ns31", got)
+	}
+	if n := dnstest.CountTag(log.Entries(), "LIMIT_REACHED"); n != 1 {
+		t.Fatalf("LIMIT_REACHED entries = %d, want 1", n)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -299,11 +300,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 
 	res = append(res, collectAddresses(pa, target, cnames)...)
 	res = append(res, collectAddresses(paaaa, target, cnames)...)
-
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].String() < res[j].String()
-	})
-	return res, nil
+	return nameserver.CapAddresses(ctx, strings.ToLower(target.String()), res), nil
 }
 
 // ClearCache clears the recursive cache.
@@ -598,19 +595,30 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 	}
 	state.unlock()
 
-	var names []string
+	byKey := map[string]string{}
 	glueAllowed := map[string]bool{}
+	owner := ""
 	for _, rr := range nsRecords {
 		nsRR, ok := rr.(*dns.NS)
 		if !ok {
 			continue
 		}
 		nsName := dnsname.New(nsRR.Ns)
-		names = append(names, nsName.String())
-		zoneName := dnsname.New(nsRR.Hdr.Name)
-		if zoneName.IsInBailiwick(nsName) {
-			glueAllowed[strings.ToLower(nsName.String())] = true
+		key := strings.ToLower(nsName.String())
+		if _, ok := byKey[key]; !ok {
+			byKey[key] = nsName.String()
 		}
+		zoneName := dnsname.New(nsRR.Hdr.Name)
+		if owner == "" {
+			owner = strings.ToLower(zoneName.String())
+		}
+		if zoneName.IsInBailiwick(nsName) {
+			glueAllowed[key] = true
+		}
+	}
+	var names []string
+	for _, key := range nameserver.CapNames(ctx, owner, slices.Sorted(maps.Keys(byKey))) {
+		names = append(names, byKey[key])
 	}
 
 	state.lock()
@@ -654,11 +662,7 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 		nameObj := dnsname.New(name)
 		key := strings.ToLower(nameObj.String())
 		if addrs, ok := state.glue[key]; ok && len(addrs) > 0 {
-			ordered := make([]netip.Addr, 0, len(addrs))
-			for addr := range addrs {
-				ordered = append(ordered, addr)
-			}
-			glueSnapshot[key] = ordered
+			glueSnapshot[key] = slices.Collect(maps.Keys(addrs))
 		}
 	}
 	state.unlock()
@@ -667,7 +671,7 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 		nameObj := dnsname.New(name)
 		key := strings.ToLower(nameObj.String())
 		if addrs, ok := glueSnapshot[key]; ok && len(addrs) > 0 {
-			for _, addr := range addrs {
+			for _, addr := range nameserver.CapAddresses(ctx, key, addrs) {
 				ns, err := nameserver.NewWithContext(ctx, name, addr.String(), r.client)
 				if err != nil {
 					return nil, fmt.Errorf("create nameserver for %s: %w", name, err)
@@ -775,7 +779,7 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 		l.state.unlock()
 	}
 	if len(cachedAddrs) > 0 {
-		return queryAddresses(cachedAddrs)
+		return queryAddresses(nameserver.CapAddresses(ctx, nameKey, cachedAddrs))
 	}
 
 	addrs, err := l.recursor.getAddressesFor(ctx, l.name, l.state)

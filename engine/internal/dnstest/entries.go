@@ -21,6 +21,17 @@ func EntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
 	return nil
 }
 
+// CountTag returns how many entries carry the tag.
+func CountTag(entries []*logger.Entry, tag string) int {
+	n := 0
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == tag {
+			n++
+		}
+	}
+	return n
+}
+
 // Tags returns the tags of the entries, in order.
 func Tags(entries []*logger.Entry) []string {
 	out := make([]string, 0, len(entries))

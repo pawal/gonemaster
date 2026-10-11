@@ -642,6 +642,7 @@
             "IPV6_BLOCKED": "DEBUG2",
             "IS_BLACKLISTED": "DEBUG",
             "IS_REDIRECT": "DEBUG2",
+            "LIMIT_REACHED": "NOTICE",
             "LOGGER_CALLBACK_ERROR": "DEBUG",
             "LOOP_PROTECTION": "DEBUG2",
             "MODULE_ERROR": "CRITICAL",

@@ -3,6 +3,7 @@ package recursor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/netip"
 	"slices"
 	"strings"
@@ -486,6 +487,40 @@ func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 	}
 	if _, ok := queryers[1].(lazyNameserver); !ok {
 		t.Fatalf("expected lazy nameserver, got %#v", queryers[1])
+	}
+}
+
+func TestGetNSFromCapsNamesAndGlue(t *testing.T) {
+	ctx, _, log := testhelpers.Context(t)
+	var names []string
+	for i := range 40 {
+		names = append(names, fmt.Sprintf("ns%02d.example", i))
+	}
+	var glue []dns.RR
+	for i := range 20 {
+		glue = append(glue, dnstest.ARR("ns00.example", fmt.Sprintf("192.0.2.%d", i+1)))
+	}
+	resp := dnstest.Response(dnstest.Authority(dnstest.NSRRs("example", names...)...), dnstest.Additional(glue...))
+	r := &Recursor{client: &transport.Client{}}
+	queryers, err := r.getNSFrom(ctx, resp, nil)
+	if err != nil {
+		t.Fatalf("getNSFrom: %v", err)
+	}
+	glued := 0
+	var lazy []string
+	for _, q := range queryers {
+		switch v := q.(type) {
+		case nameserver.Nameserver:
+			glued++
+		case lazyNameserver:
+			lazy = append(lazy, v.name)
+		}
+	}
+	if glued != 16 || !slices.Equal(lazy, names[1:32]) {
+		t.Fatalf("glued = %d, lazy = %v; want 16 glued and ns01 to ns31 lazy", glued, lazy)
+	}
+	if got := dnstest.CountTag(log.Entries(), "LIMIT_REACHED"); got != 2 {
+		t.Fatalf("LIMIT_REACHED entries = %d, want 2", got)
 	}
 }
 

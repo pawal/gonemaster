@@ -80,7 +80,7 @@ func DelegationNameservers(ctx context.Context, z *zone.Zone) ([]NSItem, error) 
 		}
 	}
 	out = append(out, oob...)
-	return uniqueSortedItems(out), nil
+	return uniqueSortedItems(ctx, z.Name.String(), out), nil
 }
 
 // delNSNames returns delegation names for the zone.
@@ -195,7 +195,7 @@ func ZoneNameservers(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 		}
 	}
 
-	return uniqueSortedItems(out), nil
+	return uniqueSortedItems(ctx, z.Name.String(), out), nil
 }
 
 func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
@@ -217,7 +217,7 @@ func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 				out = append(out, NSItem{Name: nameObj, Address: addr, HasAddress: true})
 			}
 		}
-		return uniqueSortedItems(out), nil
+		return uniqueSortedItems(ctx, z.Name.String(), out), nil
 	}
 
 	if z.Name.String() == "." {
@@ -229,7 +229,7 @@ func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 		for _, ns := range root {
 			out = append(out, NSItem{Name: ns.Name, Address: ns.Address, HasAddress: true})
 		}
-		return uniqueSortedItems(out), nil
+		return uniqueSortedItems(ctx, z.Name.String(), out), nil
 	}
 
 	parentNS, err := parentNSIPs(ctx, z)
@@ -349,7 +349,7 @@ func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	var out []NSItem
 	for nsName, addrs := range hashRef {
 		if len(addrs) > 0 {
-			for _, addr := range uniqueAddrs(addrs) {
+			for _, addr := range addrs {
 				out = append(out, NSItem{Name: dnsname.New(nsName), Address: addr, HasAddress: true})
 			}
 		} else {
@@ -357,7 +357,7 @@ func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 		}
 	}
 
-	return uniqueSortedItems(out), nil
+	return uniqueSortedItems(ctx, z.Name.String(), out), nil
 }
 
 func getOOBIPs(ctx context.Context, z *zone.Zone, nsNames []dnsname.Name) ([]NSItem, error) {
@@ -413,7 +413,7 @@ func getOOBIPs(ctx context.Context, z *zone.Zone, nsNames []dnsname.Name) ([]NSI
 		}
 	}
 
-	return uniqueSortedItems(out), nil
+	return uniqueSortedItems(ctx, z.Name.String(), out), nil
 }
 
 func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
@@ -499,7 +499,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 
 	seen := map[string]nameserver.Nameserver{}
 	for nsName, addrs := range ibNS {
-		for _, addr := range uniqueAddrs(addrs) {
+		for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
 			ns, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
 			if err != nil {
 				continue

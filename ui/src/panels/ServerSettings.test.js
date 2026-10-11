@@ -159,6 +159,19 @@ describe("ServerSettings", () => {
     expect(toggle.type).toBe("checkbox");
   });
 
+  it("renders the job timeout and saves it", async () => {
+    const calls = capturePuts();
+    await renderLoaded(/Job timeout \(minutes\)/);
+
+    const input = screen.getByLabelText(/Job timeout \(minutes\)/);
+    expect(input.value).toBe("20");
+    await fireEvent.input(input, { target: { value: "45" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.length).toBe(1));
+    expect(calls[0]).toEqual({ job_timeout_minutes: 45 });
+  });
+
   it("renders the AS holders toggle and saves it", async () => {
     const calls = capturePuts();
     await renderLoaded(/Show AS holders in public UI/);

@@ -583,6 +583,8 @@ func TestPutSettingsRejectsOutOfRangeValues(t *testing.T) {
 		{"max_concurrent_jobs", -1},
 		{"max_concurrent_jobs", 1025},
 		{"stuck_job_timeout_minutes", 525601},
+		{"job_timeout_minutes", -1},
+		{"job_timeout_minutes", 525601},
 		{"retention_days", -1},
 		{"retention_days", 36501},
 		{"purge_interval_seconds", 0},

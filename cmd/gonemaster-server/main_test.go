@@ -146,6 +146,18 @@ func TestRunDBRetentionDaysHelpText(t *testing.T) {
 	res.RequireErrContains(t, "--db-retention-days")
 }
 
+func TestRunJobTimeoutFlag(t *testing.T) {
+	clitest.Run(t, run, "--job-timeout", "-1").
+		RequireCode(t, 2).
+		RequireErrContains(t, "--job-timeout must be >= 0")
+	res := clitest.Run(t, run, "--dump-config", "--job-timeout", "45")
+	res.RequireCode(t, 0)
+	if !strings.Contains(res.Out, `"job_timeout_minutes": 45`) {
+		t.Fatalf("expected job_timeout_minutes in dump-config output, got:\n%s", res.Out)
+	}
+	clitest.Run(t, run, "-h").RequireErrContains(t, "--job-timeout N", "GONEMASTER_JOB_TIMEOUT")
+}
+
 func TestRunDBPurgeIntervalValidation(t *testing.T) {
 	res := clitest.Run(t, run, "--db-purge-interval", "0")
 	res.RequireCode(t, 2)

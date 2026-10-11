@@ -841,3 +841,41 @@ func TestQueueContinuesAfterJobPanic(t *testing.T) {
 		})
 	}
 }
+
+// A run longer than job_timeout_minutes fails; a shorter or unbounded one succeeds.
+func TestRunJobTimeout(t *testing.T) {
+	cases := []struct {
+		name       string
+		minutes    string
+		run        time.Duration
+		wantStatus JobStatus
+		wantError  string
+	}{
+		{"exceeds the limit", "20", 30 * time.Minute, JobFailed, "timed out"},
+		{"within the limit", "20", 10 * time.Minute, JobSucceeded, ""},
+		{"no limit", "0", 30 * time.Minute, JobSucceeded, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				srv := newTestServer(t, withEngineRunner(func(req engine.RunRequest) ([]engine.LogEntry, error) {
+					select {
+					case <-req.Context.Done():
+						return nil, req.Context.Err()
+					case <-time.After(tc.run):
+						return nil, nil
+					}
+				}))
+				srv.applySetting("job_timeout_minutes", tc.minutes)
+				job := Job{ID: "job-timeout", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()}
+				if _, err := srv.store.Create(job); err != nil {
+					t.Fatalf("create job: %v", err)
+				}
+				_ = srv.runJob(job.ID)
+				if state, msg := jobOutcome(srv, job.ID); state != tc.wantStatus || msg != tc.wantError {
+					t.Fatalf("job = %s %q, want %s %q", state, msg, tc.wantStatus, tc.wantError)
+				}
+			})
+		})
+	}
+}

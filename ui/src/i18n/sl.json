@@ -572,6 +572,8 @@
   "settings_help_max_concurrent_jobs": "Omejitev sočasnih izvajanj pogona (0 = neomejeno).",
   "settings_label_stuck_job_timeout_minutes": "Časovna omejitev zataknjenih opravil (minute)",
   "settings_help_stuck_job_timeout_minutes": "Označi zapuščena izvajajoča se opravila kot neuspešna po toliko minutah (0 = onemogočeno).",
+  "settings_label_job_timeout_minutes": "Časovna omejitev opravila (minute)",
+  "settings_help_job_timeout_minutes": "Označi opravilo kot neuspešno, če se izvaja dlje kot toliko minut (0 = onemogočeno).",
   "settings_label_min_level": "Najmanjša raven dnevnika",
   "settings_help_min_level": "Najmanjša raven resnosti za rezultate novih opravil.",
   "settings_label_ipv6_mode": "IPv6 v testnih izvajanjih",

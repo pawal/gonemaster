@@ -36,7 +36,7 @@ server stores nothing and answers `400` when a name is read-only
 |---|---|
 | `worker_count` | Integer 1 to 1024. |
 | `max_concurrent_jobs` | Integer 0 to 1024. |
-| `stuck_job_timeout_minutes` | Integer 0 to 525600. |
+| `stuck_job_timeout_minutes`, `job_timeout_minutes` | Integer 0 to 525600. |
 | `retention_days` | Integer 0 to 36500. |
 | `purge_interval_seconds` | Integer 1 to 31536000. |
 | `cross_job_hot_cache_ttl_seconds` | Integer 1 to 86400. |
@@ -63,6 +63,7 @@ write, and logs and ignores a stored value outside them.
 | `worker_count` | Number of workers that dequeue jobs. |
 | `max_concurrent_jobs` | Maximum number of engine runs at once. |
 | `stuck_job_timeout_minutes` | Fail abandoned running jobs after this many minutes (0 = disable). |
+| `job_timeout_minutes` | Run time limit of one job in minutes, default 20; `0` disables it. A job that reaches the limit is stopped and fails with the error `timed out`. A changed value applies to jobs that start after the change. |
 | `cross_job_hot_cache` | Enables cross-job nameserver cache sharing. |
 | `cross_job_hot_cache_ttl_seconds` | TTL for cross-job hot-cache entries. |
 | `min_level` | Minimum log level stored and returned in results. |
@@ -92,6 +93,7 @@ write, and logs and ignores a stored value outside them.
 | `GONEMASTER_WORKER_COUNT` | `worker_count` |
 | `GONEMASTER_MAX_CONCURRENT_JOBS` | `max_concurrent_jobs` |
 | `GONEMASTER_STUCK_JOB_TIMEOUT` | `stuck_job_timeout_minutes` |
+| `GONEMASTER_JOB_TIMEOUT` | `job_timeout_minutes` |
 | `GONEMASTER_MIN_LEVEL` | `min_level` |
 | `GONEMASTER_IPV6_MODE` | `ipv6_mode` |
 | `GONEMASTER_PROFILE` | `profile_path` |

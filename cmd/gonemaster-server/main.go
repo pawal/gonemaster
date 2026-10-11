@@ -67,6 +67,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var workerCount int
 	var maxConcurrentJobs int
 	var stuckJobTimeoutMinutes int
+	var jobTimeoutMinutes int
 	var positiveCacheTTL int
 	var negativeCacheTTL int
 	var timeoutSeconds int
@@ -134,6 +135,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--workers N", detail: "Number of worker goroutines (default 16)"},
 			{flag: "--max-concurrent-jobs N", detail: "Max concurrent engine runs (0 = unlimited)"},
 			{flag: "--stuck-job-timeout N", detail: "Fail abandoned running jobs after N minutes (0 = disable, default 20) (env: GONEMASTER_STUCK_JOB_TIMEOUT)"},
+			{flag: "--job-timeout N", detail: "Fail a job that runs longer than N minutes (0 = disable, default 20) (env: GONEMASTER_JOB_TIMEOUT)"},
 			{flag: "--cross-job-hot-cache", detail: "Enable cross-job nameserver cache sharing (default true)"},
 			{flag: "--no-cross-job-hot-cache", detail: "Disable cross-job nameserver cache sharing"},
 			{flag: "--cross-job-hot-cache-ttl N", detail: "Hot-cache entry TTL in seconds (default 60)"},
@@ -223,6 +225,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.IntVar(&dbRetentionDays, "db-retention-days", 0, "Delete completed jobs older than N days (0 = keep forever)")
 	fs.IntVar(&dbPurgeInterval, "db-purge-interval", 0, "Retention purge sweep interval in seconds (default 3600)")
 	fs.IntVar(&stuckJobTimeoutMinutes, "stuck-job-timeout", 0, "Fail abandoned running jobs after N minutes (0 = disable, default 20)")
+	fs.IntVar(&jobTimeoutMinutes, "job-timeout", 0, "Fail a job that runs longer than N minutes (0 = disable, default 20)")
 	fs.BoolVar(&pubAPIRateLimitEnabled, "public-api-rate-limit-enabled", false, "Enable per-IP rate limiting on POST /pub/api/v1/jobs")
 	fs.IntVar(&pubAPIRateLimitMax, "public-api-rate-limit-max", 0, "Max job submissions per IP per window (default 10)")
 	fs.IntVar(&pubAPIRateLimitGetMax, "public-api-rate-limit-get-max", 0, "Max metered GET requests per IP per window (default 600)")
@@ -306,6 +309,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if flagsSet["stuck-job-timeout"] && stuckJobTimeoutMinutes < 0 {
 		fmt.Fprintln(errOut, "--stuck-job-timeout must be >= 0")
+		return 2
+	}
+	if flagsSet["job-timeout"] && jobTimeoutMinutes < 0 {
+		fmt.Fprintln(errOut, "--job-timeout must be >= 0")
 		return 2
 	}
 	if flagsSet["public-api-rate-limit-max"] && pubAPIRateLimitMax < 1 {
@@ -449,6 +456,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if flagsSet["stuck-job-timeout"] {
 		cfg.StuckJobTimeoutMinutes = stuckJobTimeoutMinutes
+	}
+	if flagsSet["job-timeout"] {
+		cfg.JobTimeoutMinutes = jobTimeoutMinutes
 	}
 	if flagsSet["public-api-rate-limit-enabled"] {
 		cfg.PublicAPI.RateLimitEnabled = pubAPIRateLimitEnabled
@@ -720,6 +730,7 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"db-retention-days":             "retention_days",
 		"db-purge-interval":             "purge_interval_seconds",
 		"stuck-job-timeout":             "stuck_job_timeout_minutes",
+		"job-timeout":                   "job_timeout_minutes",
 		"public-api-rate-limit-enabled": "rate_limit_enabled",
 		"public-api-rate-limit-max":     "rate_limit_max",
 		"public-api-rate-limit-get-max": "rate_limit_get_max",

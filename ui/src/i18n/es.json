@@ -572,6 +572,8 @@
   "settings_help_max_concurrent_jobs": "Límite de ejecuciones simultáneas del motor (0 = ilimitado).",
   "settings_label_stuck_job_timeout_minutes": "Tiempo límite de trabajos atascados (minutos)",
   "settings_help_stuck_job_timeout_minutes": "Marca como fallidos los trabajos abandonados en ejecución tras estos minutos (0 = desactivado).",
+  "settings_label_job_timeout_minutes": "Tiempo límite de trabajos (minutos)",
+  "settings_help_job_timeout_minutes": "Marca como fallido un trabajo que se ejecuta durante más de estos minutos (0 = desactivado).",
   "settings_label_min_level": "Nivel de log mínimo",
   "settings_help_min_level": "Nivel de severidad mínimo para resultados de nuevos trabajos.",
   "settings_label_ipv6_mode": "IPv6 en las ejecuciones de prueba",

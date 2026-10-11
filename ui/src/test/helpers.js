@@ -132,6 +132,7 @@ export const serverSettingsFixture = (overrides = {}) => ({
   profile_path: setting("", { readonly: true }),
   worker_count: setting(4),
   max_concurrent_jobs: setting(0),
+  job_timeout_minutes: setting(20),
   min_level: { value: "INFO", source: "config_file" },
   ipv6_mode: setting("auto"),
   retention_days: setting(0),

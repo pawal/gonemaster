@@ -211,7 +211,7 @@ func (s *Server) runJob(jobID string) (err error) {
 		return nil
 	}
 
-	jobCtx, cancel := context.WithCancel(context.Background())
+	jobCtx, cancel := newJobContext(s.liveConfig().EffectiveJobTimeout())
 	s.registerCancel(jobID, cancel)
 	defer func() {
 		s.unregisterCancel(jobID)
@@ -241,7 +241,10 @@ func (s *Server) runJob(jobID string) (err error) {
 	s.metrics.ObserveCacheMetrics(art.stats.cacheHits, art.stats.cacheMisses, art.stats.cacheEvictions)
 	finishedAt := time.Now().UTC()
 
-	if jobCtx.Err() != nil {
+	if errors.Is(context.Cause(jobCtx), errJobTimeout) {
+		job.Status = JobFailed
+		job.Error = errJobTimeout.Error()
+	} else if jobCtx.Err() != nil {
 		job.Status = JobCanceled
 		job.Error = "canceled"
 	} else if runErr != nil {
@@ -288,6 +291,17 @@ func (s *Server) runJob(jobID string) (err error) {
 	}
 
 	return runErr
+}
+
+// errJobTimeout is the error of a job stopped by job_timeout_minutes.
+var errJobTimeout = errors.New("timed out")
+
+// newJobContext returns a job context with the deadline, if any.
+func newJobContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout > 0 {
+		return context.WithTimeoutCause(context.Background(), timeout, errJobTimeout)
+	}
+	return context.WithCancel(context.Background())
 }
 
 // failUngraduatedJob parks a job the worker has stopped running at a

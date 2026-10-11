@@ -149,6 +149,9 @@ const defaultPurgeIntervalSeconds = 3600
 // worker on it is considered abandoned.
 const defaultStuckJobTimeoutMinutes = 20
 
+// defaultJobTimeoutMinutes is the wall time a run may take before it fails.
+const defaultJobTimeoutMinutes = 20
+
 // stuckJobSweepInterval is how often the reaper looks for abandoned jobs.
 const stuckJobSweepInterval = time.Minute
 
@@ -163,6 +166,8 @@ type Config struct {
 	// StuckJobTimeoutMinutes is how long a job may sit at "running" with no
 	// worker on it before the reaper fails it. Zero disables the reaper.
 	StuckJobTimeoutMinutes int `json:"stuck_job_timeout_minutes"`
+	// JobTimeoutMinutes bounds the run time of one job. Zero disables it.
+	JobTimeoutMinutes int `json:"job_timeout_minutes"`
 	// CrossJobHotCache enables sharing of warmed nameserver query/error caches
 	// across consecutive jobs. Caches are keyed by profile and network settings
 	// so jobs with different resolver configs get independent stores.
@@ -307,6 +312,7 @@ type FileConfig struct {
 	WorkerCount                 *int                    `json:"worker_count"`
 	MaxConcurrentJobs           *int                    `json:"max_concurrent_jobs"`
 	StuckJobTimeoutMinutes      *int                    `json:"stuck_job_timeout_minutes,omitempty"`
+	JobTimeoutMinutes           *int                    `json:"job_timeout_minutes,omitempty"`
 	PositiveCacheTTL            *int                    `json:"positive_cache_ttl"`
 	NegativeCacheTTL            *int                    `json:"negative_cache_ttl"`
 	Timeout                     *int                    `json:"timeout"`
@@ -355,6 +361,7 @@ func DefaultConfig() Config {
 		WorkerCount:                 16,
 		MaxConcurrentJobs:           0,
 		StuckJobTimeoutMinutes:      defaultStuckJobTimeoutMinutes,
+		JobTimeoutMinutes:           defaultJobTimeoutMinutes,
 		IPv6Mode:                    IPv6ModeAuto,
 		MinLevel:                    "INFO",
 		LogFormat:                   "text",
@@ -421,6 +428,14 @@ func (c Config) EffectiveStuckJobTimeout() time.Duration {
 		return 0
 	}
 	return time.Duration(c.StuckJobTimeoutMinutes) * time.Minute
+}
+
+// EffectiveJobTimeout returns the run time limit of a job; zero means none.
+func (c Config) EffectiveJobTimeout() time.Duration {
+	if c.JobTimeoutMinutes <= 0 {
+		return 0
+	}
+	return time.Duration(c.JobTimeoutMinutes) * time.Minute
 }
 
 // EffectivePurgeInterval returns the retention purge interval as a time.Duration.
@@ -490,6 +505,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.StuckJobTimeoutMinutes != nil {
 		c.StuckJobTimeoutMinutes = *file.StuckJobTimeoutMinutes
+	}
+	if file.JobTimeoutMinutes != nil {
+		c.JobTimeoutMinutes = *file.JobTimeoutMinutes
 	}
 	if file.PositiveCacheTTL != nil {
 		c.PositiveCacheTTL = file.PositiveCacheTTL

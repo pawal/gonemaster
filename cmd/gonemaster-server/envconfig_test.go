@@ -104,6 +104,10 @@ func TestApplyEnvVarsSetsFields(t *testing.T) {
 			get: func(c server.Config) any { return c.Database.DSN }, want: "/var/lib/gonemaster/db.sqlite",
 		},
 		{
+			name: "job timeout", env: "GONEMASTER_JOB_TIMEOUT", value: "45",
+			get: func(c server.Config) any { return c.JobTimeoutMinutes }, want: 45,
+		},
+		{
 			name: "db retention days", env: "GONEMASTER_DB_RETENTION_DAYS", value: "90",
 			get: func(c server.Config) any { return c.Database.RetentionDays }, want: 90,
 		},

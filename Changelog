@@ -22,6 +22,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Security
 
 - engine: queries carry a random message ID per attempt, and a reply whose question differs from the query is refused
+- server: a job that runs longer than `job_timeout_minutes` (default 20) fails with `timed out`
 - deps: bump undici to 7.30.0 and source-map-js to 1.2.2 to fix npm advisories in UI dev dependencies
 
 ## [v1.7.20] - 2026-10-09

@@ -103,6 +103,7 @@ var writableSettings = map[string]settingSpec{
 	"worker_count":                    {kind: settingInt, min: 1, max: 1024},
 	"max_concurrent_jobs":             {kind: settingInt, min: 0, max: 1024},
 	"stuck_job_timeout_minutes":       {kind: settingInt, min: 0, max: 525600},
+	"job_timeout_minutes":             {kind: settingInt, min: 0, max: 525600},
 	"min_level":                       {kind: settingLevel},
 	"ipv6_mode":                       {kind: settingEnum, values: ipv6Modes},
 	"retention_days":                  {kind: settingInt, min: 0, max: 36500},
@@ -185,6 +186,8 @@ func (s *Server) applySetting(key, val string) {
 		s.cfg.MaxConcurrentJobs = num
 	case "stuck_job_timeout_minutes":
 		s.cfg.StuckJobTimeoutMinutes = num
+	case "job_timeout_minutes":
+		s.cfg.JobTimeoutMinutes = num
 	case "min_level":
 		s.cfg.MinLevel = val
 	case "ipv6_mode":
@@ -305,6 +308,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"worker_count":                    {Value: cfg.WorkerCount, Source: s.settingSource("worker_count")},
 		"max_concurrent_jobs":             {Value: cfg.MaxConcurrentJobs, Source: s.settingSource("max_concurrent_jobs")},
 		"stuck_job_timeout_minutes":       {Value: cfg.StuckJobTimeoutMinutes, Source: s.settingSource("stuck_job_timeout_minutes")},
+		"job_timeout_minutes":             {Value: cfg.JobTimeoutMinutes, Source: s.settingSource("job_timeout_minutes")},
 		"min_level":                       {Value: cfg.MinLevel, Source: s.settingSource("min_level")},
 		"ipv6_mode":                       {Value: cfg.IPv6Mode, Source: s.settingSource("ipv6_mode")},
 		"retention_days":                  {Value: cfg.Database.RetentionDays, Source: s.settingSource("retention_days")},

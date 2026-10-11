@@ -696,3 +696,22 @@ func TestExternalDataConfigMapsToProvider(t *testing.T) {
 		t.Errorf("user agent = %q, want a gonemaster/<version> string", got.UserAgent)
 	}
 }
+
+func TestJobTimeoutConfig(t *testing.T) {
+	if got := DefaultConfig().EffectiveJobTimeout(); got != 20*time.Minute {
+		t.Fatalf("default job timeout = %v, want 20m0s", got)
+	}
+	for _, tc := range []struct {
+		minutes int
+		want    time.Duration
+	}{
+		{5, 5 * time.Minute},
+		{0, 0},
+	} {
+		cfg := DefaultConfig()
+		cfg.ApplyFileConfig(FileConfig{JobTimeoutMinutes: &tc.minutes})
+		if got := cfg.EffectiveJobTimeout(); got != tc.want {
+			t.Fatalf("job_timeout_minutes %d: timeout = %v, want %v", tc.minutes, got, tc.want)
+		}
+	}
+}

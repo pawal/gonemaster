@@ -123,6 +123,9 @@ As a backstop, a sweep every minute fails any job left at `running` with no
 worker on it for longer than `stuck_job_timeout_minutes` (default 20, `0`
 disables it). Reaped jobs are logged as `reaped stuck job`.
 
+A job that runs longer than `job_timeout_minutes` (default 20, `0` disables
+it) is stopped and fails with the error `timed out`.
+
 This assumes one server process per database. Two servers sharing one
 database will reap each other's live jobs, so set the timeout to `0` on
 such a deployment.

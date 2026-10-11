@@ -281,6 +281,8 @@
   "settings_help_max_concurrent_jobs": "Omezení počtu souběžných běhů enginu (0 = bez omezení).",
   "settings_label_stuck_job_timeout_minutes": "Časový limit uvázlé úlohy (minuty)",
   "settings_help_stuck_job_timeout_minutes": "Označí opuštěné běžící úlohy jako neúspěšné po tomto počtu minut (0 = vypnuto).",
+  "settings_label_job_timeout_minutes": "Časový limit úlohy (minuty)",
+  "settings_help_job_timeout_minutes": "Označí úlohu jako neúspěšnou, pokud běží déle než tento počet minut (0 = vypnuto).",
   "settings_label_min_level": "Minimální úroveň protokolu",
   "settings_help_min_level": "Minimální úroveň závažnosti pro nové výsledky úloh.",
   "settings_label_ipv6_mode": "IPv6 v testovacích bězích",

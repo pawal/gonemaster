@@ -53,6 +53,9 @@ variables, CLI flags. Later sources override earlier ones.
 **--stuck-job-timeout** *N*
 : Fail abandoned running jobs after N minutes (0 = disable, default 20).
 
+**--job-timeout** *N*
+: Fail a job that runs longer than N minutes (0 = disable, default 20).
+
 ### Resolver
 
 **--profile** *PATH*
@@ -175,6 +178,9 @@ variables, CLI flags. Later sources override earlier ones.
 
 **GONEMASTER_STUCK_JOB_TIMEOUT**
 : Equivalent to **--stuck-job-timeout**.
+
+**GONEMASTER_JOB_TIMEOUT**
+: Equivalent to **--job-timeout**.
 
 **GONEMASTER_MIN_LEVEL**
 : Equivalent to **--min-level**.

@@ -194,6 +194,11 @@ cut, for a cut X itself serves. It queries `M DS` at X with DNSSEC enabled
   - A signature whose algorithm the local verifier cannot process is
     `indeterminate`, not `broken`.
 - `AA` `NOERROR` without a DS RRset (NODATA):
+  - NSEC3 records with a hash algorithm other than SHA-1 are ignored
+    (RFC 5155 section 8.1). Without an NSEC record whose owner is M, NSEC3 records that
+    carry more than one parameter set (RFC 5155 section 7.2), or an iteration
+    count above 100 (RFC 9276 section 3.2), are not evaluated:
+    `indeterminate`.
   - Locate the NSEC record whose owner is M, or the NSEC3 record whose owner
     matches the hash of M computed with the salt and iteration count of that
     record.
@@ -479,6 +484,9 @@ Scoring takes the severity default in the `dnssec` dimension. No
   finding there. Other nameservers are unaffected.
 - Running `--testcase dnssec22` alone makes the DNSKEY and DS queries of the
   gate itself; nothing is assumed cached.
+- A zone whose NSEC3 chain uses more than 100 iterations yields no zone cut
+  status from its denials: a name that rests on such a denial is
+  `indeterminate` and yields no finding. DNSSEC03 reports the iteration count.
 
 ## Implementation Notes
 Implementation-defined choices, none of them mandated by the protocol:
@@ -501,6 +509,12 @@ Implementation-defined choices, none of them mandated by the protocol:
 - No recursion is used. Every address comes from discovery or from glue.
 - The zone cut walk is bounded by the labels between the name and the zone
   apex; no ancestor of the zone under test is derived.
+- NSEC3 hashing is bounded at 100 iterations, the insecure limit RFC 9276
+  Appendix A measured as interoperable. A larger count is not hashed and the
+  testcase logs `LIMIT_REACHED` with `bound` `nsec3_iterations`, once per
+  testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)).
+  Hashes are memoized per name, salt and iteration count for one run of the
+  testcase.
 - `DS22_NS_ADDRESS_VALIDATES` is OK-tag gated: it is emitted only when no
   ERROR-level `DS22_*` tag was emitted.
 - The reference time for signature validity is `packetTime(resp)`, the

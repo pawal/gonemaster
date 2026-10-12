@@ -54,6 +54,10 @@ Status: Final
          name and the delegation is insecure.
        - Type bitmap without the NS bit: `denied`. The parent proves no
          delegation exists at the name.
+     - NSEC3 records with a hash algorithm other than SHA-1 are ignored
+       (RFC 5155 section 8.1). NSEC3 records that carry more than one
+       parameter set (RFC 5155 section 7.2), or an iteration count above 100
+       (RFC 9276 section 3.2), are not evaluated: `unproven`.
      - No NSEC and no NSEC3 record: `unproven`. The parent zone is unsigned, or
        its denial is incomplete, and states nothing about the name.
 8. Emit child-side signing-state tags:
@@ -267,3 +271,14 @@ emit TEST_CASE_END
   NSEC and no NSEC3, so step 7 records `unproven` and no verdict is reached.
 - `DS07_NO_DS_FOR_SIGNED_ZONE` continues to fire whenever no parent nameserver
   has a DS. It says the zone is not anchored; the new tag says why.
+- A parent whose NSEC3 chain uses more than 100 iterations reaches no
+  `DS07_PARENT_PROVES_NO_DELEGATION` verdict. DNSSEC03 reports the count when
+  the parent zone is tested.
+
+## Implementation Notes
+- NSEC3 hashing is bounded at 100 iterations, the insecure limit RFC 9276
+  Appendix A measured as interoperable. A larger count is not hashed and the
+  testcase logs `LIMIT_REACHED` with `bound` `nsec3_iterations`, once per
+  testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)).
+- Hashes are memoized per name, salt and iteration count for one run of the
+  testcase.

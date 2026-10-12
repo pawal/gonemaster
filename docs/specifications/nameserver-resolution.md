@@ -194,9 +194,19 @@ set; a set computed once per run reports its cut once.
 
 | Argument | Type | Meaning |
 |---|---|---|
-| `bound` | `string` | The bound, as named in the table above. |
+| `bound` | `string` | The bound, as named in the table above or in [DNSSEC Limits](#dnssec-limits). |
 | `limit` | `int` | The value of the bound. |
-| `count` | `int` | The size of the set before the cut; for `addresses_per_run`, the bound plus one. |
-| `domain` | `string` | The zone whose names, or the NS name whose addresses, the bound cut; for `addresses_per_run`, the NS name of the first query not sent. |
+| `count` | `int` | The size of the set before the cut; for `addresses_per_run`, the bound plus one; for `nsec3_iterations`, the iteration count. |
+| `domain` | `string` | The zone whose names, or the NS name whose addresses, the bound cut; for `addresses_per_run`, the NS name of the first query not sent; for a DNSSEC bound, the zone under test. |
 
 Source: `engine/nameserver/limits.go`.
+
+### DNSSEC Limits
+
+DNSSEC testcases log `LIMIT_REACHED` for the bounds below, each defined in the
+Implementation Notes of the testcases named, at most once per testcase and
+bound. The Edge Cases of each testcase state the effect on its verdicts.
+
+| Bound | Value | Testcases |
+|---|---|---|
+| `nsec3_iterations` | 100 | DNSSEC07, DNSSEC20, DNSSEC22 |

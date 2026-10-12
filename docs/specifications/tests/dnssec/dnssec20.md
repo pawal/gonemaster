@@ -30,6 +30,7 @@ Status: Final
      - If an NSEC record for the apex is present in the answer section, extract its type bitmap (NSEC zone).
      - Else if an NSEC3 record matching the apex hash is present in the authority section, extract its type bitmap (NSEC3 zone).
      - An NSEC or NSEC3 record whose covering RRSIG records all carry a Signer's Name other than the zone name belongs to the parent zone (RFC 4034 section 3.1.7) and MUST be ignored. A record without covering RRSIG records is accepted.
+     - NSEC3 records with a hash algorithm other than SHA-1 are ignored (RFC 5155 section 8.1). When the remaining NSEC3 records carry more than one parameter set (RFC 5155 section 7.2), or an iteration count above 100 (RFC 9276 section 3.2), they are not evaluated, no bitmap is obtained, and the `NSEC3PARAM` query is not made.
    - If no bitmap obtained from the NSEC query, try `NSEC3PARAM` query and look for an NSEC record in the authority section (NODATA response). The same signer rule applies.
    - If no bitmap could be obtained, classify nameserver as `no_bitmap` and skip.
    - For each probed type (A, AAAA, MX, TXT):
@@ -63,6 +64,8 @@ For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):
        NSEC for apex in answer    -> bitmap from NSEC (mark zone style NSEC)
        NSEC3 for apex in authority -> bitmap from NSEC3 (mark zone style NSEC3)
        every covering RRSIG signer != z.Name -> parent-side record, ignore
+       NSEC3 with several parameter sets or iterations > 100
+                                  -> no bitmap, skip NSEC3PARAM
      no bitmap yet:
        query NSEC3PARAM at z.Name, DNSSEC=on
          NSEC for apex in authority (NODATA) -> bitmap from NSEC
@@ -151,7 +154,12 @@ emit TEST_CASE_END
 - Super-set bitmaps (types listed in the bitmap but not actually present) are not flagged - only subset bitmaps (existing types missing from the bitmap) are checked, as these are the security-relevant case per the ISC presentation.
 - For NSEC3 zones, the NSEC3 record must have an owner hash matching the apex for the bitmap to be used; non-matching NSEC3 records are ignored.
 - A nameserver serving both the parent and the child zone MAY answer the apex `NSEC` query from the parent zone with the delegation NSEC or NSEC3. Its RRSIG names the parent as signer, so the record is ignored and the bitmap comes from the `NSEC3PARAM` fallback. An NSEC3 child in that situation yields `DS20_NO_BITMAP`, since the fallback carries no NSEC3.
+- An NSEC3 zone whose chain uses more than 100 iterations yields `DS20_NO_BITMAP`. DNSSEC03 reports the iteration count.
 - All queries in DNSSEC20 benefit from the per-nameserver query cache. In a full test run (after DNSSEC10, Basic, Zone, etc.), most queries are cache hits with zero network overhead.
+
+## Implementation Notes
+- NSEC3 hashing is bounded at 100 iterations, the insecure limit RFC 9276 Appendix A measured as interoperable. A larger count is not hashed and the testcase logs `LIMIT_REACHED` with `bound` `nsec3_iterations`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)).
+- Hashes are memoized per name, salt and iteration count for one run of the testcase.
 
 ## Evidence In Gonemaster
 - Code paths:

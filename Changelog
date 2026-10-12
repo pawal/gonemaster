@@ -12,6 +12,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Security
 
 - engine: addresses in `fec0::/10` and `::/96` are not queried
+- deps: bump golang.org/x/net to v0.60.0 for HTTP/2 advisories
 
 ## [v1.7.21] - 2026-10-11
 

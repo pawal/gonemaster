@@ -823,6 +823,49 @@ func TestDNSSEC02MatchNamesTheValidatingKeytag(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS", "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
 }
 
+func TestDNSSEC02SkipsRRSIGsOfAnotherAlgorithm(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	signing, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP(), tctest.KeyTTL(3600))
+	sig := tctest.Sign(t, signing, signer, dns.TypeDNSKEY, []dns.RR{signing})
+	// An RRSIG with the key's tag under another algorithm was not made by the key.
+	foreign, ok := sig.Clone().(*dns.RRSIG)
+	if !ok {
+		t.Fatal("clone changed type")
+	}
+	foreign.Algorithm = dns.ED25519
+	ds := signing.ToDS(2)
+	if ds == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+
+	parentNS := tctest.NS(t, ctx, "ns-parent.example", "192.0.2.50", func(q tctest.Query) packet.Packet {
+		if q.Type != "DS" {
+			return packet.Packet{}
+		}
+		dsCopy := *ds
+		return dsPacketFromDS(q.Name, &dsCopy)
+	})
+	childNS := tctest.NS(t, ctx, "ns-child.example", "192.0.2.51", func(q tctest.Query) packet.Packet {
+		if q.Type != "DNSKEY" {
+			return packet.Packet{}
+		}
+		keyCopy := *signing
+		sigCopy := *sig
+		foreignCopy := *foreign
+		return answerPacket(q.Name, dns.TypeDNSKEY, &keyCopy, &foreignCopy, &sigCopy)
+	})
+	dnssec02Wire(t, parentNS, childNS)
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+	tctest.RequireTags(t, entries, "DS02_MATCH_DS_DNSKEY")
+	tctest.RequireNoTag(t, entries, "DS02_RRSIG_NOT_VALID_BY_DNSKEY")
+}
+
 // A truncated DNSKEY answer is a partial RRset, not a missing signature.
 func TestDNSSEC02TruncatedDNSKEYAnswerIsInconclusive(t *testing.T) {
 	ctx := tctest.Context(t)
@@ -7156,6 +7199,57 @@ func TestDNSSEC08CandidateCaps(t *testing.T) {
 			}
 			tctest.RequireTags(t, entries, tc.want)
 			tctest.RequireLimit(t, log.Entries(), "DNSSEC08", tc.bound, map[string]int{"keys_per_tag": 4, "rrsigs_per_rrset": 8}[tc.bound], tc.count)
+			if got := tried(); !slices.Equal(got, tc.tried) {
+				t.Errorf("keys tried per RRSIG = %v, want %v", got, tc.tried)
+			}
+		})
+	}
+}
+
+func TestDNSSEC08MatchesKeysByAlgorithm(t *testing.T) {
+	set := newSameTagSet(t, "example")
+	var foreign []dns.RR
+	for _, decoy := range set.decoys {
+		foreign = append(foreign, dnstest.SameTagKeyWithAlgorithm(t, decoy, dns.ECDSAP256SHA256))
+	}
+	behind := append(slices.Clone(foreign), set.kp.Key)
+
+	cases := []struct {
+		name    string
+		answers []dns.RR
+		want    string
+		tried   []int
+	}{
+		{"signing key behind keys of another algorithm", slices.Concat(behind, []dns.RR{set.sign(t, behind)}), "DS08_DNSKEY_RRSIG_VALID", []int{1}},
+		{"tag carried only by keys of another algorithm", slices.Concat(foreign, []dns.RR{set.sign(t, foreign)}), "DS08_NO_MATCHING_DNSKEY", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tried := countTried(t)
+			log := logger.New()
+			ctx := logger.WithContext(tctest.Context(t), log)
+			ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.80", func(q tctest.Query) packet.Packet {
+				if q.Type != "DNSKEY" {
+					return packet.Packet{}
+				}
+				pkt := answerPacket(q.Name, dns.TypeDNSKEY, tc.answers...)
+				pkt.Timestamp = set.now
+				return pkt
+			})
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns}, nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nil, nil
+			})
+
+			entries, err := DNSSEC08(ctx, &zone.Zone{Name: dnsname.New("example")})
+			if err != nil {
+				t.Fatalf("dnssec08: %v", err)
+			}
+			tctest.RequireTags(t, entries, tc.want)
+			tctest.RequireNoTag(t, entries, "DS08_RRSIG_NOT_VALID_BY_DNSKEY")
+			tctest.RequireNoTag(t, log.Entries(), "LIMIT_REACHED")
 			if got := tried(); !slices.Equal(got, tc.tried) {
 				t.Errorf("keys tried per RRSIG = %v, want %v", got, tc.tried)
 			}

@@ -29,7 +29,7 @@ Status: Final
      - If inception is after test time, mark `DS09_SOA_RRSIG_NOT_YET_VALID` by keytag.
      - Else if expiration is before test time, mark `DS09_SOA_RRSIG_EXPIRED` by keytag.
      - Else if algorithm is unsupported, mark `DS09_ALGO_NOT_SUPPORTED_BY_ZM` by keytag+algo.
-     - Else find matching DNSKEY records by keytag:
+     - Else find DNSKEY records matching the RRSIG keytag and algorithm:
        - If none found, mark `DS09_NO_MATCHING_DNSKEY`.
        - Else verify signature over SOA RRset; if no candidate validates, mark `DS09_RRSIG_NOT_VALID_BY_DNSKEY`.
 4. Emit accumulated DS09 findings grouped by keytag/algo as applicable.
@@ -57,7 +57,7 @@ For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
          sig.Inception > now    -> soaRRSIGNotYetValid[keytag][ns]
          sig.Expiration < now   -> soaRRSIGExpired[keytag][ns]
          algorithm unsupported  -> algoNotSupportedByZM[keytag][algo][ns]
-         no DNSKEY with that keytag in answer
+         no DNSKEY with that keytag and algorithm in answer
                                 -> noMatchingDNSKEY[keytag][ns]
          verify over SOA rrset against matching DNSKEYs:
             no candidate validates -> rrsigNotValidByDNSKEY[keytag][ns]
@@ -86,7 +86,7 @@ emit TEST_CASE_END
 | `DS09_ALGO_NOT_SUPPORTED_BY_ZM` | RRSIG verification requires an unsupported algorithm. |
 | `DS09_SOA_RRSIG_VALID` | At least one nameserver returned SOA with RRSIG and all RRSIG checks passed. |
 | `DS09_MISSING_RRSIG_IN_RESPONSE` | SOA response has no answer-section RRSIG records (RFC 4035 sections 2.2 and 3.1.1). |
-| `DS09_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY keytag (RFC 4035 section 5.3.1). |
+| `DS09_NO_MATCHING_DNSKEY` | No DNSKEY matches the RRSIG keytag and algorithm (RFC 4035 section 5.3.1). |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none verify the SOA signature (RFC 4035 section 5.3.3). |
 | `DS09_RSA_EXPONENT_UNSUPPORTED` | SOA RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports (more than 64 bits). |
 | `DS09_SOA_RRSIG_EXPIRED` | SOA-related RRSIG expiration is before test time (RFC 4034 section 3.1.5). |
@@ -104,7 +104,7 @@ emit TEST_CASE_END
 | `DS09_ALGO_NOT_SUPPORTED_BY_ZM` | `algo_mnemo` | `string` | Unsupported DNSSEC algorithm mnemonic. |
 | `DS09_ALGO_NOT_SUPPORTED_BY_ZM` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS09_MISSING_RRSIG_IN_RESPONSE` | `addresses` | `array<string>` | Structured child nameserver IP list lacking SOA RRSIG. |
-| `DS09_NO_MATCHING_DNSKEY` | `keytag` | `int` | RRSIG keytag with no matching DNSKEY keytag. |
+| `DS09_NO_MATCHING_DNSKEY` | `keytag` | `int` | RRSIG keytag with no DNSKEY of that keytag and algorithm. |
 | `DS09_NO_MATCHING_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | RRSIG keytag that failed DNSKEY verification. |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
@@ -153,7 +153,7 @@ emit TEST_CASE_END
 - Nameservers failing response-shape checks (`Msg`, `NOERROR`, `AA`, apex owner match) are skipped for DS09 findings.
 - If no usable DNSKEY records are found for a nameserver, SOA signing checks are skipped for that nameserver.
 - Large RSA public exponent handling: an RSA DNSKEY the DNS library refuses (an exponent of more than 4 bytes or greater than 2^31-1, which RFC 3110 section 2 permits up to 4096 bits, or a leading zero byte in the exponent or modulus, which RFC 3110 section 2 prohibits) is verified by gonemaster's own RSA path instead, so the SOA RRSIG passes or fails like any other. Only when the exponent exceeds 64 bits is the finding reclassified from the `ERROR` `DS09_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS09_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS09_SOA_RRSIG_VALID` pass.
-- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS09_RRSIG_NOT_VALID_BY_DNSKEY`.
+- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag and algorithm of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS09_RRSIG_NOT_VALID_BY_DNSKEY`.
 
 ## Implementation Notes
-- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset.

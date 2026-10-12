@@ -36,7 +36,7 @@ Status: Final
    - For each RRSIG in the DS answer that covers `TypeDS` and whose signer matches `parent.Name`:
      - If inception is in the future, mark `DS21_DS_RRSIG_NOT_YET_VALID` by keytag.
      - Else if expiration is in the past, mark `DS21_DS_RRSIG_EXPIRED` by keytag.
-     - Else select parent DNSKEY candidates by keytag from the parent DNSKEY RRset. If none, mark `DS21_NO_DNSKEY_FOR_DS_RRSIG` by keytag.
+     - Else select parent DNSKEY candidates by keytag and algorithm from the parent DNSKEY RRset. If none, mark `DS21_NO_DNSKEY_FOR_DS_RRSIG` by keytag.
      - Else for each candidate DNSKEY:
        - If the signature algorithm is unsupported, mark `DS21_ALGO_NOT_SUPPORTED` by keytag+algo.
        - Else call `verifyRRSIG(sig, dsRRset, dnskey, testTime)`.
@@ -79,7 +79,8 @@ For each unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
    For each RRSIG over DS (signer matches parent.Name; per-sig keyed by sig.KeyTag):
      sig.Inception in future          -> DS21_DS_RRSIG_NOT_YET_VALID[keytag][ns]
      sig.Expiration in past           -> DS21_DS_RRSIG_EXPIRED[keytag][ns]
-     no parent DNSKEY with keytag     -> DS21_NO_DNSKEY_FOR_DS_RRSIG[keytag][ns]
+     no parent DNSKEY with keytag and algorithm
+                                      -> DS21_NO_DNSKEY_FOR_DS_RRSIG[keytag][ns]
      for each candidate DNSKEY:
         algorithm unsupported         -> DS21_ALGO_NOT_SUPPORTED[keytag][algo][ns]
         verifyRRSIG(sig, dsRRset, dnskey, testTime)
@@ -104,7 +105,7 @@ emit TEST_CASE_END
 | --- | --- |
 | `DS21_ALGO_NOT_SUPPORTED` | DS RRSIG verification requires an unsupported algorithm for this build/runtime. |
 | `DS21_DS_RRSIG_EXPIRED` | DS-covering RRSIG has expired (signature inception/expiration is past, RFC 4035 section 5.3.1). |
-| `DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY` | DS-covering RRSIG was matched to a parent DNSKEY by keytag but cryptographic verification failed (RFC 4035 section 5.3.3). |
+| `DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY` | DS-covering RRSIG was matched to a parent DNSKEY by keytag and algorithm but cryptographic verification failed (RFC 4035 section 5.3.3). |
 | `DS21_DS_RRSIG_NOT_VERIFIABLE` | At least one parent nameserver returned a DS RRset with RRSIG, but no parent NS produced a DS RRset whose RRSIG verified against a parent DNSKEY. |
 | `DS21_DS_RRSIG_NOT_YET_VALID` | DS-covering RRSIG inception time is in the future (RFC 4035 section 5.3.1). |
 | `DS21_DS_RRSIG_VERIFIED` | At least one parent nameserver returned a DS RRset whose RRSIG verifies against a published parent DNSKEY. |
@@ -183,10 +184,10 @@ The child zone operator cannot fix a parent-zone signing failure, so DNSSEC21 re
 - Verification reuses the existing `verifyRRSIG(sig, rrset, dnskey, at)` helper and the existing supported-algorithm policy. No new crypto is introduced.
 - The DS query is the same query already issued by DNSSEC02 and DNSSEC07 against the parent. In a full test run the response is served from the per-nameserver query cache and adds no extra network traffic. The parent DNSKEY query is a single new query per parent NS IP (cached on subsequent testcases).
 - DNSSEC21 does not validate the chain *above* the parent (parent's own DS at grandparent, root trust anchor). The goal is bounded to the parent->child link, which is the link broken in the .de incident.
-- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY`.
+- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag and algorithm of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY`.
 
 ## Implementation Notes
-- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset.
 
 ## Evidence In Gonemaster
 - Code paths (when implemented):

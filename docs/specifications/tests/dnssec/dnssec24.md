@@ -369,10 +369,10 @@ Scoring takes the severity default in the `dnssec` dimension. No
   does not apply.
 - A top-level domain passes the gate like any zone. Its parental agent is the
   root zone operator.
-- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY
-  past the first 4 with the key tag of an RRSIG is not tried. A zone whose
-  only valid signature or only verifying key lies past a cut is reported from
-  what was considered: a level whose RRSIGs no considered key verifies is
+- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past
+  the first 4 with the key tag and algorithm of an RRSIG is not tried. A zone
+  whose only valid signature or only verifying key lies past a cut is reported
+  from what was considered: a level whose RRSIGs no considered key verifies is
   broken and yields `DS24_SIGNAL_CHAIN_BROKEN`, and a signaling RRset
   `DS24_SIGNAL_UNSIGNED`.
 
@@ -392,15 +392,15 @@ Implementation-defined choices, none of them mandated by the protocol:
 - The apex queries share the option set of DNSSEC15, and the parent `DS`
   queries that of DNSSEC07, so a full run serves them from the cache.
 - `DS24_BOOTSTRAP_READY` is OK-tag gated on every signaling name validating.
-- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are
-  considered, and at most 4 DNSKEYs with the key tag of an RRSIG are tried for
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered,
+  and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for
   it, each in response order. RFC 4035 section 5.3.1 requires trying every
   DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034
   Appendix B), so a zone chooses how many keys match, and the caps depart from
   that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset`
   or `keys_per_tag`, once per testcase
-  ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG
-  is verified over one copy of the RRset.
+  ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is
+  verified over one copy of the RRset.
 
 ## Evidence In Gonemaster
 - Code paths:

@@ -12,7 +12,7 @@ const (
 	MaxRRSIGsPerRRset = 8
 )
 
-// CandidateKeys returns the first MaxKeysPerTag keys with sig's key tag, in order, and how many carry it.
+// CandidateKeys returns the first MaxKeysPerTag keys with sig's key tag and algorithm, in order, and how many carry both.
 func CandidateKeys(sig *dns.RRSIG, keys []*dns.DNSKEY) ([]*dns.DNSKEY, int) {
 	if sig == nil {
 		return nil, 0
@@ -20,7 +20,7 @@ func CandidateKeys(sig *dns.RRSIG, keys []*dns.DNSKEY) ([]*dns.DNSKEY, int) {
 	var out []*dns.DNSKEY
 	matched := 0
 	for _, key := range keys {
-		if key == nil || KeyTag(key) != sig.KeyTag {
+		if key == nil || key.Algorithm != sig.Algorithm || KeyTag(key) != sig.KeyTag {
 			continue
 		}
 		matched++

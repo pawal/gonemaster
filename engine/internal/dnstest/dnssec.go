@@ -144,6 +144,30 @@ func SameTagKeys(t testing.TB, key *dns.DNSKEY, n int) []*dns.DNSKEY {
 	return out
 }
 
+// SameTagKeyWithAlgorithm returns a copy of key under algorithm alg with the same key tag.
+func SameTagKeyWithAlgorithm(t testing.TB, key *dns.DNSKEY, alg uint8) *dns.DNSKEY {
+	t.Helper()
+	pub, err := base64.StdEncoding.DecodeString(key.PublicKey)
+	if err != nil || len(pub) < 2 {
+		t.Fatalf("decode key: %v", err)
+	}
+	// The algorithm octet and the first public key word add into the same checksum.
+	w := int(pub[0])<<8 | int(pub[1]) + int(key.Algorithm) - int(alg)
+	if w < 0 || w > 0xffff {
+		t.Fatalf("no room to move algorithm %d to %d", key.Algorithm, alg)
+	}
+	out, ok := key.Clone().(*dns.DNSKEY)
+	if !ok {
+		t.Fatal("clone changed type")
+	}
+	out.Algorithm = alg
+	out.PublicKey = base64.StdEncoding.EncodeToString(append([]byte{byte(w >> 8), byte(w)}, pub[2:]...))
+	if dnssecutil.KeyTag(out) != dnssecutil.KeyTag(key) {
+		t.Fatalf("key under algorithm %d has tag %d, want %d", alg, dnssecutil.KeyTag(out), dnssecutil.KeyTag(key))
+	}
+	return out
+}
+
 // RSADNSKEY builds an RSASHA256 DNSKEY carrying a captured public key.
 func RSADNSKEY(owner string, flags uint16, pub string) *dns.DNSKEY {
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}

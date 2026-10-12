@@ -1361,21 +1361,22 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				rrset := dnskeyRRset(dnskeyRecords)
 				testTime := packetTime(resp)
 				sigs := capRRSIGs(ctx, dnskeyRRSIG)
-				perTag := map[uint16]int{}
+				perTag := map[[2]uint16]int{}
 				for _, dnskey := range dnskeyRecords {
 					keytag, ok := dnskeyMatchingDS[dnskey]
 					if !ok {
 						continue
 					}
-					perTag[keytag]++
-					if perTag[keytag] > dnssecutil.MaxKeysPerTag {
-						limitReached(ctx, boundKeysPerTag, dnssecutil.MaxKeysPerTag, perTag[keytag])
+					tagAlgo := [2]uint16{keytag, uint16(dnskey.Algorithm)}
+					perTag[tagAlgo]++
+					if perTag[tagAlgo] > dnssecutil.MaxKeysPerTag {
+						limitReached(ctx, boundKeysPerTag, dnssecutil.MaxKeysPerTag, perTag[tagAlgo])
 						continue
 					}
 
 					foundMatch := false
 					for _, sig := range sigs {
-						if sig.KeyTag != keytag {
+						if sig.KeyTag != keytag || sig.Algorithm != dnskey.Algorithm {
 							continue
 						}
 						_, errs := verifyCandidates(sig, rrset, []*dns.DNSKEY{dnskey}, testTime)

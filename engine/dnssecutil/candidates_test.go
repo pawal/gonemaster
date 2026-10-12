@@ -39,6 +39,21 @@ func TestCandidateKeysCapsKeysPerTag(t *testing.T) {
 	}
 }
 
+func TestCandidateKeysSkipsOtherAlgorithms(t *testing.T) {
+	kp, _, sig, _ := signedA(t, "www.example.test")
+	foreign := dnstest.SameTagKeyWithAlgorithm(t, kp.Key, dns.ECDSAP256SHA256)
+	keys := append([]*dns.DNSKEY{foreign}, dnstest.SameTagKeys(t, foreign, 4)...)
+	keys = append(keys, kp.Key)
+
+	got, matched := dnssecutil.CandidateKeys(sig, keys)
+	if matched != 1 {
+		t.Errorf("matched = %d, want 1", matched)
+	}
+	if !slices.Equal(got, []*dns.DNSKEY{kp.Key}) {
+		t.Errorf("candidates = %v, want only the signing key", got)
+	}
+}
+
 func TestVerifyCandidatesReusesOneCopy(t *testing.T) {
 	kp, rrset, sig, now := signedA(t, "www.example.test")
 	keys := append(dnstest.SameTagKeys(t, kp.Key, 3), kp.Key)

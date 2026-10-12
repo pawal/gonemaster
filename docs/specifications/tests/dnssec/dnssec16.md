@@ -40,7 +40,7 @@ Status: Final
        - If any matching DNSKEY has SEP bit unset => `DS16_CDS_MATCHES_NON_SEP_DNSKEY`.
    - If CDS RRset has no RRSIG records => `DS16_CDS_UNSIGNED`.
    - Else for each CDS RRSIG:
-     - If keytag has no matching DNSKEY => `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY`.
+     - If no DNSKEY matches the RRSIG keytag and algorithm => `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY`.
      - Else if cryptographic verification fails for all matching DNSKEY records => `DS16_CDS_INVALID_RRSIG`.
 6. Emit accumulated DS16 findings grouped by keytag or nameserver list as applicable.
 7. Emit `TEST_CASE_END`.
@@ -93,7 +93,7 @@ For each non-delete CDS at ns (keytag = cds.KeyTag):
 CDS RRSIG verification:
    cdsRRSIGByNS[ns] empty               -> DS16_CDS_UNSIGNED (addresses)
    otherwise, for each CDS RRSIG (keyed by sig.KeyTag):
-     no DNSKEY in dnskeyByNS[ns] with that keytag
+     no DNSKEY in dnskeyByNS[ns] with that keytag and algorithm
                                         -> DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY
                                            (keytag, addresses)
      verify CDS rrset against each matching DNSKEY:
@@ -109,12 +109,12 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DS16_CDS_INVALID_RRSIG` | CDS RRSIG keytag matches DNSKEY keytag(s), but signature verification fails (RFC 4035 section 5.3). |
+| `DS16_CDS_INVALID_RRSIG` | CDS RRSIG keytag and algorithm match DNSKEY(s), but signature verification fails (RFC 4035 section 5.3). |
 | `DS16_CDS_MATCHES_NON_SEP_DNSKEY` | CDS points to a DNSKEY with SEP bit unset (RFC 4034 section 2.1.1, RFC 6781 section 3.2.3). |
 | `DS16_CDS_MATCHES_NON_ZONE_DNSKEY` | CDS points to a DNSKEY with zone bit unset (RFC 4034 section 5.2). |
 | `DS16_CDS_MATCHES_NO_DNSKEY` | CDS keytag matches no DNSKEY keytag (RFC 4035 section 2.4). |
 | `DS16_CDS_NOT_SIGNED_BY_CDS` | CDS RRset has no RRSIG with CDS keytag. |
-| `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY` | CDS RRset has RRSIG keytag not present in DNSKEY RRset (RFC 4035 section 5.3.1). |
+| `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY` | CDS RRset has an RRSIG whose keytag and algorithm no DNSKEY in the DNSKEY RRset carries (RFC 4035 section 5.3.1). |
 | `DS16_CDS_UNSIGNED` | CDS RRset has no RRSIG records (RFC 4035 section 2.2). |
 | `DS16_CDS_WITHOUT_DNSKEY` | CDS RRset exists but DNSKEY RRset is missing. |
 | `DS16_DELETE_CDS` | Nameserver CDS RRset consists only of delete CDS record(s) (RFC 8078 section 4). |
@@ -186,7 +186,7 @@ emit TEST_CASE_END
 - Delete semantics short-circuit further CDS validation for that nameserver.
 - `DS16_CDS_MATCHES_NON_ZONE_DNSKEY` is emitted if any matching-keytag DNSKEY has zone bit unset.
 - Nameserver evaluation is deduplicated by IP.
-- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS16_CDS_INVALID_RRSIG`.
+- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag and algorithm of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS16_CDS_INVALID_RRSIG`.
 
 ## Implementation Notes
-- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset.

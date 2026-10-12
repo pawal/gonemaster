@@ -196,7 +196,7 @@ set; a set computed once per run reports its cut once.
 |---|---|---|
 | `bound` | `string` | The bound, as named in the table above or in [DNSSEC Limits](#dnssec-limits). |
 | `limit` | `int` | The value of the bound. |
-| `count` | `int` | The size of the set before the cut; for `addresses_per_run`, the bound plus one; for `nsec3_iterations`, the iteration count; for `keys_per_tag`, the DNSKEYs with the key tag; for `rrsigs_per_rrset`, the RRSIGs over the RRset. |
+| `count` | `int` | The size of the set before the cut; for `addresses_per_run`, the bound plus one; for `nsec3_iterations`, the iteration count; for `keys_per_tag`, the DNSKEYs with the key tag and algorithm of the RRSIG; for `rrsigs_per_rrset`, the RRSIGs over the RRset. |
 | `domain` | `string` | The zone whose names, or the NS name whose addresses, the bound cut; for `addresses_per_run`, the NS name of the first query not sent; for a DNSSEC bound, the zone under test. |
 
 Source: `engine/nameserver/limits.go`.

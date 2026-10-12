@@ -2,6 +2,7 @@ package constants
 
 import (
 	"net/netip"
+	"slices"
 	"testing"
 )
 
@@ -117,6 +118,100 @@ func TestNotQueryableReason(t *testing.T) {
 	} {
 		if got := NotQueryableReason(netip.MustParseAddr(addr)); got != want {
 			t.Errorf("NotQueryableReason(%s) = %q, want %q", addr, got, want)
+		}
+	}
+}
+
+type registryEntry struct {
+	addr   string
+	reason string
+}
+
+// One address per registry entry; "" marks a globally reachable entry.
+var registryEntries = []registryEntry{
+	{"0.1.2.3", `"This network"`},
+	{"0.0.0.0", `"This host on this network"`},
+	{"10.0.0.1", "Private-Use"},
+	{"100.64.0.1", "Shared Address Space"},
+	{"127.0.0.1", "Loopback"},
+	{"169.254.1.1", "Link Local"},
+	{"172.16.0.1", "Private-Use"},
+	{"192.0.0.100", "IETF Protocol Assignments"},
+	{"192.0.0.1", "IPv4 Service Continuity Prefix"},
+	{"192.0.0.8", "IPv4 dummy address"},
+	{"192.0.0.9", ""},
+	{"192.0.0.10", ""},
+	{"192.0.0.170", "NAT64/DNS64 Discovery"},
+	{"192.0.0.171", "NAT64/DNS64 Discovery"},
+	{"192.0.2.1", "Documentation (TEST-NET-1)"},
+	{"192.31.196.1", ""},
+	{"192.52.193.1", ""},
+	{"192.88.99.1", "Deprecated (6to4 Relay Anycast)"},
+	{"192.168.1.1", "Private-Use"},
+	{"192.175.48.6", ""},
+	{"198.18.0.1", "Benchmarking"},
+	{"198.51.100.1", "Documentation (TEST-NET-2)"},
+	{"203.0.113.1", "Documentation (TEST-NET-3)"},
+	{"240.0.0.1", "Reserved"},
+	{"255.255.255.255", "Limited Broadcast"},
+	{"::1", "Loopback Address"},
+	{"::", "Unspecified Address"},
+	{"::ffff:10.0.0.1", "Private-Use"},
+	{"64:ff9b::808:808", ""},
+	{"64:ff9b:1::1", "IPv4-IPv6 Translat."},
+	{"100::1", "Discard-Only Address Block"},
+	{"100:0:0:1::1", "Dummy IPv6 Prefix"},
+	{"2001:100::1", "IETF Protocol Assignments"},
+	{"2001:0:4136:e378::1", "TEREDO"},
+	{"2001:1::1", ""},
+	{"2001:1::2", ""},
+	{"2001:1::3", ""},
+	{"2001:2::1", "Benchmarking"},
+	{"2001:3::1", ""},
+	{"2001:4:112::1", ""},
+	{"2001:10::1", "Deprecated (previously ORCHID)"},
+	{"2001:20::1", ""},
+	{"2001:30::1", ""},
+	{"2001:db8::1", "Documentation"},
+	{"2002:808:808::1", "6to4"},
+	{"2620:4f:8000::6", ""},
+	{"3fff::1", "Documentation"},
+	{"5f00::1", "Segment Routing (SRv6) SIDs"},
+	{"fd00::1", "Unique-Local"},
+	{"fe80::1", "Link-Local Unicast"},
+}
+
+func TestNotQueryableReasonPerRegistryEntry(t *testing.T) {
+	for _, e := range registryEntries {
+		addr := netip.MustParseAddr(e.addr)
+		if got := NotQueryableReason(addr); got != e.reason {
+			t.Errorf("NotQueryableReason(%s) = %q, want %q", e.addr, got, e.reason)
+		}
+		if addr.Is4() {
+			mapped := netip.AddrFrom16(addr.As16())
+			if got := NotQueryableReason(mapped); got != e.reason {
+				t.Errorf("NotQueryableReason(%s) = %q, want %q", mapped, got, e.reason)
+			}
+		}
+	}
+}
+
+func TestRegistryEntriesCoverEveryBlock(t *testing.T) {
+	blocks := slices.Concat(IPv4SpecialAddresses, IPv6SpecialAddresses)
+	if len(blocks) != 50 {
+		t.Fatalf("registry has %d blocks, want 50", len(blocks))
+	}
+	seen := map[netip.Prefix]bool{}
+	for _, e := range registryEntries {
+		block := FindSpecialAddress(netip.MustParseAddr(e.addr))
+		if block == nil {
+			t.Fatalf("%s is in no block", e.addr)
+		}
+		seen[block.Prefix] = true
+	}
+	for _, block := range blocks {
+		if !seen[block.Prefix] {
+			t.Errorf("no entry for %s (%s)", block.Prefix, block.Name)
 		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -41,6 +42,24 @@ func TestAddress01DocumentationAddr(t *testing.T) {
 	endpoints := tctest.ServerEndpoints(t, entry.Args)
 	if len(endpoints) != 1 || endpoints[0] != "ns1.example/192.0.2.1" {
 		t.Fatalf("expected typed servers [ns1.example/192.0.2.1], got %v", endpoints)
+	}
+}
+
+func TestAddress01NestedBlockGloballyReachable(t *testing.T) {
+	ctx := testContext(t)
+	z := tctest.ZoneWithAddrs(t, "example", map[string][]string{
+		"blackhole.as112.arpa": {"2001:4:112::1"},
+	})
+
+	entries, err := Address01(ctx, z)
+	if err != nil {
+		t.Fatalf("address01: %v", err)
+	}
+	tctest.RequireNoTag(t, entries, "A01_ADDR_NOT_GLOBALLY_REACHABLE")
+	entry := tctest.RequireTag(t, entries, "A01_GLOBALLY_REACHABLE_ADDR")
+	endpoints := tctest.ServerEndpoints(t, entry.Args)
+	if !slices.Equal(endpoints, []string{"blackhole.as112.arpa/2001:4:112::1"}) {
+		t.Fatalf("servers = %v, want [blackhole.as112.arpa/2001:4:112::1]", endpoints)
 	}
 }
 

@@ -5,28 +5,20 @@ import (
 	"strings"
 )
 
-// FindSpecialAddress returns the special address metadata for a given IP.
+// FindSpecialAddress returns the most specific special-purpose block containing ip.
 func FindSpecialAddress(ip netip.Addr) *SpecialIPBlock {
+	blocks := IPv6SpecialAddresses
 	if ip.Is4() {
-		for i := range IPv4SpecialAddresses {
-			block := &IPv4SpecialAddresses[i]
-			if block.Prefix.Contains(ip) {
-				return block
-			}
-		}
-		return nil
+		blocks = IPv4SpecialAddresses
 	}
-
-	if ip.Is6() {
-		for i := range IPv6SpecialAddresses {
-			block := &IPv6SpecialAddresses[i]
-			if block.Prefix.Contains(ip) {
-				return block
-			}
+	var found *SpecialIPBlock
+	for i := range blocks {
+		block := &blocks[i]
+		if block.Prefix.Contains(ip) && (found == nil || block.Prefix.Bits() > found.Prefix.Bits()) {
+			found = block
 		}
 	}
-
-	return nil
+	return found
 }
 
 // IsGloballyReachable reports whether the IANA metadata marks the block as globally reachable.

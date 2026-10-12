@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -1090,6 +1091,7 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 // DNSSEC02 runs the DNSSEC02 test case.
 func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC02"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -1354,48 +1356,56 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 					dnskeyMatchingDS[matchingDNSKEY] = keyTag(matchingDNSKEY)
 					outcome.hasDNSKEYMatchDS = true
+				}
 
-					rrset := dnskeyRRset(dnskeyRecords)
-					testTime := packetTime(resp)
+				rrset := dnskeyRRset(dnskeyRecords)
+				testTime := packetTime(resp)
+				sigs := capRRSIGs(ctx, dnskeyRRSIG)
+				perTag := map[uint16]int{}
+				for _, dnskey := range dnskeyRecords {
+					keytag, ok := dnskeyMatchingDS[dnskey]
+					if !ok {
+						continue
+					}
+					perTag[keytag]++
+					if perTag[keytag] > dnssecutil.MaxKeysPerTag {
+						limitReached(ctx, boundKeysPerTag, dnssecutil.MaxKeysPerTag, perTag[keytag])
+						continue
+					}
 
-					for dnskey, keytag := range dnskeyMatchingDS {
-						var matchingRRSIG []*dns.RRSIG
-						for _, sig := range dnskeyRRSIG {
-							if sig.KeyTag == keytag {
-								matchingRRSIG = append(matchingRRSIG, sig)
+					foundMatch := false
+					for _, sig := range sigs {
+						if sig.KeyTag != keytag {
+							continue
+						}
+						_, errs := verifyCandidates(sig, rrset, []*dns.DNSKEY{dnskey}, testTime)
+						if len(errs) == 0 {
+							foundMatch = true
+							continue
+						}
+						if err := errs[0]; errors.Is(err, dns.ErrAlg) {
+							if outcome.algoNotSupportedByZM[keytag] == nil {
+								outcome.algoNotSupportedByZM[keytag] = map[uint8]bool{}
 							}
+							outcome.algoNotSupportedByZM[keytag][sig.Algorithm] = true
+						} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
+							// RSA exponent we cannot verify locally: indeterminate, not a failure.
+							outcome.rsaExponentUnsupported[keytag] = true
+						} else {
+							outcome.rrsigNotValidByDNSKEY[keytag] = true
 						}
+					}
 
-						foundMatch := false
-						for _, sig := range matchingRRSIG {
-							if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
-								if errors.Is(err, dns.ErrAlg) {
-									if outcome.algoNotSupportedByZM[keytag] == nil {
-										outcome.algoNotSupportedByZM[keytag] = map[uint8]bool{}
-									}
-									outcome.algoNotSupportedByZM[keytag][sig.Algorithm] = true
-								} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
-									// RSA exponent we cannot verify locally: indeterminate, not a failure.
-									outcome.rsaExponentUnsupported[keytag] = true
-								} else {
-									outcome.rrsigNotValidByDNSKEY[keytag] = true
-								}
-							} else {
-								foundMatch = true
-							}
-						}
-
-						switch {
-						case foundMatch:
-							outcome.hasRRSIGMatchDS = true
-							outcome.rrsigMatchDS[keytag] = true
-						case outcome.rsaExponentUnsupported[keytag] && !outcome.rrsigNotValidByDNSKEY[keytag] && outcome.algoNotSupportedByZM[keytag] == nil:
-							// Sole reason this DS-linked key did not verify is the unsupported
-							// exponent; leave it indeterminate rather than raising a failure.
-							outcome.hasRRSIGUnsupportedDS = true
-						default:
-							outcome.noMatchingDNSKEYRRSIG[keytag] = true
-						}
+					switch {
+					case foundMatch:
+						outcome.hasRRSIGMatchDS = true
+						outcome.rrsigMatchDS[keytag] = true
+					case outcome.rsaExponentUnsupported[keytag] && !outcome.rrsigNotValidByDNSKEY[keytag] && outcome.algoNotSupportedByZM[keytag] == nil:
+						// Sole reason this DS-linked key did not verify is the unsupported
+						// exponent; leave it indeterminate rather than raising a failure.
+						outcome.hasRRSIGUnsupportedDS = true
+					default:
+						outcome.noMatchingDNSKEYRRSIG[keytag] = true
 					}
 				}
 
@@ -2400,6 +2410,7 @@ func dnskeyRRSIGPresent(resp packet.Packet) bool {
 // DNSSEC07 runs the DNSSEC07 test case.
 func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC07"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -2608,7 +2619,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcome.noDS = true
 					// The proof of what the parent says about the name is in
 					// the response already made; no query is added to read it.
-					outcome.delegation, outcome.denial = ds07ReadDenial(z.Name, dsResp)
+					outcome.delegation, outcome.denial = ds07ReadDenial(ctx, z.Name, dsResp)
 					outcome.endpoints = dnssec22Endpoints(group)
 				}
 				outcomes[i] = outcome
@@ -2777,6 +2788,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 // DNSSEC08 runs the DNSSEC08 test case.
 func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC08"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -2889,7 +2901,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				outcome.hadRRSIGs = true
 				testTime := packetTime(resp)
 
-				for _, rr := range rrsigRRs {
+				for _, rr := range capRRSIGs(ctx, rrsigRRs) {
 					sig, ok := rr.(*dns.RRSIG)
 					if !ok {
 						continue
@@ -2912,34 +2924,16 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 
-					var matchingDNSKEYs []*dns.DNSKEY
-					for _, dnskey := range dnskeyRecords {
-						if keyTag(dnskey) == sig.KeyTag {
-							matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-						}
-					}
-
+					matchingDNSKEYs, _ := candidateKeys(ctx, sig, dnskeyRecords)
 					if len(matchingDNSKEYs) == 0 {
 						outcome.noMatchingDNSKEY[sig.KeyTag] = true
 						continue
 					}
 
-					rrset := dnskeyRRset(dnskeyRecords)
-					valid := false
-					algoUnsupported := false
-					rsaUnsupported := false
-					for _, dnskey := range matchingDNSKEYs {
-						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
-							if errors.Is(err, dns.ErrAlg) {
-								algoUnsupported = true
-							} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
-								rsaUnsupported = true
-							}
-							continue
-						}
-						valid = true
-						break
-					}
+					key, errs := verifyCandidates(sig, dnskeyRRset(dnskeyRecords), matchingDNSKEYs, testTime)
+					valid := key != nil
+					algoUnsupported := slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dns.ErrAlg) })
+					rsaUnsupported := slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) })
 
 					if algoUnsupported {
 						if outcome.algoNotSupportedByZM[sig.KeyTag] == nil {
@@ -3096,6 +3090,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 // DNSSEC09 runs the DNSSEC09 test case.
 func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC09"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -3221,7 +3216,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				outcome.hadRRSIGs = true
 				testTime := packetTime(dnskeyResp)
 
-				for _, rr := range rrsigRRs {
+				for _, rr := range capRRSIGs(ctx, rrsigRRs) {
 					sig, ok := rr.(*dns.RRSIG)
 					if !ok {
 						continue
@@ -3244,34 +3239,16 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 
-					var matchingDNSKEYs []*dns.DNSKEY
-					for _, dnskey := range dnskeyRecords {
-						if keyTag(dnskey) == sig.KeyTag {
-							matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-						}
-					}
-
+					matchingDNSKEYs, _ := candidateKeys(ctx, sig, dnskeyRecords)
 					if len(matchingDNSKEYs) == 0 {
 						outcome.noMatchingDNSKEY[sig.KeyTag] = true
 						continue
 					}
 
-					rrset := append([]dns.RR{}, soaRRs...)
-					valid := false
-					algoUnsupported := false
-					rsaUnsupported := false
-					for _, dnskey := range matchingDNSKEYs {
-						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
-							if errors.Is(err, dns.ErrAlg) {
-								algoUnsupported = true
-							} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
-								rsaUnsupported = true
-							}
-							continue
-						}
-						valid = true
-						break
-					}
+					key, errs := verifyCandidates(sig, soaRRs, matchingDNSKEYs, testTime)
+					valid := key != nil
+					algoUnsupported := slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dns.ErrAlg) })
+					rsaUnsupported := slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) })
 
 					if algoUnsupported {
 						if outcome.algoNotSupportedByZM[sig.KeyTag] == nil {
@@ -3428,6 +3405,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 // DNSSEC10 runs the DNSSEC10 test case.
 func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC10"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -3644,14 +3622,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							outcome.nsec3MissingSignature = true
 						} else {
 							rrset := rrsetForName(nsec3RRsRaw, nsec3RR.Hdr.Name)
-							for _, sig := range rrsigRRs {
+							for _, sig := range capRRSIGs(ctx, rrsigRRs) {
 								keytag := sig.KeyTag
-								var matchingDNSKEYs []*dns.DNSKEY
-								for _, dnskey := range dnskeyRecords {
-									if keyTag(dnskey) == keytag {
-										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-									}
-								}
+								matchingDNSKEYs, _ := candidateKeys(ctx, sig, dnskeyRecords)
 								if len(matchingDNSKEYs) == 0 {
 									outcome.nsec3RRSIGNoDNSKEY[keytag] = true
 									continue
@@ -3665,22 +3638,18 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 									continue
 								}
 
-								for idx, dnskey := range matchingDNSKEYs {
-									if err := verifyRRSIG(sig, rrset, dnskey, testingTime); err == nil {
-										outcome.nsec3RRSIGVerified = true
-										break
-									} else if idx == len(matchingDNSKEYs)-1 {
-										if errors.Is(err, dns.ErrAlg) {
-											key := keyTag(dnskey)
-											if outcome.algoNotSupportedByZM[key] == nil {
-												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
-											}
-											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
-											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
-											outcome.nsec3RRSIGVerifyError[keytag] = true
-										}
+								verified, errs := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
+								if verified != nil {
+									outcome.nsec3RRSIGVerified = true
+								} else if err, dnskey := errs[len(errs)-1], matchingDNSKEYs[len(matchingDNSKEYs)-1]; errors.Is(err, dns.ErrAlg) {
+									key := keyTag(dnskey)
+									if outcome.algoNotSupportedByZM[key] == nil {
+										outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 									}
+									outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
+								} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
+									// Skip an unsupported RSA exponent: indeterminate, not a verify error.
+									outcome.nsec3RRSIGVerifyError[keytag] = true
 								}
 							}
 						}
@@ -3723,14 +3692,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							outcome.nsecMissingSignature = true
 						} else {
 							rrset := rrsetForName(nsecRRsRaw, nsecRR.Hdr.Name)
-							for _, sig := range rrsigRRs {
+							for _, sig := range capRRSIGs(ctx, rrsigRRs) {
 								keytag := sig.KeyTag
-								var matchingDNSKEYs []*dns.DNSKEY
-								for _, dnskey := range dnskeyRecords {
-									if keyTag(dnskey) == keytag {
-										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-									}
-								}
+								matchingDNSKEYs, _ := candidateKeys(ctx, sig, dnskeyRecords)
 								if len(matchingDNSKEYs) == 0 {
 									outcome.nsecRRSIGNoDNSKEY[keytag] = true
 									continue
@@ -3744,22 +3708,18 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 									continue
 								}
 
-								for idx, dnskey := range matchingDNSKEYs {
-									if err := verifyRRSIG(sig, rrset, dnskey, testingTime); err == nil {
-										outcome.nsecRRSIGVerified = true
-										break
-									} else if idx == len(matchingDNSKEYs)-1 {
-										if errors.Is(err, dns.ErrAlg) {
-											key := keyTag(dnskey)
-											if outcome.algoNotSupportedByZM[key] == nil {
-												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
-											}
-											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
-											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
-											outcome.nsecRRSIGVerifyError[keytag] = true
-										}
+								verified, errs := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
+								if verified != nil {
+									outcome.nsecRRSIGVerified = true
+								} else if err, dnskey := errs[len(errs)-1], matchingDNSKEYs[len(matchingDNSKEYs)-1]; errors.Is(err, dns.ErrAlg) {
+									key := keyTag(dnskey)
+									if outcome.algoNotSupportedByZM[key] == nil {
+										outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 									}
+									outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
+								} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
+									// Skip an unsupported RSA exponent: indeterminate, not a verify error.
+									outcome.nsecRRSIGVerifyError[keytag] = true
 								}
 							}
 						}
@@ -3819,14 +3779,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							outcome.nsecMissingSignature = true
 						} else {
 							rrset := rrsetForName(nsecRRsRaw, nsecRR.Hdr.Name)
-							for _, sig := range rrsigRRs {
+							for _, sig := range capRRSIGs(ctx, rrsigRRs) {
 								keytag := sig.KeyTag
-								var matchingDNSKEYs []*dns.DNSKEY
-								for _, dnskey := range dnskeyRecords {
-									if keyTag(dnskey) == keytag {
-										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-									}
-								}
+								matchingDNSKEYs, _ := candidateKeys(ctx, sig, dnskeyRecords)
 								if len(matchingDNSKEYs) == 0 {
 									outcome.nsecRRSIGNoDNSKEY[keytag] = true
 									continue
@@ -3840,22 +3795,18 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 									continue
 								}
 
-								for idx, dnskey := range matchingDNSKEYs {
-									if err := verifyRRSIG(sig, rrset, dnskey, testingTime); err == nil {
-										outcome.nsecRRSIGVerified = true
-										break
-									} else if idx == len(matchingDNSKEYs)-1 {
-										if errors.Is(err, dns.ErrAlg) {
-											key := keyTag(dnskey)
-											if outcome.algoNotSupportedByZM[key] == nil {
-												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
-											}
-											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
-											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
-											outcome.nsecRRSIGVerifyError[keytag] = true
-										}
+								verified, errs := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
+								if verified != nil {
+									outcome.nsecRRSIGVerified = true
+								} else if err, dnskey := errs[len(errs)-1], matchingDNSKEYs[len(matchingDNSKEYs)-1]; errors.Is(err, dns.ErrAlg) {
+									key := keyTag(dnskey)
+									if outcome.algoNotSupportedByZM[key] == nil {
+										outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 									}
+									outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
+								} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
+									// Skip an unsupported RSA exponent: indeterminate, not a verify error.
+									outcome.nsecRRSIGVerifyError[keytag] = true
 								}
 							}
 						}
@@ -5391,6 +5342,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 // DNSSEC16 runs the DNSSEC16 test case.
 func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC16"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -5666,25 +5618,15 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					for _, cds := range cdsRecords {
 						rrset = append(rrset, cds)
 					}
-					for _, sig := range cdsRRSIG[nsIP] {
+					for _, sig := range capRRSIGs(ctx, cdsRRSIG[nsIP]) {
 						keytag := sig.KeyTag
-						var matchingDNSKEYs []*dns.DNSKEY
-						for _, dnskey := range dnskeys {
-							if keyTag(dnskey) == keytag {
-								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-							}
-						}
+						matchingDNSKEYs, _ := candidateKeys(ctx, sig, dnskeys)
 						if len(matchingDNSKEYs) == 0 {
 							outcome.cdsSignedByUnknownDNSKEY[keytag] = true
 							continue
 						}
-						valid := false
-						for _, dnskey := range matchingDNSKEYs {
-							if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
-								valid = true
-								break
-							}
-						}
+						verified, _ := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
+						valid := verified != nil
 						if !valid {
 							outcome.cdsInvalidRRSIG[keytag] = true
 						}
@@ -5907,6 +5849,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 // DNSSEC17 runs the DNSSEC17 test case.
 func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC17"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -6169,25 +6112,15 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					for _, cdnskey := range cdnskeyRecords {
 						rrset = append(rrset, cdnskey)
 					}
-					for _, sig := range cdnskeyRRSIG[nsIP] {
+					for _, sig := range capRRSIGs(ctx, cdnskeyRRSIG[nsIP]) {
 						keytag := sig.KeyTag
-						var matchingDNSKEYs []*dns.DNSKEY
-						for _, dnskey := range dnskeys {
-							if keyTag(dnskey) == keytag {
-								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-							}
-						}
+						matchingDNSKEYs, _ := candidateKeys(ctx, sig, dnskeys)
 						if len(matchingDNSKEYs) == 0 {
 							outcome.cdnskeySignedByUnknownDNSKEY[keytag] = true
 							continue
 						}
-						valid := false
-						for _, dnskey := range matchingDNSKEYs {
-							if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
-								valid = true
-								break
-							}
-						}
+						verified, _ := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
+						valid := verified != nil
 						if !valid {
 							outcome.cdnskeyInvalidRRSIG[keytag] = true
 						}
@@ -7435,15 +7368,15 @@ func nsec3OwnerMatchesName(rr *dns.NSEC3, name dnsname.Name) bool {
 // nsec3FlagOptOut is the Opt-Out bit of the NSEC3 flags field (RFC 5155 section 3.1.2.1).
 const nsec3FlagOptOut = 1
 
-// nsec3Covers reports whether the hash of name lies strictly inside the span of rr.
-func nsec3Covers(rr *dns.NSEC3, name dnsname.Name) bool {
-	hash := strings.ToLower(dnsutil.NSEC3Name(name.FQDN(), rr.Salt, rr.Iterations))
+// nsec3Covers reports whether the hash of name lies strictly inside the span of rr; false past the iteration bound.
+func nsec3Covers(ctx context.Context, rr *dns.NSEC3, name dnsname.Name) (bool, bool) {
+	hash, ok := nsec3Hash(ctx, rr, name)
 	labels := dnsname.New(rr.Hdr.Name).Labels()
-	if hash == "" || len(labels) == 0 {
-		return false
+	if !ok || hash == "" || len(labels) == 0 {
+		return false, ok
 	}
 	span := dnssec23Record{key: strings.ToLower(labels[0]), nextKey: strings.ToLower(rr.NextDomain)}
-	return span.covers(hash, strings.Compare)
+	return span.covers(hash, strings.Compare), true
 }
 
 func filterRRSIGByType(rrs []dns.RR, typeCovered uint16) []*dns.RRSIG {
@@ -8166,9 +8099,110 @@ func rrsigTypeString(typeCovered uint16) string {
 // Aliases to the shared dnssecutil primitives; behavior is identical.
 var (
 	dnssecAlgorithmSupported = dnssecutil.AlgorithmSupported
-	verifyRRSIG              = dnssecutil.VerifyRRSIG
+	verifyCandidates         = dnssecutil.VerifyCandidates
 	keyTag                   = dnssecutil.KeyTag
 )
+
+// Bound names in LIMIT_REACHED.
+const (
+	boundNSEC3Iterations = "nsec3_iterations"
+	boundKeysPerTag      = "keys_per_tag"
+	boundRRSIGsPerRRset  = "rrsigs_per_rrset"
+)
+
+// runScope is the per-run state of one testcase: the NSEC3 memo and the limits logged.
+type runScope struct {
+	testcase string
+	domain   string
+	hashes   dnssecutil.NSEC3Hashes
+	mu       sync.Mutex
+	logged   map[string]bool
+}
+
+type runScopeKey struct{}
+
+// withRunScope starts the per-run state of testcase on domain.
+func withRunScope(ctx context.Context, testcase string, domain dnsname.Name) context.Context {
+	return context.WithValue(ctx, runScopeKey{}, &runScope{testcase: testcase, domain: domain.String(), logged: map[string]bool{}})
+}
+
+func scopeOf(ctx context.Context) *runScope {
+	scope, _ := ctx.Value(runScopeKey{}).(*runScope)
+	return scope
+}
+
+// limitReached logs LIMIT_REACHED once per bound and testcase run.
+func limitReached(ctx context.Context, bound string, limit int, count int) {
+	scope := scopeOf(ctx)
+	if scope == nil {
+		return
+	}
+	scope.mu.Lock()
+	seen := scope.logged[bound]
+	scope.logged[bound] = true
+	scope.mu.Unlock()
+	if seen {
+		return
+	}
+	args := map[string]any{"bound": bound, "limit": limit, "count": count, "domain": scope.domain}
+	_, _ = util.LoggerFromContext(ctx).Add("LIMIT_REACHED", args, logger.ModuleName, scope.testcase)
+}
+
+// candidateKeys returns the keys tried for sig and how many carry its tag, logging a cut.
+func candidateKeys(ctx context.Context, sig *dns.RRSIG, keys []*dns.DNSKEY) ([]*dns.DNSKEY, int) {
+	candidates, matched := dnssecutil.CandidateKeys(sig, keys)
+	if matched > len(candidates) {
+		limitReached(ctx, boundKeysPerTag, dnssecutil.MaxKeysPerTag, matched)
+	}
+	return candidates, matched
+}
+
+// capRRSIGs keeps the RRSIGs considered over one RRset, logging a cut.
+func capRRSIGs[T any](ctx context.Context, sigs []T) []T {
+	if len(sigs) <= dnssecutil.MaxRRSIGsPerRRset {
+		return sigs
+	}
+	limitReached(ctx, boundRRSIGsPerRRset, dnssecutil.MaxRRSIGsPerRRset, len(sigs))
+	return sigs[:dnssecutil.MaxRRSIGsPerRRset]
+}
+
+// nsec3Hash returns the hash of name under the parameters of rr; false past the iteration bound, which it logs.
+func nsec3Hash(ctx context.Context, rr *dns.NSEC3, name dnsname.Name) (string, bool) {
+	var hashes *dnssecutil.NSEC3Hashes
+	if scope := scopeOf(ctx); scope != nil {
+		hashes = &scope.hashes
+	}
+	hash, ok := hashes.Hash(name.FQDN(), rr.Salt, rr.Iterations)
+	if !ok {
+		limitReached(ctx, boundNSEC3Iterations, dnssecutil.NSEC3MaxIterations, int(rr.Iterations))
+	}
+	return hash, ok
+}
+
+// nsec3Matching returns the record owned by the hash of name, or nil; false past the iteration bound.
+func nsec3Matching(ctx context.Context, records []*dns.NSEC3, name dnsname.Name) (*dns.NSEC3, bool) {
+	for _, rr := range records {
+		hash, ok := nsec3Hash(ctx, rr, name)
+		if !ok {
+			return nil, false
+		}
+		if labels := dnsname.New(rr.Hdr.Name).Labels(); hash != "" && len(labels) > 0 && strings.EqualFold(hash, labels[0]) {
+			return rr, true
+		}
+	}
+	return nil, true
+}
+
+// nsec3Records returns the NSEC3 records in section of resp.
+func nsec3Records(resp packet.Packet, section string) []*dns.NSEC3 {
+	var out []*dns.NSEC3
+	for _, rr := range resp.GetRecords("NSEC3", section) {
+		if nsec3, ok := rr.(*dns.NSEC3); ok {
+			out = append(out, nsec3)
+		}
+	}
+	return out
+}
 
 // DNSSEC20 runs the DNSSEC20 test case.
 // It verifies that the NSEC/NSEC3 type bitmap at the zone apex accurately
@@ -8176,6 +8210,7 @@ var (
 // problem that enables cache poisoning via RFC 8198.
 func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC20"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -8184,7 +8219,6 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	typeDNSKEY := "DNSKEY"
 	typeNSEC := "NSEC"
-	typeNSEC3 := "NSEC3"
 	typeNSEC3PARAM := "NSEC3PARAM"
 	probeTypes := []string{"A", "AAAA", "MX", "TXT"}
 
@@ -8255,6 +8289,7 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				// Try to obtain the apex type bitmap from NSEC or NSEC3.
 				var typeMap map[string]bool
 				var isNSEC3 bool
+				var nsec3Unusable bool
 
 				nsecResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeNSEC, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
 				if nsecResp.Msg != nil && nsecResp.Rcode() == "NOERROR" && nsecResp.AA() {
@@ -8274,24 +8309,27 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 					// NSEC3 zone: NSEC3 in authority section (NODATA response).
 					if typeMap == nil {
-						nsec3RRs := nsecResp.GetRecords(typeNSEC3, "authority")
-						for _, rr := range nsec3RRs {
-							nsec3, ok := rr.(*dns.NSEC3)
-							if !ok || !nsec3OwnerMatchesApex(nsec3, z.Name) {
-								continue
+						var zoneNSEC3 []*dns.NSEC3
+						for _, nsec3 := range nsec3Records(nsecResp, "authority") {
+							if !signedByOtherZone(nsecResp, nsec3.Hdr.Name, dns.TypeNSEC3, "authority", z.Name) {
+								zoneNSEC3 = append(zoneNSEC3, nsec3)
 							}
-							if signedByOtherZone(nsecResp, nsec3.Hdr.Name, dns.TypeNSEC3, "authority", z.Name) {
-								continue
-							}
-							typeMap = typeMapFromBitmap(nsec3.TypeBitMap)
-							isNSEC3 = true
-							break
 						}
+						records, usable := dnssecutil.NSEC3Usable(zoneNSEC3)
+						var apex *dns.NSEC3
+						if usable {
+							apex, usable = nsec3Matching(ctx, records, z.Name)
+						}
+						if apex != nil {
+							typeMap = typeMapFromBitmap(apex.TypeBitMap)
+							isNSEC3 = true
+						}
+						nsec3Unusable = !usable
 					}
 				}
 
-				// If we still don't have a bitmap, try NSEC3PARAM query.
-				if typeMap == nil {
+				// If we still don't have a bitmap, try NSEC3PARAM query; it carries no NSEC3.
+				if typeMap == nil && !nsec3Unusable {
 					nsec3paramResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeNSEC3PARAM, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
 					if nsec3paramResp.Msg != nil && nsec3paramResp.Rcode() == "NOERROR" && nsec3paramResp.AA() {
 						// NSEC zone: NSEC in authority section (NODATA response).
@@ -8427,6 +8465,7 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 // DNSSEC21 runs the DNSSEC21 test case.
 func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC21"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -8576,7 +8615,7 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			testTime := packetTime(dsResp)
 			dsRRset := append([]dns.RR{}, dsRRs...)
 
-			for _, sig := range rrsigCoverDS {
+			for _, sig := range capRRSIGs(ctx, rrsigCoverDS) {
 				if int64(sig.Inception) > testTime.Unix() {
 					outcome.rrsigNotYetValid[sig.KeyTag] = true
 					continue
@@ -8593,33 +8632,16 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					continue
 				}
 
-				var matchingKeys []*dns.DNSKEY
-				for _, k := range parentKeys {
-					if keyTag(k) == sig.KeyTag {
-						matchingKeys = append(matchingKeys, k)
-					}
-				}
+				matchingKeys, _ := candidateKeys(ctx, sig, parentKeys)
 				if len(matchingKeys) == 0 {
 					outcome.noDNSKEYForRRSIG[sig.KeyTag] = true
 					continue
 				}
 
-				verified := false
-				algoUnsupported := false
-				rsaUnsupported := false
-				for _, k := range matchingKeys {
-					if verr := verifyRRSIG(sig, dsRRset, k, testTime); verr != nil {
-						if errors.Is(verr, dns.ErrAlg) {
-							algoUnsupported = true
-						} else if errors.Is(verr, dnssecutil.ErrRSAExponentUnsupported) {
-							rsaUnsupported = true
-						}
-						continue
-					}
-					verified = true
-					break
-				}
-				if verified {
+				key, errs := verifyCandidates(sig, dsRRset, matchingKeys, testTime)
+				algoUnsupported := slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dns.ErrAlg) })
+				rsaUnsupported := slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) })
+				if key != nil {
 					outcome.verifiedKeytags = append(outcome.verifiedKeytags, sig.KeyTag)
 					continue
 				}
@@ -8824,7 +8846,7 @@ type ds07Denial struct {
 
 // ds07ReadDenial reads the parent's statement about name off the NSEC or NSEC3
 // matching it in a DS NODATA response. It adds no query.
-func ds07ReadDenial(name dnsname.Name, resp packet.Packet) (ds07Delegation, ds07Denial) {
+func ds07ReadDenial(ctx context.Context, name dnsname.Name, resp packet.Packet) (ds07Delegation, ds07Denial) {
 	for _, rr := range resp.GetRecords("NSEC", "authority") {
 		nsec, ok := rr.(*dns.NSEC)
 		if !ok || !rrOwnerMatchesZone(rr, name) {
@@ -8832,12 +8854,12 @@ func ds07ReadDenial(name dnsname.Name, resp packet.Packet) (ds07Delegation, ds07
 		}
 		return ds07DelegationFromBitmap(nsec.TypeBitMap), ds07DenialFor(resp, dns.TypeNSEC, rr)
 	}
-	for _, rr := range resp.GetRecords("NSEC3", "authority") {
-		nsec3, ok := rr.(*dns.NSEC3)
-		if !ok || !nsec3OwnerMatchesName(nsec3, name) {
-			continue
-		}
-		return ds07DelegationFromBitmap(nsec3.TypeBitMap), ds07DenialFor(resp, dns.TypeNSEC3, rr)
+	records, ok := dnssecutil.NSEC3Usable(nsec3Records(resp, "authority"))
+	if !ok {
+		return ds07Unproven, ds07Denial{}
+	}
+	if nsec3, ok := nsec3Matching(ctx, records, name); ok && nsec3 != nil {
+		return ds07DelegationFromBitmap(nsec3.TypeBitMap), ds07DenialFor(resp, dns.TypeNSEC3, nsec3)
 	}
 	return ds07Unproven, ds07Denial{}
 }
@@ -8923,7 +8945,7 @@ func ds07ParentAnchors(ctx context.Context, z *zone.Zone, parentNS []nameserver.
 		return "", false
 	}
 	keySigs := filterRRSIGByType(keyResp.GetRecordsForName("RRSIG", parent.Name, "answer"), dns.TypeDNSKEY)
-	keyCheck := dnssec22VerifySigs(keySigs, matched, packetTime(keyResp), func(*dns.RRSIG) []dns.RR { return keyRRs })
+	keyCheck := dnssec22VerifySigs(ctx, keySigs, matched, packetTime(keyResp), func(*dns.RRSIG) []dns.RR { return keyRRs })
 	if !keyCheck.verified {
 		return "", false
 	}
@@ -8932,7 +8954,7 @@ func ds07ParentAnchors(ctx context.Context, z *zone.Zone, parentNS []nameserver.
 		if len(denial.sigs) == 0 || len(denial.rrset) == 0 {
 			continue
 		}
-		check := dnssec22VerifySigs(denial.sigs, keys, denial.at, func(*dns.RRSIG) []dns.RR { return denial.rrset })
+		check := dnssec22VerifySigs(ctx, denial.sigs, keys, denial.at, func(*dns.RRSIG) []dns.RR { return denial.rrset })
 		if check.verified {
 			return parent.Name.String(), true
 		}
@@ -9266,7 +9288,7 @@ func (w *dnssec22Walker) probeCut(ctx context.Context, name dnsname.Name, referr
 	}
 	dsRRs := resp.GetRecordsForName("DS", name, "answer")
 	if len(dsRRs) == 0 {
-		return dnssec22Cut{status: dnssec22CutFromDenial(name, resp)}
+		return dnssec22Cut{status: dnssec22CutFromDenial(ctx, name, resp)}
 	}
 	if referred {
 		return w.dsStatus(ctx, name, resp, dsRRs)
@@ -9275,7 +9297,7 @@ func (w *dnssec22Walker) probeCut(ctx context.Context, name dnsname.Name, referr
 }
 
 // dnssec22CutFromDenial reads the zone cut status off the NSEC or NSEC3 matching name.
-func dnssec22CutFromDenial(name dnsname.Name, resp packet.Packet) dnssec22CutStatus {
+func dnssec22CutFromDenial(ctx context.Context, name dnsname.Name, resp packet.Packet) dnssec22CutStatus {
 	for _, rr := range resp.GetRecords("NSEC", "authority") {
 		nsec, ok := rr.(*dns.NSEC)
 		if !ok || !rrOwnerMatchesZone(rr, name) {
@@ -9283,36 +9305,51 @@ func dnssec22CutFromDenial(name dnsname.Name, resp packet.Packet) dnssec22CutSta
 		}
 		return dnssec22CutFromBitmap(nsec.TypeBitMap)
 	}
-	var nsec3s []*dns.NSEC3
-	for _, rr := range resp.GetRecords("NSEC3", "authority") {
-		nsec3, ok := rr.(*dns.NSEC3)
-		if !ok {
-			continue
-		}
-		if nsec3OwnerMatchesName(nsec3, name) {
-			return dnssec22CutFromBitmap(nsec3.TypeBitMap)
-		}
-		nsec3s = append(nsec3s, nsec3)
+	records, ok := dnssecutil.NSEC3Usable(nsec3Records(resp, "authority"))
+	if !ok {
+		return dnssec22Indeterminate
 	}
-	if dnssec22OptOutCovers(name, nsec3s) {
+	match, ok := nsec3Matching(ctx, records, name)
+	if !ok {
+		return dnssec22Indeterminate
+	}
+	if match != nil {
+		return dnssec22CutFromBitmap(match.TypeBitMap)
+	}
+	covered, ok := dnssec22OptOutCovers(ctx, name, records)
+	switch {
+	case !ok:
+		return dnssec22Indeterminate
+	case covered:
 		return dnssec22InsecureCut
 	}
 	// An unsigned enclosing zone proves nothing here; an ancestor decides.
 	return dnssec22NotACut
 }
 
-// dnssec22OptOutCovers reports whether an Opt-Out NSEC3 covers the next closer name of name (RFC 5155 section 8.6).
-func dnssec22OptOutCovers(name dnsname.Name, records []*dns.NSEC3) bool {
+// dnssec22OptOutCovers reports whether an Opt-Out NSEC3 covers the next closer name of name (RFC 5155 section 8.6); false past the iteration bound.
+func dnssec22OptOutCovers(ctx context.Context, name dnsname.Name, records []*dns.NSEC3) (bool, bool) {
 	next := name
-	for encloser, ok := name.NextHigher(); ok; encloser, ok = encloser.NextHigher() {
-		if slices.ContainsFunc(records, func(rr *dns.NSEC3) bool { return nsec3OwnerMatchesName(rr, encloser) }) {
-			return slices.ContainsFunc(records, func(rr *dns.NSEC3) bool {
-				return rr.Flags&nsec3FlagOptOut != 0 && nsec3Covers(rr, next)
-			})
+	for encloser, more := name.NextHigher(); more; encloser, more = encloser.NextHigher() {
+		match, ok := nsec3Matching(ctx, records, encloser)
+		if !ok {
+			return false, false
 		}
-		next = encloser
+		if match == nil {
+			next = encloser
+			continue
+		}
+		for _, rr := range records {
+			if rr.Flags&nsec3FlagOptOut == 0 {
+				continue
+			}
+			if covers, ok := nsec3Covers(ctx, rr, next); !ok || covers {
+				return covers, ok
+			}
+		}
+		return false, true
 	}
-	return false
+	return false, true
 }
 
 // dnssec22CutFromBitmap maps the NSEC or NSEC3 type bitmap onto a zone cut status.
@@ -9362,7 +9399,7 @@ func (w *dnssec22Walker) dsStatus(ctx context.Context, name dnsname.Name, resp p
 		return dnssec22Cut{status: dnssec22BrokenCut}
 	}
 
-	dsCheck := dnssec22VerifySigs(sigs, parentCut.keys, packetTime(resp), func(*dns.RRSIG) []dns.RR { return dsRRs })
+	dsCheck := dnssec22VerifySigs(ctx, sigs, parentCut.keys, packetTime(resp), func(*dns.RRSIG) []dns.RR { return dsRRs })
 	if status := dnssec22CutFromCheck(dsCheck); status != dnssec22SecureCut {
 		return dnssec22Cut{status: status}
 	}
@@ -9389,7 +9426,7 @@ func dnssec22ChildKeys(ctx context.Context, ns nameserver.Nameserver, name dnsna
 	}
 	keyset := dnskeyRRset(keys)
 	sigs := filterRRSIGByType(resp.GetRecordsForName("RRSIG", name, "answer"), dns.TypeDNSKEY)
-	check := dnssec22VerifySigs(sigs, matched, packetTime(resp), func(*dns.RRSIG) []dns.RR { return keyset })
+	check := dnssec22VerifySigs(ctx, sigs, matched, packetTime(resp), func(*dns.RRSIG) []dns.RR { return keyset })
 	if status := dnssec22CutFromCheck(check); status != dnssec22SecureCut {
 		return dnssec22Cut{status: status}, true
 	}
@@ -9560,7 +9597,7 @@ func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) dnssec
 	}
 
 	if signer.Compare(expected) == 0 {
-		check := dnssec22VerifySigs(sigs, expectedCut.keys, packetTime(sigResp), func(sig *dns.RRSIG) []dns.RR {
+		check := dnssec22VerifySigs(ctx, sigs, expectedCut.keys, packetTime(sigResp), func(sig *dns.RRSIG) []dns.RR {
 			return rrsetForName(sigResp.GetRecords(rrsigTypeString(sig.TypeCovered), section), sig.Hdr.Name)
 		})
 		switch {
@@ -9619,9 +9656,9 @@ func dnssec22DenialSigs(resp packet.Packet) []*dns.RRSIG {
 
 // dnssec22VerifySigs checks sigs against keys at time at, taking each covered
 // RRset from rrsetFor.
-func dnssec22VerifySigs(sigs []*dns.RRSIG, keys []*dns.DNSKEY, at time.Time, rrsetFor func(*dns.RRSIG) []dns.RR) dnssec22SigCheck {
+func dnssec22VerifySigs(ctx context.Context, sigs []*dns.RRSIG, keys []*dns.DNSKEY, at time.Time, rrsetFor func(*dns.RRSIG) []dns.RR) dnssec22SigCheck {
 	var check dnssec22SigCheck
-	for _, sig := range sigs {
+	for _, sig := range capRRSIGs(ctx, sigs) {
 		if int64(sig.Expiration) < at.Unix() {
 			check.markExpired(sig.KeyTag)
 			continue
@@ -9639,23 +9676,16 @@ func dnssec22VerifySigs(sigs []*dns.RRSIG, keys []*dns.DNSKEY, at time.Time, rrs
 			check.markFailed(sig.KeyTag)
 			continue
 		}
-		matched := false
-		unsupported := false
-		for _, key := range keys {
-			if keyTag(key) != sig.KeyTag {
-				continue
-			}
-			matched = true
-			err := verifyRRSIG(sig, rrset, key, at)
-			if err == nil {
-				check.verified = true
-				return check
-			}
-			if errors.Is(err, dns.ErrAlg) || errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
-				unsupported = true
-			}
+		candidates, _ := candidateKeys(ctx, sig, keys)
+		verified, errs := verifyCandidates(sig, rrset, candidates, at)
+		if verified != nil {
+			check.verified = true
+			return check
 		}
-		if !matched || !unsupported {
+		unsupported := slices.ContainsFunc(errs, func(err error) bool {
+			return errors.Is(err, dns.ErrAlg) || errors.Is(err, dnssecutil.ErrRSAExponentUnsupported)
+		})
+		if len(candidates) == 0 || !unsupported {
 			check.markFailed(sig.KeyTag)
 			continue
 		}
@@ -9917,6 +9947,7 @@ func dnssec22FollowOne(ctx context.Context, plan dnssec22FollowTask, ns nameserv
 // zone against the zone's own chain of trust.
 func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC22"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
@@ -10821,7 +10852,7 @@ func (w *ds24Walker) check(ctx context.Context, l *ds24Level) ds24Verdict {
 		return ds24Verdict{status: ds24Insecure, zone: zone}
 	}
 	sigs := ds24SignedBy(l.dsSigs, l.parent.cut)
-	check := dnssec22VerifySigs(sigs, parent.keys, l.dsAt, func(*dns.RRSIG) []dns.RR { return l.ds })
+	check := dnssec22VerifySigs(ctx, sigs, parent.keys, l.dsAt, func(*dns.RRSIG) []dns.RR { return l.ds })
 	if status := ds24StatusOf(check); status != ds24Secure {
 		return ds24Verdict{status: status, zone: zone}
 	}
@@ -10936,7 +10967,7 @@ func (w *ds24Walker) evaluate(ctx context.Context, n dnsname.Name, apex ds24Apex
 		if len(set.rrs) > 0 {
 			sigs := ds24SignedBy(filterRRSIGByType(set.resp.GetRecordsForName("RRSIG", n, "answer"), set.rrtype), level.cut)
 			rrs := set.rrs
-			switch ds24StatusOf(dnssec22VerifySigs(sigs, verdict.keys, packetTime(set.resp), func(*dns.RRSIG) []dns.RR { return rrs })) {
+			switch ds24StatusOf(dnssec22VerifySigs(ctx, sigs, verdict.keys, packetTime(set.resp), func(*dns.RRSIG) []dns.RR { return rrs })) {
 			case ds24Broken:
 				d.unsigned = append(d.unsigned, qtype)
 				continue
@@ -11041,6 +11072,7 @@ func ds24ApexView(ctx context.Context, z *zone.Zone, testcase string) ([]ds24Ape
 // DNSSEC24 runs the DNSSEC24 test case.
 func DNSSEC24(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC24"
+	ctx = withRunScope(ctx, testcase, z.Name)
 	var results []*logger.Entry
 
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {

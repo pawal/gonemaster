@@ -138,3 +138,21 @@ func addEntry(t *testing.T, log *logger.Logger, tag string, module string, testc
 	}
 	return e
 }
+
+func TestRequireLimit(t *testing.T) {
+	limit := func(bound string, count int) *logger.Entry {
+		return &logger.Entry{Tag: "LIMIT_REACHED", Module: logger.ModuleName, Testcase: "DNSSEC08",
+			Args: map[string]any{"bound": bound, "limit": 4, "count": count}}
+	}
+	entries := []*logger.Entry{limit("keys_per_tag", 6), limit("rrsigs_per_rrset", 9)}
+	RequireLimit(t, entries, "DNSSEC08", "keys_per_tag", 4, 6)
+
+	cases := map[string]func(tb *tbtest.TB){
+		"LIMIT_REACHED nsec3_iterations entries = 0": func(tb *tbtest.TB) { RequireLimit(tb, entries, "DNSSEC08", "nsec3_iterations", 4, 6) },
+		"want System/DNSSEC09":                       func(tb *tbtest.TB) { RequireLimit(tb, entries, "DNSSEC09", "keys_per_tag", 4, 6) },
+		"limit 4 count 7":                            func(tb *tbtest.TB) { RequireLimit(tb, entries, "DNSSEC08", "keys_per_tag", 4, 7) },
+	}
+	for want, fn := range cases {
+		t.Run(want, func(t *testing.T) { tbtest.MustFail(t, want, fn) })
+	}
+}

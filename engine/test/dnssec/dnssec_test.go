@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -7014,7 +7015,7 @@ func TestDS07ReadDenial(t *testing.T) {
 		t.Run(tc.label, func(t *testing.T) {
 			nsec3 := nsec3Record("a.ns.example", "ns.example", tc.types...)
 			resp := tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(nsec3))
-			got, denial := ds07ReadDenial(name, resp)
+			got, denial := ds07ReadDenial(t.Context(), name, resp)
 			if got != tc.want {
 				t.Errorf("delegation = %v, want %v", got, tc.want)
 			}
@@ -7026,8 +7027,254 @@ func TestDS07ReadDenial(t *testing.T) {
 
 	t.Run("no denial record states nothing", func(t *testing.T) {
 		resp := tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure())
-		if got, _ := ds07ReadDenial(name, resp); got != ds07Unproven {
+		if got, _ := ds07ReadDenial(t.Context(), name, resp); got != ds07Unproven {
 			t.Errorf("delegation = %v, want unproven", got)
 		}
 	})
+}
+
+// scopedContext is a test context with a run scope of testcase on zoneName and a logger to read.
+func scopedContext(t *testing.T, testcase string, zoneName string) (context.Context, *logger.Logger) {
+	t.Helper()
+	log := logger.New()
+	ctx := logger.WithContext(tctest.Context(t), log)
+	return withRunScope(ctx, testcase, dnsname.New(zoneName)), log
+}
+
+// countTried counts the keys each verification tries, through the seam.
+func countTried(t *testing.T) func() []int {
+	t.Helper()
+	var mu sync.Mutex
+	var tried []int
+	tctest.Stub(t, &verifyCandidates, func(sig *dns.RRSIG, rrset []dns.RR, keys []*dns.DNSKEY, at time.Time) (*dns.DNSKEY, []error) {
+		key, errs := dnssecutil.VerifyCandidates(sig, rrset, keys, at)
+		n := len(errs)
+		if key != nil {
+			n++
+		}
+		mu.Lock()
+		tried = append(tried, n)
+		mu.Unlock()
+		return key, errs
+	})
+	return func() []int {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(tried)
+	}
+}
+
+// corruptSig returns a copy of sig whose signature does not verify.
+func corruptSig(t *testing.T, sig *dns.RRSIG) *dns.RRSIG {
+	t.Helper()
+	raw, err := base64.StdEncoding.DecodeString(sig.Signature)
+	if err != nil || len(raw) == 0 {
+		t.Fatalf("decode signature: %v", err)
+	}
+	raw[0] ^= 0xff
+	bad, ok := sig.Clone().(*dns.RRSIG)
+	if !ok {
+		t.Fatal("clone changed type")
+	}
+	bad.Signature = base64.StdEncoding.EncodeToString(raw)
+	return bad
+}
+
+// sameTagSet is a DNSKEY RRset of the signing key placed among five keys sharing its tag.
+type sameTagSet struct {
+	kp     dnstest.Keypair
+	decoys []*dns.DNSKEY
+	now    time.Time
+}
+
+func newSameTagSet(t *testing.T, owner string) sameTagSet {
+	t.Helper()
+	kp := dnstest.GenKey(t, owner, dns.ED25519, false)
+	return sameTagSet{kp: kp, decoys: dnstest.SameTagKeys(t, kp.Key, 5), now: time.Unix(1700000000, 0).UTC()}
+}
+
+// keys returns the RRset with the signing key at position at.
+func (s sameTagSet) keys(at int) []dns.RR {
+	rrs := make([]dns.RR, 0, len(s.decoys)+1)
+	for _, decoy := range s.decoys {
+		rrs = append(rrs, decoy)
+	}
+	return slices.Insert(rrs, at, dns.RR(s.kp.Key))
+}
+
+// sign signs a copy of rrset, since signing sorts it.
+func (s sameTagSet) sign(t *testing.T, rrset []dns.RR) *dns.RRSIG {
+	t.Helper()
+	owner := rrset[0].Header().Name
+	return dnstest.SignRRset(t, s.kp, slices.Clone(rrset), owner, s.kp.Key.Hdr.Name, s.now.Add(-time.Hour), s.now.Add(time.Hour))
+}
+
+func TestDNSSEC08CandidateCaps(t *testing.T) {
+	set := newSameTagSet(t, "example")
+	single := []dns.RR{set.kp.Key}
+	var nineSigs []dns.RR
+	for range dnssecutil.MaxRRSIGsPerRRset {
+		nineSigs = append(nineSigs, corruptSig(t, set.sign(t, single)))
+	}
+	nineSigs = append(nineSigs, set.sign(t, single))
+
+	cases := []struct {
+		name    string
+		answers []dns.RR
+		want    string
+		bound   string
+		count   int
+		tried   []int
+	}{
+		{"signing key within the key cap", slices.Concat(set.keys(1), []dns.RR{set.sign(t, set.keys(1))}), "DS08_DNSKEY_RRSIG_VALID", "keys_per_tag", 6, []int{2}},
+		{"signing key past the key cap", slices.Concat(set.keys(5), []dns.RR{set.sign(t, set.keys(5))}), "DS08_RRSIG_NOT_VALID_BY_DNSKEY", "keys_per_tag", 6, []int{4}},
+		{"valid RRSIG past the RRSIG cap", slices.Concat(single, nineSigs), "DS08_RRSIG_NOT_VALID_BY_DNSKEY", "rrsigs_per_rrset", 9, []int{1, 1, 1, 1, 1, 1, 1, 1}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tried := countTried(t)
+			log := logger.New()
+			ctx := logger.WithContext(tctest.Context(t), log)
+			ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.80", func(q tctest.Query) packet.Packet {
+				if q.Type != "DNSKEY" {
+					return packet.Packet{}
+				}
+				pkt := answerPacket(q.Name, dns.TypeDNSKEY, tc.answers...)
+				pkt.Timestamp = set.now
+				return pkt
+			})
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns}, nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nil, nil
+			})
+
+			entries, err := DNSSEC08(ctx, &zone.Zone{Name: dnsname.New("example")})
+			if err != nil {
+				t.Fatalf("dnssec08: %v", err)
+			}
+			tctest.RequireTags(t, entries, tc.want)
+			tctest.RequireLimit(t, log.Entries(), "DNSSEC08", tc.bound, map[string]int{"keys_per_tag": 4, "rrsigs_per_rrset": 8}[tc.bound], tc.count)
+			if got := tried(); !slices.Equal(got, tc.tried) {
+				t.Errorf("keys tried per RRSIG = %v, want %v", got, tc.tried)
+			}
+		})
+	}
+}
+
+func TestDNSSEC22VerifySigsCaps(t *testing.T) {
+	set := newSameTagSet(t, "example")
+	past := set.keys(5)
+	var keys []*dns.DNSKEY
+	for _, rr := range past {
+		keys = append(keys, rr.(*dns.DNSKEY))
+	}
+	a := tctest.ARR("ns.example", "192.0.2.53")
+	valid := set.sign(t, []dns.RR{a})
+	sigs := []*dns.RRSIG{}
+	for range dnssecutil.MaxRRSIGsPerRRset {
+		sigs = append(sigs, corruptSig(t, valid))
+	}
+	rrsetFor := func(*dns.RRSIG) []dns.RR { return []dns.RR{a} }
+
+	cases := []struct {
+		name  string
+		sigs  []*dns.RRSIG
+		keys  []*dns.DNSKEY
+		bound string
+		count int
+	}{
+		{"signing key past the key cap", []*dns.RRSIG{valid}, keys, "keys_per_tag", 6},
+		{"valid RRSIG past the RRSIG cap", append(slices.Clone(sigs), valid), []*dns.DNSKEY{set.kp.Key}, "rrsigs_per_rrset", 9},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, log := scopedContext(t, "DNSSEC22", "example")
+			check := dnssec22VerifySigs(ctx, tc.sigs, tc.keys, set.now, rrsetFor)
+			if check.verified || !check.failed {
+				t.Fatalf("verified = %v, failed = %v; want false, true", check.verified, check.failed)
+			}
+			limit := map[string]int{"keys_per_tag": 4, "rrsigs_per_rrset": 8}[tc.bound]
+			tctest.RequireLimit(t, log.Entries(), "DNSSEC22", tc.bound, limit, tc.count)
+		})
+	}
+
+	ctx, log := scopedContext(t, "DNSSEC22", "example")
+	if check := dnssec22VerifySigs(ctx, []*dns.RRSIG{valid}, keys[2:], set.now, rrsetFor); !check.verified {
+		t.Error("signing key fourth of four did not verify")
+	}
+	tctest.RequireNoTag(t, log.Entries(), "LIMIT_REACHED")
+}
+
+// nsec3For builds an NSEC3 in zoneName owned by the hash of name, with an NS bit.
+func nsec3For(name string, zoneName string, salt string, iterations uint16) *dns.NSEC3 {
+	owner := dnsutil.NSEC3Name(dnsutil.Fqdn(name), salt, iterations) + "." + zoneName
+	return nsec3At(owner, salt, iterations, dns.TypeNS, dns.TypeRRSIG)
+}
+
+func TestDS07ReadDenialNSEC3Bound(t *testing.T) {
+	cases := []struct {
+		name    string
+		records []dns.RR
+		want    ds07Delegation
+		limit   bool
+	}{
+		{"at the bound", []dns.RR{nsec3For("a.ns.example", "ns.example", "", 100)}, ds07Delegated, false},
+		{"past the bound", []dns.RR{nsec3For("a.ns.example", "ns.example", "", 101)}, ds07Unproven, true},
+		{"two parameter sets", []dns.RR{nsec3For("a.ns.example", "ns.example", "aa", 1), nsec3For("b.ns.example", "ns.example", "aa", 2)}, ds07Unproven, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, log := scopedContext(t, "DNSSEC07", "a.ns.example")
+			resp := tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(tc.records...))
+			if got, _ := ds07ReadDenial(ctx, dnsname.New("a.ns.example"), resp); got != tc.want {
+				t.Fatalf("delegation = %v, want %v", got, tc.want)
+			}
+			if tc.limit {
+				tctest.RequireLimit(t, log.Entries(), "DNSSEC07", "nsec3_iterations", 100, 101)
+			} else {
+				tctest.RequireNoTag(t, log.Entries(), "LIMIT_REACHED")
+			}
+		})
+	}
+}
+
+func TestDNSSEC20NSEC3PastBoundHasNoBitmap(t *testing.T) {
+	log := logger.New()
+	ctx := logger.WithContext(tctest.Context(t), log)
+	var nsec3param atomic.Int32
+	tctest.NS(t, ctx, "ns1.example", "192.0.2.202", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "DNSKEY":
+			return dnskeyPacket(q.Name, dnssec19P256Key(q.Name))
+		case "NSEC":
+			apex := nsec3For("example", "example", "", 150)
+			apex.TypeBitMap = []uint16{dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG, dns.TypeDNSKEY, dns.TypeNSEC3PARAM}
+			return nsec3Packet(q.Name, apex)
+		case "NSEC3PARAM":
+			nsec3param.Add(1)
+		}
+		return packet.Packet{}
+	})
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{tctest.NSItem("ns1.example", "192.0.2.202")}, nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC20(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec20: %v", err)
+	}
+	tctest.RequireTags(t, entries, "DS20_NO_BITMAP")
+	tctest.RequireLimit(t, log.Entries(), "DNSSEC20", "nsec3_iterations", 100, 150)
+	if n := nsec3param.Load(); n != 0 {
+		t.Errorf("NSEC3PARAM queries = %d, want 0", n)
+	}
 }

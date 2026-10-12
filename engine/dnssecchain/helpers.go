@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -194,33 +195,34 @@ func sigState(sig *dns.RRSIG, rrset []dns.RR, keys []*dns.DNSKEY, at time.Time) 
 	if len(keys) == 0 {
 		return SigUnverified
 	}
-	var matching []*dns.DNSKEY
-	for _, k := range keys {
-		if dnssecutil.KeyTag(k) == sig.KeyTag {
-			matching = append(matching, k)
-		}
-	}
+	matching, _ := dnssecutil.CandidateKeys(sig, keys)
 	if len(matching) == 0 {
 		return SigNoKey
 	}
-	algoUnsupported := false
-	unsupportedKey := false
-	for _, k := range matching {
-		if err := dnssecutil.VerifyRRSIG(sig, rrset, k, at); err == nil {
-			return SigValid
-		} else if errors.Is(err, dns.ErrAlg) {
-			algoUnsupported = true
-		} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
-			unsupportedKey = true // RSA exponent beyond the local verifier
-		}
-	}
-	if algoUnsupported {
+	key, errs := dnssecutil.VerifyCandidates(sig, rrset, matching, at)
+	switch {
+	case key != nil:
+		return SigValid
+	case slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dns.ErrAlg) }):
 		return SigUnsupported
-	}
-	if unsupportedKey {
-		return SigUnsupportedKey
+	case slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) }):
+		return SigUnsupportedKey // RSA exponent beyond the local verifier
 	}
 	return SigBogus
+}
+
+// capRRSIGs keeps the first MaxRRSIGsPerRRset RRSIGs of each owner name.
+func capRRSIGs(sigs []*dns.RRSIG) []*dns.RRSIG {
+	perOwner := map[string]int{}
+	var out []*dns.RRSIG
+	for _, sig := range sigs {
+		owner := canonName(sig.Hdr.Name)
+		perOwner[owner]++
+		if perOwner[owner] <= dnssecutil.MaxRRSIGsPerRRset {
+			out = append(out, sig)
+		}
+	}
+	return out
 }
 
 func dsSetSignature(dsRRs []*dns.DS) string {

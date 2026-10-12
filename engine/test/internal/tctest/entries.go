@@ -105,6 +105,24 @@ func RequireCount(t TB, entries []*logger.Entry, tag string, want int) {
 	}
 }
 
+// RequireLimit fails the test unless one LIMIT_REACHED for bound was logged by testcase with these args.
+func RequireLimit(t TB, entries []*logger.Entry, testcase string, bound string, limit int, count int) {
+	t.Helper()
+	var found []*logger.Entry
+	for _, entry := range All(entries, "LIMIT_REACHED") {
+		if entry.Args["bound"] == bound {
+			found = append(found, entry)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("LIMIT_REACHED %s entries = %d, want 1", bound, len(found))
+	}
+	entry := found[0]
+	if entry.Module != logger.ModuleName || entry.Testcase != testcase || entry.Args["limit"] != limit || entry.Args["count"] != count {
+		t.Fatalf("LIMIT_REACHED = %s/%s %v, want %s/%s limit %d count %d", entry.Module, entry.Testcase, entry.Args, logger.ModuleName, testcase, limit, count)
+	}
+}
+
 // Normalize renders entries as "module:testcase:tag args" strings for comparison.
 func Normalize(entries []*logger.Entry) []string {
 	normalized := make([]string, 0, len(entries))

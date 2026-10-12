@@ -1473,3 +1473,35 @@ func TestDNSSEC22ReferredCutIsNotContendedWithASignerCut(t *testing.T) {
 		t.Errorf("DNSKEY questions = %d, want 0", got)
 	}
 }
+
+// An NSEC3 past the iteration bound, or a second parameter set, decides no cut.
+func TestDNSSEC22CutNSEC3Bound(t *testing.T) {
+	cases := []struct {
+		name    string
+		records []dns.RR
+		want    dnssec22CutStatus
+		limit   bool
+	}{
+		{"at the bound", []dns.RR{nsec3For("ns.example", "example", "", 100)}, dnssec22InsecureCut, false},
+		{"past the bound", []dns.RR{nsec3For("ns.example", "example", "", 101)}, dnssec22Indeterminate, true},
+		{"two parameter sets", []dns.RR{nsec3For("ns.example", "example", "aa", 1), nsec3For("x.example", "example", "aa", 2)}, dnssec22Indeterminate, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, log := scopedContext(t, "DNSSEC22", "example")
+			f := newDS22Fixture(t)
+			f.answers[ds22Key("ns.example", "DS")] = tctest.Wire(t, tctest.Response(
+				tctest.Question("ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(tc.records...)))
+
+			cut := f.walker(t, ctx).cut(ctx, dnsname.New("ns.example"))
+			if cut.status != tc.want {
+				t.Fatalf("status = %d, want %d", cut.status, tc.want)
+			}
+			if tc.limit {
+				tctest.RequireLimit(t, log.Entries(), "DNSSEC22", "nsec3_iterations", 100, 101)
+			} else {
+				tctest.RequireNoTag(t, log.Entries(), "LIMIT_REACHED")
+			}
+		})
+	}
+}

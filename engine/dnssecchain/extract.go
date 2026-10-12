@@ -171,7 +171,7 @@ func (e *extractor) extractParent(ctx context.Context, in Input) {
 		var prof sigProfile
 		parentKeys := parentApexKeys(ctx, ns, in.ParentZone, parentApex)
 		dsRRset := dsRRsetToRR(dsRRs)
-		for _, sig := range coveringRRSIG(resp, dns.TypeDS, parentApex, "answer") {
+		for _, sig := range capRRSIGs(coveringRRSIG(resp, dns.TypeDS, parentApex, "answer")) {
 			state := sigState(sig, dsRRset, parentKeys, e.at)
 			e.addRRSIG(&e.summary.Parent.DSRRSIG, sig, state, ip)
 			prof.add("DS", sig, state)
@@ -218,7 +218,7 @@ func (e *extractor) extractChild(ctx context.Context, in Input) {
 
 		var prof sigProfile
 		keyRRset := keysToRR(keyRRs)
-		for _, sig := range coveringRRSIG(resp, dns.TypeDNSKEY, zoneName, "answer") {
+		for _, sig := range capRRSIGs(coveringRRSIG(resp, dns.TypeDNSKEY, zoneName, "answer")) {
 			state := sigState(sig, keyRRset, keyRRs, e.at)
 			e.addRRSIG(&e.summary.Child.DNSKEYRRSIG, sig, state, ip)
 			prof.add("DNSKEY", sig, state)
@@ -237,7 +237,7 @@ func (e *extractor) extractChild(ctx context.Context, in Input) {
 			if _, seen := e.signedTTL[zt.name]; !seen {
 				e.signedTTL[zt.name] = rrs[0].Header().TTL
 			}
-			for _, sig := range coveringRRSIG(zresp, zt.rrtype, zoneName, zt.section) {
+			for _, sig := range capRRSIGs(coveringRRSIG(zresp, zt.rrtype, zoneName, zt.section)) {
 				state := sigState(sig, rrsetForOwner(rrs, sig.Hdr.Name), keyRRs, e.at)
 				e.addSignedRRSIG(zt.name, sig, state, ip)
 				prof.add(zt.name, sig, state)

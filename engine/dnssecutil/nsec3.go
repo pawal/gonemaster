@@ -8,8 +8,8 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 )
 
-// NSEC3MaxIterations is the highest iteration count hashed, the insecure limit of RFC 9276 Appendix A.
-const NSEC3MaxIterations = 100
+// NSEC3MaxIterations is the highest iteration count hashed, below the insecure limit of RFC 9276 Appendix A.
+const NSEC3MaxIterations = 50
 
 // nsec3Name is the hash function, replaced in tests.
 var nsec3Name = dnsutil.NSEC3Name

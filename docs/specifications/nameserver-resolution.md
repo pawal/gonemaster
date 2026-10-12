@@ -209,6 +209,6 @@ bound. The Edge Cases of each testcase state the effect on its verdicts.
 
 | Bound | Value | Testcases |
 |---|---|---|
-| `nsec3_iterations` | 100 | DNSSEC07, DNSSEC20, DNSSEC22 |
+| `nsec3_iterations` | 50 | DNSSEC07, DNSSEC20, DNSSEC22 |
 | `keys_per_tag` | 4 | DNSSEC02, DNSSEC07, DNSSEC08, DNSSEC09, DNSSEC10, DNSSEC16, DNSSEC17, DNSSEC21, DNSSEC22, DNSSEC24 |
 | `rrsigs_per_rrset` | 8 | DNSSEC02, DNSSEC07, DNSSEC08, DNSSEC09, DNSSEC10, DNSSEC16, DNSSEC17, DNSSEC21, DNSSEC22, DNSSEC24 |

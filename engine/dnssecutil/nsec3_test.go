@@ -17,10 +17,10 @@ func TestNSEC3HashesBound(t *testing.T) {
 			t.Errorf("Hash(%s) = %q, %v; want the RFC 5155 hash", name, got, ok)
 		}
 	}
-	if _, ok := h.Hash("example", "", dnssecutil.NSEC3MaxIterations); !ok {
+	if _, ok := h.Hash("example", "", 50); !ok {
 		t.Error("hash at the bound refused")
 	}
-	if got, ok := h.Hash("example", "", dnssecutil.NSEC3MaxIterations+1); ok || got != "" {
+	if got, ok := h.Hash("example", "", 51); ok || got != "" {
 		t.Errorf("Hash above the bound = %q, %v; want \"\", false", got, ok)
 	}
 	var none *dnssecutil.NSEC3Hashes

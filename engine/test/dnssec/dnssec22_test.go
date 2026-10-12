@@ -1482,8 +1482,8 @@ func TestDNSSEC22CutNSEC3Bound(t *testing.T) {
 		want    dnssec22CutStatus
 		limit   bool
 	}{
-		{"at the bound", []dns.RR{nsec3For("ns.example", "example", "", 100)}, dnssec22InsecureCut, false},
-		{"past the bound", []dns.RR{nsec3For("ns.example", "example", "", 101)}, dnssec22Indeterminate, true},
+		{"at the bound", []dns.RR{nsec3For("ns.example", "example", "", 50)}, dnssec22InsecureCut, false},
+		{"past the bound", []dns.RR{nsec3For("ns.example", "example", "", 51)}, dnssec22Indeterminate, true},
 		{"two parameter sets", []dns.RR{nsec3For("ns.example", "example", "aa", 1), nsec3For("x.example", "example", "aa", 2)}, dnssec22Indeterminate, false},
 	}
 	for _, tc := range cases {
@@ -1498,7 +1498,7 @@ func TestDNSSEC22CutNSEC3Bound(t *testing.T) {
 				t.Fatalf("status = %d, want %d", cut.status, tc.want)
 			}
 			if tc.limit {
-				tctest.RequireLimit(t, log.Entries(), "DNSSEC22", "nsec3_iterations", 100, 101)
+				tctest.RequireLimit(t, log.Entries(), "DNSSEC22", "nsec3_iterations", 50, 51)
 			} else {
 				tctest.RequireNoTag(t, log.Entries(), "LIMIT_REACHED")
 			}

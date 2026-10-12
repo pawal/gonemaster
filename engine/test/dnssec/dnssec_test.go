@@ -7220,8 +7220,8 @@ func TestDS07ReadDenialNSEC3Bound(t *testing.T) {
 		want    ds07Delegation
 		limit   bool
 	}{
-		{"at the bound", []dns.RR{nsec3For("a.ns.example", "ns.example", "", 100)}, ds07Delegated, false},
-		{"past the bound", []dns.RR{nsec3For("a.ns.example", "ns.example", "", 101)}, ds07Unproven, true},
+		{"at the bound", []dns.RR{nsec3For("a.ns.example", "ns.example", "", 50)}, ds07Delegated, false},
+		{"past the bound", []dns.RR{nsec3For("a.ns.example", "ns.example", "", 51)}, ds07Unproven, true},
 		{"two parameter sets", []dns.RR{nsec3For("a.ns.example", "ns.example", "aa", 1), nsec3For("b.ns.example", "ns.example", "aa", 2)}, ds07Unproven, false},
 	}
 	for _, tc := range cases {
@@ -7232,7 +7232,7 @@ func TestDS07ReadDenialNSEC3Bound(t *testing.T) {
 				t.Fatalf("delegation = %v, want %v", got, tc.want)
 			}
 			if tc.limit {
-				tctest.RequireLimit(t, log.Entries(), "DNSSEC07", "nsec3_iterations", 100, 101)
+				tctest.RequireLimit(t, log.Entries(), "DNSSEC07", "nsec3_iterations", 50, 51)
 			} else {
 				tctest.RequireNoTag(t, log.Entries(), "LIMIT_REACHED")
 			}
@@ -7249,7 +7249,7 @@ func TestDNSSEC20NSEC3PastBoundHasNoBitmap(t *testing.T) {
 		case "DNSKEY":
 			return dnskeyPacket(q.Name, dnssec19P256Key(q.Name))
 		case "NSEC":
-			apex := nsec3For("example", "example", "", 150)
+			apex := nsec3For("example", "example", "", 51)
 			apex.TypeBitMap = []uint16{dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG, dns.TypeDNSKEY, dns.TypeNSEC3PARAM}
 			return nsec3Packet(q.Name, apex)
 		case "NSEC3PARAM":
@@ -7273,7 +7273,7 @@ func TestDNSSEC20NSEC3PastBoundHasNoBitmap(t *testing.T) {
 		t.Fatalf("dnssec20: %v", err)
 	}
 	tctest.RequireTags(t, entries, "DS20_NO_BITMAP")
-	tctest.RequireLimit(t, log.Entries(), "DNSSEC20", "nsec3_iterations", 100, 150)
+	tctest.RequireLimit(t, log.Entries(), "DNSSEC20", "nsec3_iterations", 50, 51)
 	if n := nsec3param.Load(); n != 0 {
 		t.Errorf("NSEC3PARAM queries = %d, want 0", n)
 	}

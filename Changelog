@@ -4,14 +4,20 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- dnssecutil: export `NSEC3Hashes`, `NSEC3Usable`, `CandidateKeys` and `VerifyCandidates`
+
 ### Fixed
 
 - dnssecutil: RSA keys of 512 to 1023 bits verify, as RFC 3110 permits
 - engine: a nested special-purpose block, such as AS112-v6 in `2001::/23`, decides reachability
+- dnssec02: each key's RRSIGs are verified once, not once per DS record
 
 ### Security
 
 - engine: addresses in `fec0::/10` and `::/96` are not queried
+- engine: DNSSEC tests stop at 100 NSEC3 iterations, 4 keys per key tag and 8 RRSIGs per RRset
 - deps: bump golang.org/x/net to v0.60.0 for HTTP/2 advisories
 
 ## [v1.7.21] - 2026-10-11

@@ -55,8 +55,9 @@ These are part of the profile but configured elsewhere:
 - `net.allow_non_global_targets` - default `false`. When `false` (the default), the
   engine refuses to send queries or zone transfers to nameserver addresses that are not
   globally reachable (loopback, RFC1918, CGNAT, link-local, ULA, documentation,
-  benchmarking, and similar IANA special-purpose ranges, multicast, and NAT64 or
-  IPv4-compatible forms of such IPv4 addresses), even when learned from glue or DNS
+  benchmarking, and similar IANA special-purpose ranges, multicast, the deprecated
+  site-local `fec0::/10` and IPv4-compatible `::/96` ranges, and NAT64 forms of
+  such IPv4 addresses), even when learned from glue or DNS
   resolution, and emits a `NON_GLOBAL_QUERY_BLOCKED` notice instead. The same rule
   applies to the RIPE whois sources of `asndb`: a source address that is not globally
   reachable is skipped without a notice, as an unreachable source is. Set `true` (CLI

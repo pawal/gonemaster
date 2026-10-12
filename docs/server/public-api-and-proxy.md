@@ -174,11 +174,13 @@ addresses the engine learns later from parent glue or from resolving a
 nameserver name. A second, deeper guard runs at query time: the engine refuses
 to send a DNS query or a zone transfer to an address that is not globally
 reachable, and emits a `NON_GLOBAL_QUERY_BLOCKED` notice instead. An address is
-not globally reachable when it is in an IANA special-purpose range not marked
-globally reachable (loopback, RFC 1918, CGNAT, link-local, ULA, documentation,
-benchmarking, and similar), when it is multicast, or when it is a NAT64
-well-known prefix address (`64:ff9b::/96`, RFC 6052) or an IPv4-compatible
-address (`::a.b.c.d`) whose IPv4 address is not globally reachable. A blocked
+not globally reachable when the most specific IANA special-purpose range that
+contains it is not marked globally reachable (loopback, RFC 1918, CGNAT,
+link-local, ULA, documentation, benchmarking, and similar), when it is
+multicast, when it is in the deprecated site-local range (`fec0::/10`,
+RFC 3879) or IPv4-compatible range (`::/96`, RFC 4291 section 2.5.5.1), or when
+it is a NAT64 well-known prefix address (`64:ff9b::/96`, RFC 6052) whose IPv4
+address is not globally reachable. A blocked
 query reads no answer from the cache that concurrent and recent runs share. The
 same guard applies to the TCP connection to each RIPE whois source of the
 profile `asn_db`: a source that resolves only to such addresses is skipped.

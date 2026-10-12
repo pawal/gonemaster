@@ -44,25 +44,24 @@ func NotQueryableReason(ip netip.Addr) string {
 	if ip.IsMulticast() {
 		return "Multicast"
 	}
-	if v4, ok := embeddedIPv4(ip); ok {
-		if reason := NotQueryableReason(v4); reason != "" {
+	for _, block := range deprecatedIPv6 {
+		if block.Prefix.Contains(ip) {
+			return block.Name
+		}
+	}
+	if nat64WellKnown.Contains(ip) {
+		b := ip.As16()
+		if reason := NotQueryableReason(netip.AddrFrom4([4]byte(b[12:]))); reason != "" {
 			return "embedded " + reason
 		}
 	}
 	return ""
 }
 
-var (
-	nat64WellKnown = netip.MustParsePrefix("64:ff9b::/96")
-	ipv4Compatible = netip.MustParsePrefix("::/96")
-)
+var nat64WellKnown = netip.MustParsePrefix("64:ff9b::/96")
 
-// embeddedIPv4 returns the IPv4 address in the low 32 bits of a NAT64 well-known
-// prefix address (RFC 6052) or an IPv4-compatible address (RFC 4291).
-func embeddedIPv4(ip netip.Addr) (netip.Addr, bool) {
-	if !nat64WellKnown.Contains(ip) && !ipv4Compatible.Contains(ip) {
-		return netip.Addr{}, false
-	}
-	b := ip.As16()
-	return netip.AddrFrom4([4]byte(b[12:])), true
+// Deprecated IPv6 ranges absent from the special-purpose registry.
+var deprecatedIPv6 = []SpecialIPBlock{
+	{Prefix: netip.MustParsePrefix("fec0::/10"), Name: "Site-Local (deprecated)", Reference: "[RFC3879]", GloballyReachable: "False"},
+	{Prefix: netip.MustParsePrefix("::/96"), Name: "IPv4-Compatible (deprecated)", Reference: "[RFC4291]", GloballyReachable: "False"},
 }

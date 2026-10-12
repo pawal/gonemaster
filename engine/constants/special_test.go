@@ -87,7 +87,7 @@ func TestIsQueryableEmbeddedIPv4(t *testing.T) {
 		{"64:ff9b::c0a8:101", false},
 		{"64:ff9b::c612:1", false},
 		{"64:ff9b:1::a00:1", false},
-		{"::8.8.8.8", true},
+		{"::8.8.8.8", false},
 		{"::10.0.0.1", false},
 		{"::192.168.1.1", false},
 		{"::198.18.0.1", false},
@@ -115,6 +115,8 @@ func TestNotQueryableReason(t *testing.T) {
 		"10.0.0.1":       "Private-Use",
 		"224.0.0.1":      "Multicast",
 		"64:ff9b::a00:1": "embedded Private-Use",
+		"fec0::1":        "Site-Local (deprecated)",
+		"::8.8.8.8":      "IPv4-Compatible (deprecated)",
 	} {
 		if got := NotQueryableReason(netip.MustParseAddr(addr)); got != want {
 			t.Errorf("NotQueryableReason(%s) = %q, want %q", addr, got, want)

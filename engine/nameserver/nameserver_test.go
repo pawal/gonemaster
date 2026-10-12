@@ -1721,6 +1721,23 @@ func TestNonGlobalQueryGuard(t *testing.T) {
 	}
 }
 
+// dnsviz2 queries with no profile in the context and relies on the embedded default.
+func TestDnsviz2NonGlobalGuardWithoutProfile(t *testing.T) {
+	log := logger.New()
+	ctx := WithCache(logger.WithContext(t.Context(), log), NewCacheStore())
+	timeout := 10 * time.Millisecond
+	resp, err := newNS(t, ctx, "ns.example", "10.1.2.3").QueryWithOptions(ctx, "example.com", "SOA", &QueryOptions{Timeout: &timeout})
+	if err != nil || resp.Msg != nil {
+		t.Errorf("got msg=%v err=%v, want neither", resp.Msg != nil, err)
+	}
+	if !dnstest.HasTag(log.Entries(), "NON_GLOBAL_QUERY_BLOCKED") {
+		t.Error("NON_GLOBAL_QUERY_BLOCKED not logged")
+	}
+	if dnstest.HasTag(log.Entries(), "EXTERNAL_QUERY") {
+		t.Error("blocked query emitted EXTERNAL_QUERY")
+	}
+}
+
 func TestNonGlobalAXFRGuard(t *testing.T) {
 	const blockTag = "NON_GLOBAL_QUERY_BLOCKED"
 	axfr := func(ctx context.Context, addr string) (bool, error) {

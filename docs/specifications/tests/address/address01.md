@@ -23,7 +23,7 @@ Status: Final
 3. Merge the two result sets, keep only entries with an address, and deduplicate by lowercase `name/ip`.
 4. If no addressed nameserver remains, emit `A01_NO_NAME_SERVERS_FOUND`, emit `TEST_CASE_END`, and return.
 5. Group items by IP address, then iterate IP groups in lexicographic IP string order.
-6. For each IP group, classify by special-address category:
+6. For each IP group, classify by the category of the most specific special-purpose block that contains the address, that is the longest matching prefix; a broader block defers to a more specific entry (RFC 6890 sections 2.2.2 and 2.2.3):
    - Documentation category -> add all `name/ip` pairs in group to documentation set.
    - Local-use categories (`Private-Use`, `Loopback`, `Link Local`, `Link-Local`, `Unique-Local`, `Shared Address Space`) -> add to local-use set.
    - Any other non-globally-reachable special range -> add to not-globally-reachable set.
@@ -50,7 +50,7 @@ addressed NS count
  +- nonzero -> group by Address.String(); iterate IP keys in lex order
                  |
                  v
-              FindSpecialAddress(ip)  (constants.FindSpecialAddress on group[0])
+              FindSpecialAddress(ip)  (longest prefix, on group[0])
                 +- no special-purpose block         -> globallyReachable
                 +- block.Name contains "Documentation" -> documentationAddr
                 +- isLocalUseCategory(block.Name)   -> localUseAddr
@@ -137,4 +137,5 @@ After classification, emit in fixed order:
 - The testcase ignores nameserver entries that lack resolved IP addresses.
 - If all discovered addresses are reserved/non-global, `A01_NO_GLOBALLY_REACHABLE_ADDR` can be emitted together with one or more category error tags.
 - Multiple nameserver names sharing one IP are preserved as distinct `name/ip` entries in output lists.
+- An address in a block nested inside a broader one, such as AS112-v6 (`2001:4:112::/48`) inside IETF Protocol Assignments (`2001::/23`), is classified by the nested block and its globally reachable flag.
 

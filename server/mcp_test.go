@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -151,23 +152,24 @@ func TestMCPEndpointLatestForReadsTheStore(t *testing.T) {
 type lockedBuffer struct {
 	mu    sync.Mutex
 	buf   bytes.Buffer
-	await string
+	await func(log string) bool
 	once  sync.Once
 	seen  chan struct{}
 }
 
-// awaitingBuffer is a lockedBuffer that closes seen on the first Write containing substr.
-func awaitingBuffer(substr string) *lockedBuffer {
-	return &lockedBuffer{await: substr, seen: make(chan struct{})}
+// awaitingBuffer is a lockedBuffer that closes seen once done holds for its contents.
+func awaitingBuffer(done func(log string) bool) *lockedBuffer {
+	return &lockedBuffer{await: done, seen: make(chan struct{})}
 }
 
 func (b *lockedBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.seen != nil && bytes.Contains(p, []byte(b.await)) {
+	n, err := b.buf.Write(p)
+	if b.await != nil && b.await(b.buf.String()) {
 		b.once.Do(func() { close(b.seen) })
 	}
-	return b.buf.Write(p)
+	return n, err
 }
 
 func (b *lockedBuffer) String() string {
@@ -176,8 +178,28 @@ func (b *lockedBuffer) String() string {
 	return b.buf.String()
 }
 
+// accessLogIDs maps each logged path to its request ids, in log order.
+func accessLogIDs(log string) map[string][]string {
+	ids := map[string][]string{}
+	for line := range strings.SplitSeq(log, "\n") {
+		var rec struct {
+			Path      string `json:"path"`
+			RequestID string `json:"request_id"`
+		}
+		if json.Unmarshal([]byte(line), &rec) != nil || rec.Path == "" || rec.RequestID == "" {
+			continue
+		}
+		ids[rec.Path] = append(ids[rec.Path], rec.RequestID)
+	}
+	return ids
+}
+
 func TestMCPEndpointSharesTheRequestID(t *testing.T) {
-	logs := awaitingBuffer(`"path":"/api/v1/mcp"`)
+	logs := awaitingBuffer(func(log string) bool {
+		ids := accessLogIDs(log)
+		runs := ids["/api/v1/runs"]
+		return len(runs) == 1 && slices.Contains(ids["/api/v1/mcp"], runs[0])
+	})
 	srv := newTestServer(t, withMCP(false), withLogTo(logs, "info"))
 	session, ctx := mcpSession(t, srv, "")
 	if _, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "latest_for", Arguments: map[string]any{"domain": "example.se"}}); err != nil {
@@ -187,27 +209,7 @@ func TestMCPEndpointSharesTheRequestID(t *testing.T) {
 	select {
 	case <-logs.seen:
 	case <-time.After(2 * time.Second):
-		t.Fatal("no access log line for /api/v1/mcp within 2s")
-	}
-
-	ids := map[string]string{}
-	for _, line := range strings.Split(logs.String(), "\n") {
-		var rec struct {
-			Path      string `json:"path"`
-			RequestID string `json:"request_id"`
-		}
-		if json.Unmarshal([]byte(line), &rec) != nil || rec.RequestID == "" {
-			continue
-		}
-		if rec.Path == "/api/v1/mcp" || rec.Path == "/api/v1/runs" {
-			ids[rec.Path] = rec.RequestID
-		}
-	}
-	if ids["/api/v1/mcp"] == "" || ids["/api/v1/runs"] == "" {
-		t.Fatalf("expected access log lines for the endpoint and the inner call, got %v", ids)
-	}
-	if ids["/api/v1/mcp"] != ids["/api/v1/runs"] {
-		t.Fatalf("request ids differ: %v", ids)
+		t.Fatalf("no /api/v1/mcp line shares the /api/v1/runs request id within 2s: %v", accessLogIDs(logs.String()))
 	}
 }
 

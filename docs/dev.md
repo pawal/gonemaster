@@ -220,7 +220,9 @@ func main() {
   ID (RFC 5452 section 9.2). A reply whose question differs from the query
   in name, ignoring ASCII case, or in type or class is invalid (RFC 5452
   section 9.1) and fails the attempt; a reply without a question section is
-  accepted.
+  accepted. A caller outside the engine, such as dnsviz2, builds its query
+  with `transport.BuildQuery` and sends it with `transport.Client.Exchange`;
+  the ID and the question check hold on that path, and it MUST keep them.
 - Query timing and fallback behavior can be tuned with:
   - `resolver.defaults.timeout` (`--timeout`, seconds per attempt)
   - `resolver.defaults.retry` (`--retry`, retry count)

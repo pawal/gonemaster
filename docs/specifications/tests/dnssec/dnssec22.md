@@ -487,6 +487,12 @@ Scoring takes the severity default in the `dnssec` dimension. No
 - A zone whose NSEC3 chain uses more than 100 iterations yields no zone cut
   status from its denials: a name that rests on such a denial is
   `indeterminate` and yields no finding. DNSSEC03 reports the iteration count.
+- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY
+  past the first 4 with the key tag of an RRSIG is not tried. A zone whose
+  only valid signature or only verifying key lies past a cut is reported from
+  what was considered: an RRSIG that no considered key verifies is `broken` in
+  the zone cut walk and yields `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` at
+  a name.
 
 ## Implementation Notes
 Implementation-defined choices, none of them mandated by the protocol:
@@ -522,6 +528,15 @@ Implementation-defined choices, none of them mandated by the protocol:
   DNSSEC testcases.
 - The name set is the delegation. The SOA MNAME is not evaluated, although an
   in-domain MNAME carries the same failure.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are
+  considered, and at most 4 DNSKEYs with the key tag of an RRSIG are tried for
+  it, each in response order. RFC 4035 section 5.3.1 requires trying every
+  DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034
+  Appendix B), so a zone chooses how many keys match, and the caps depart from
+  that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset`
+  or `keys_per_tag`, once per testcase
+  ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG
+  is verified over one copy of the RRset.
 
 ## Evidence In Gonemaster
 - Code paths:

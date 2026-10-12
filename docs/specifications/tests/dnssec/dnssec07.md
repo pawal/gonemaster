@@ -274,6 +274,11 @@ emit TEST_CASE_END
 - A parent whose NSEC3 chain uses more than 100 iterations reaches no
   `DS07_PARENT_PROVES_NO_DELEGATION` verdict. DNSSEC03 reports the count when
   the parent zone is tested.
+- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY
+  past the first 4 with the key tag of an RRSIG is not tried. A zone whose
+  only valid signature or only verifying key lies past a cut is reported from
+  what was considered: the anchoring check of step 10 fails and no
+  `DS07_PARENT_PROVES_NO_DELEGATION` verdict is reached.
 
 ## Implementation Notes
 - NSEC3 hashing is bounded at 100 iterations, the insecure limit RFC 9276
@@ -282,3 +287,12 @@ emit TEST_CASE_END
   testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)).
 - Hashes are memoized per name, salt and iteration count for one run of the
   testcase.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are
+  considered, and at most 4 DNSKEYs with the key tag of an RRSIG are tried for
+  it, each in response order. RFC 4035 section 5.3.1 requires trying every
+  DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034
+  Appendix B), so a zone chooses how many keys match, and the caps depart from
+  that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset`
+  or `keys_per_tag`, once per testcase
+  ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG
+  is verified over one copy of the RRset.

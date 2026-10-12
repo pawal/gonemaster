@@ -185,3 +185,7 @@ emit TEST_CASE_END
 - Delete semantics short-circuit further CDNSKEY validation for that nameserver.
 - Non-zone CDNSKEY records are flagged and then skipped from subsequent matching/signing checks for that record.
 - Nameserver evaluation is deduplicated by IP.
+- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS17_CDNSKEY_INVALID_RRSIG`.
+
+## Implementation Notes
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset.

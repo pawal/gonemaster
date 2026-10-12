@@ -183,6 +183,10 @@ The child zone operator cannot fix a parent-zone signing failure, so DNSSEC21 re
 - Verification reuses the existing `verifyRRSIG(sig, rrset, dnskey, at)` helper and the existing supported-algorithm policy. No new crypto is introduced.
 - The DS query is the same query already issued by DNSSEC02 and DNSSEC07 against the parent. In a full test run the response is served from the per-nameserver query cache and adds no extra network traffic. The parent DNSKEY query is a single new query per parent NS IP (cached on subsequent testcases).
 - DNSSEC21 does not validate the chain *above* the parent (parent's own DS at grandparent, root trust anchor). The goal is bounded to the parent->child link, which is the link broken in the .de incident.
+- An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY`.
+
+## Implementation Notes
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset.
 
 ## Evidence In Gonemaster
 - Code paths (when implemented):

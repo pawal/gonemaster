@@ -116,6 +116,34 @@ func SignRRset(t testing.TB, kp Keypair, rrset []dns.RR, owner string, signer st
 	return sig
 }
 
+// SameTagKeys returns n keys that share the key tag of key and verify nothing.
+func SameTagKeys(t testing.TB, key *dns.DNSKEY, n int) []*dns.DNSKEY {
+	t.Helper()
+	pub, err := base64.StdEncoding.DecodeString(key.PublicKey)
+	if err != nil || len(pub) < 4 {
+		t.Fatalf("decode key: %v", err)
+	}
+	var out []*dns.DNSKEY
+	for d := 1; len(out) < n; d++ {
+		// Moving d between the first two 16-bit words keeps the checksum.
+		hi, lo := int(pub[0])<<8|int(pub[1])+d, int(pub[2])<<8|int(pub[3])-d
+		if hi > 0xffff || lo < 0 {
+			t.Fatalf("no room for same-tag key %d", d)
+		}
+		b := append([]byte{byte(hi >> 8), byte(hi), byte(lo >> 8), byte(lo)}, pub[4:]...)
+		decoy, ok := key.Clone().(*dns.DNSKEY)
+		if !ok {
+			t.Fatal("clone changed type")
+		}
+		decoy.PublicKey = base64.StdEncoding.EncodeToString(b)
+		if dnssecutil.KeyTag(decoy) != dnssecutil.KeyTag(key) {
+			t.Fatalf("same-tag key %d has tag %d, want %d", d, dnssecutil.KeyTag(decoy), dnssecutil.KeyTag(key))
+		}
+		out = append(out, decoy)
+	}
+	return out
+}
+
 // RSADNSKEY builds an RSASHA256 DNSKEY carrying a captured public key.
 func RSADNSKEY(owner string, flags uint16, pub string) *dns.DNSKEY {
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}

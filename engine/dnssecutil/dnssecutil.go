@@ -164,34 +164,60 @@ func RSAExponentBeyondLocalVerifier(key *dns.DNSKEY) bool {
 }
 
 // VerifyRRSIG checks the signature against the RRset and key at the given time.
-func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) (err error) {
-	if sig == nil || key == nil {
-		return errors.New("missing rrsig or key")
+func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) error {
+	if key == nil {
+		return errMissing
 	}
-	if !sig.ValidPeriod(at) {
-		return errors.New("rrsig not valid at time")
+	if _, errs := VerifyCandidates(sig, rrset, []*dns.DNSKEY{key}, at); len(errs) > 0 {
+		return errs[0]
 	}
+	return nil
+}
+
+var (
+	errMissing    = errors.New("missing rrsig or key")
+	errOutOfRange = errors.New("rrsig not valid at time")
+)
+
+// cloneRRset copies rrset; verification canonicalizes in place.
+func cloneRRset(rrset []dns.RR) (copies []dns.RR, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("dns library panic during RRSIG verification: %v", r)
 		}
 	}()
-	// Verification canonicalizes in place, and cached records are shared between
-	// concurrent runs, so verify on copies.
-	local := *sig
-	keyCopy, ok := key.Clone().(*dns.DNSKEY)
-	if !ok {
-		return errors.New("dnskey copy changed type")
-	}
-	copies := make([]dns.RR, 0, len(rrset))
+	copies = make([]dns.RR, 0, len(rrset))
 	for _, rr := range rrset {
 		if rr == nil {
 			continue
 		}
 		copies = append(copies, rr.Clone())
 	}
+	return copies, nil
+}
+
+// verifyCopy verifies sig over copies, already cloned, with key.
+func verifyCopy(sig *dns.RRSIG, copies []dns.RR, key *dns.DNSKEY) (err error) {
+	if key == nil {
+		return errMissing
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("dns library panic during RRSIG verification: %v", r)
+		}
+	}()
+	local := *sig
+	keyCopy, ok := key.Clone().(*dns.DNSKEY)
+	if !ok {
+		return errors.New("dnskey copy changed type")
+	}
 	if RSAExponentBeyondLocalVerifier(key) || rsaModulusBelowLibrary(key) {
-		return verifyLargeExponentRSA(&local, copies, keyCopy)
+		// This path rewrites owner names without restoring them.
+		fresh, err := cloneRRset(copies)
+		if err != nil {
+			return err
+		}
+		return verifyLargeExponentRSA(&local, fresh, keyCopy)
 	}
 	// The hook shares the library's default branch with every unverifiable
 	// algorithm, so attaching it for those would turn ErrAlg into ErrSig.

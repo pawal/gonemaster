@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"slices"
 	"sort"
@@ -535,8 +536,13 @@ func deriveRunDomainSummary(input RunInput, endpoints []extractedEndpoint, addre
 func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoint {
 	unresolvedNSSet := unresolvedNSNames(input.Entries)
 	seen := map[string]extractedEndpoint{}
+	tooLong := 0
 	add := func(item extractedEndpoint) {
 		if item.nameserver == "" {
+			return
+		}
+		if len(item.nameserver) > maxNameserverNameLen {
+			tooLong++
 			return
 		}
 		// Address may be empty when this is a synthetic delegation-only
@@ -697,6 +703,10 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		}
 	}
 
+	if tooLong > 0 {
+		slog.Default().Warn("analysis projection skips nameserver names over 255 characters",
+			"run_id", input.Run.ID, "skipped", tooLong)
+	}
 	out := make([]extractedEndpoint, 0, len(seen))
 	for _, item := range seen {
 		out = append(out, item)
@@ -1096,6 +1106,9 @@ func MatchAnalysisEnabledCohorts(domainTags []string, cohorts []serverpkg.Analys
 
 	return matched
 }
+
+// maxNameserverNameLen is the width of the nameserver name columns.
+const maxNameserverNameLen = 255
 
 func normalizeNameserverName(name string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(name)), ".")

@@ -285,6 +285,10 @@ func (s *fakeStore) UpsertAnalysisNameserver(name string, seenAt time.Time) (ser
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
+	// The VARCHAR(255) column refuses a longer name on PostgreSQL and MariaDB.
+	if len(name) > 255 {
+		return serverpkg.AnalysisNameserver{}, fmt.Errorf("value too long for type character varying(255)")
+	}
 	if item, ok := s.nameserversByName[name]; ok {
 		item.FirstSeenAt = minTestTime(item.FirstSeenAt, seenAt)
 		item.LastSeenAt = maxTestTime(item.LastSeenAt, seenAt)
@@ -1544,6 +1548,39 @@ func TestProjectorExtractAddressFacts(t *testing.T) {
 	third := byAddress["192.0.2.55"]
 	if third.status != "unknown" || third.asn != nil || third.prefix != "" {
 		t.Fatalf("unexpected address-only fact: %+v", third)
+	}
+}
+
+func TestProjectorSkipsOverlongNameserverName(t *testing.T) {
+	long := strings.Repeat(strings.Repeat("a", 63)+".", 4) + "example"
+	run := serverpkg.Run{
+		ID:         "run-long",
+		DomainID:   404,
+		Domain:     "example.test",
+		Status:     serverpkg.JobSucceeded,
+		FinishedAt: time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC),
+		NameserverTimings: []serverpkg.NameserverTiming{
+			{Nameserver: "ns1.example.test", Address: "192.0.2.10", AvgMS: 11, Count: 1},
+			{Nameserver: long, Address: "192.0.2.11", AvgMS: 12, Count: 1},
+		},
+	}
+	store := &fakeStore{
+		runs:    map[string]serverpkg.Run{run.ID: run},
+		tags:    map[int64][]string{run.DomainID: {"tld"}},
+		cohorts: []serverpkg.AnalysisCohort{{ID: 10, SourceType: "tag", SourceTag: "tld", AnalysisEnabled: true}},
+	}
+
+	if err := NewProjector(store).ProjectRun(run.ID); err != nil {
+		t.Fatalf("ProjectRun: %v", err)
+	}
+	if _, ok := store.states[projectionKey(10, run.ID)]; !ok {
+		t.Error("run not recorded as projected")
+	}
+	if _, ok := store.nameserversByName[long]; ok {
+		t.Errorf("overlong name of %d characters was stored", len(long))
+	}
+	if _, ok := store.nameserversByName["ns1.example.test"]; !ok {
+		t.Error("ns1.example.test missing")
 	}
 }
 

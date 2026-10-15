@@ -51,8 +51,15 @@ func (c *Client) WithHints(tokenHint, urlHint string) *Client {
 	return c
 }
 
-// BaseURL is the normalized admin API base.
-func (c *Client) BaseURL() string { return c.baseURL }
+// BaseURL is the normalized admin API base without user information.
+func (c *Client) BaseURL() string {
+	u, err := url.Parse(c.baseURL)
+	if err != nil || u.User == nil {
+		return c.baseURL
+	}
+	u.User = nil
+	return u.String()
+}
 
 // normalizeBaseURL ensures the URL ends in the /api/v1 admin prefix.
 func normalizeBaseURL(raw string) (string, error) {

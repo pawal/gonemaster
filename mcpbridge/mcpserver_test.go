@@ -121,6 +121,15 @@ func tokenMode(token string) apitest.Opts {
 	return apitest.Opts{WhoamiMode: "token", RequireToken: token}
 }
 
+func TestPingHidesUserinfo(t *testing.T) {
+	srv := apitest.New(t, apitest.Opts{})
+	withUser := strings.Replace(srv.URL, "http://", "http://gm:s3cret@", 1)
+	out := callPing(t, clientFor(t, withUser, ""))
+	if want := srv.URL + "/api/v1"; out.ServerURL != want {
+		t.Errorf("server_url = %q, want %q", out.ServerURL, want)
+	}
+}
+
 func TestPingOpenMode(t *testing.T) {
 	out := callPing(t, fakeAPI(t, apitest.Opts{}))
 	if !out.Reachable {

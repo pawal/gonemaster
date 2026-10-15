@@ -147,7 +147,7 @@ func registerPing(srv *mcp.Server, api *Client) {
 		Description: "Check connectivity to gonemaster-server and report its auth mode and whether this bridge is authenticated.",
 		Annotations: readOnly("Ping gonemaster-server"),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ pingInput) (*mcp.CallToolResult, pingOutput, error) {
-		out := pingOutput{ServerURL: api.baseURL}
+		out := pingOutput{ServerURL: api.BaseURL()}
 		who, err := api.whoami(ctx)
 		if err != nil {
 			out.Detail = api.pingFailure(err)
@@ -169,7 +169,7 @@ func registerPing(srv *mcp.Server, api *Client) {
 func (c *Client) pingFailure(err error) string {
 	var he *httpError
 	if errors.As(err, &he) {
-		return fmt.Sprintf("%s/whoami answered http %d: not a gonemaster-server admin API, %s", c.baseURL, he.status, c.urlHint)
+		return fmt.Sprintf("%s/whoami answered http %d: not a gonemaster-server admin API, %s", c.BaseURL(), he.status, c.urlHint)
 	}
 	return "gonemaster-server unreachable: " + err.Error()
 }

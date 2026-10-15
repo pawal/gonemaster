@@ -33,13 +33,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         }
       ]
@@ -60,13 +60,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         }
       ]
@@ -87,13 +87,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "int"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "int"
         }
       ]
@@ -140,49 +140,49 @@
         {
           "tag": "CACHE_CREATED",
           "file": "engine/nameserver/nameserver.go",
-          "line": 107,
+          "line": 109,
           "shape": "unknown"
         },
         {
           "tag": "CACHE_FETCHED",
           "file": "engine/nameserver/nameserver.go",
-          "line": 109,
+          "line": 111,
           "shape": "unknown"
         },
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 504,
+          "line": 506,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "string"
         },
         {
           "tag": "NON_GLOBAL_QUERY_BLOCKED",
           "file": "engine/nameserver/nameserver.go",
-          "line": 560,
+          "line": 562,
           "shape": "string"
         },
         {
           "tag": "NS_CREATED",
           "file": "engine/nameserver/nameserver.go",
-          "line": 132,
+          "line": 134,
           "shape": "unknown"
         },
         {
           "tag": "QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 185,
+          "line": 187,
           "shape": "string"
         }
       ]
@@ -332,13 +332,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "int"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "int"
         }
       ]
@@ -440,13 +440,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "int"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "int"
         }
       ]
@@ -672,13 +672,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         }
       ]
@@ -807,7 +807,7 @@
         {
           "tag": "PACKET_BIG",
           "file": "engine/nameserver/nameserver.go",
-          "line": 336,
+          "line": 338,
           "shape": "string"
         }
       ]
@@ -1344,13 +1344,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "string"
         },
         {
@@ -1523,25 +1523,25 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 504,
+          "line": 506,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "string"
         },
         {
           "tag": "QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 185,
+          "line": 187,
           "shape": "unknown"
         }
       ]
@@ -2375,7 +2375,7 @@
         {
           "tag": "NS_CREATED",
           "file": "engine/nameserver/nameserver.go",
-          "line": 132,
+          "line": 134,
           "shape": "unknown"
         },
         {
@@ -2424,13 +2424,13 @@
         {
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 583,
+          "line": 585,
           "shape": "string"
         },
         {
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 583,
+          "line": 585,
           "shape": "unknown"
         },
         {
@@ -2616,25 +2616,25 @@
         {
           "tag": "BLACKLISTING",
           "file": "engine/nameserver/nameserver.go",
-          "line": 304,
+          "line": 306,
           "shape": "unknown"
         },
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 504,
+          "line": 506,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         },
         {
@@ -2658,7 +2658,7 @@
         {
           "tag": "QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 185,
+          "line": 187,
           "shape": "unknown"
         }
       ]
@@ -2697,25 +2697,25 @@
         {
           "tag": "BLACKLISTING",
           "file": "engine/nameserver/nameserver.go",
-          "line": 304,
+          "line": 306,
           "shape": "unknown"
         },
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 504,
+          "line": 506,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         },
         {
@@ -2739,7 +2739,7 @@
         {
           "tag": "QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 185,
+          "line": 187,
           "shape": "unknown"
         }
       ]
@@ -2779,25 +2779,25 @@
         {
           "tag": "BLACKLISTING",
           "file": "engine/nameserver/nameserver.go",
-          "line": 304,
+          "line": 306,
           "shape": "unknown"
         },
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 504,
+          "line": 506,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         },
         {
@@ -2821,7 +2821,7 @@
         {
           "tag": "QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 185,
+          "line": 187,
           "shape": "unknown"
         }
       ]
@@ -2842,13 +2842,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         }
       ]
@@ -2874,13 +2874,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         },
         {
@@ -2925,13 +2925,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         }
       ]
@@ -3327,7 +3327,7 @@
         {
           "tag": "PACKET_BIG",
           "file": "engine/nameserver/nameserver.go",
-          "line": 336,
+          "line": 338,
           "shape": "unknown"
         },
         {
@@ -3439,13 +3439,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 536,
+          "line": 538,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 538,
+          "line": 540,
           "shape": "unknown"
         }
       ]
@@ -3912,7 +3912,7 @@
     {
       "tag": "IPV4_BLOCKED",
       "file": "engine/nameserver/nameserver.go",
-      "line": 170,
+      "line": 172,
       "args_expr": "logargs.NS(ns.NameString(), ns.AddressString())"
     },
     {
@@ -4002,7 +4002,7 @@
     {
       "tag": "IPV6_BLOCKED",
       "file": "engine/nameserver/nameserver.go",
-      "line": 174,
+      "line": 176,
       "args_expr": "logargs.NS(ns.NameString(), ns.AddressString())"
     },
     {
@@ -4446,13 +4446,13 @@
     {
       "tag": "d.tag",
       "file": "engine/nameserver/nameserver.go",
-      "line": 229,
+      "line": 231,
       "args_expr": "d.args"
     },
     {
       "tag": "d.tag",
       "file": "engine/nameserver/nameserver.go",
-      "line": 231,
+      "line": 233,
       "args_expr": "d.args"
     },
     {

@@ -1455,6 +1455,23 @@ func TestQueryLogsIPBlocked(t *testing.T) {
 	}
 }
 
+func TestMappedAddressIsIPv4(t *testing.T) {
+	ctx, prof := testContext(t)
+	log := logger.FromContext(ctx)
+	prof.Net.IPv4 = false
+
+	ns := newNS(t, ctx, "ns.example", "::ffff:192.0.2.82")
+	if got := ns.AddressString(); got != "192.0.2.82" {
+		t.Errorf("address = %q, want 192.0.2.82", got)
+	}
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
+		t.Fatalf("query with ipv4 disabled: %v", err)
+	}
+	if !dnstest.HasTag(log.Entries(), "IPV4_BLOCKED") {
+		t.Fatal("expected IPV4_BLOCKED for a mapped address")
+	}
+}
+
 // TestSkipShortCircuitPriorityOrder pins the relative priority of the five
 // "give up on this server" mechanisms: reachability beats error-cache beats
 // blacklisting beats fast-fail beats the latency budget. Refactors of

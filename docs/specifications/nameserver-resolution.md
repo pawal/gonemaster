@@ -11,6 +11,10 @@ The functions in this page live in [`engine/nsdiscovery`](https://codeberg.org/p
 except `Zone.GlueNames` and `Zone.ApexNSNames`, which are methods on
 `*zone.Zone` in [`engine/zone`](https://codeberg.org/pawal/gonemaster/src/branch/main/engine/zone).
 
+A nameserver address in IPv4-mapped IPv6 form (RFC 4291 section 2.5.5.2)
+is queried as the IPv4 address it carries: the IPv4 switch of the profile
+governs it, and it shares that address's cache.
+
 ## GlueNameservers
 
 Nameservers from the parent's delegation glue, as name+address pairs.

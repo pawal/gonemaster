@@ -86,6 +86,8 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 	if err != nil {
 		return Nameserver{}, fmt.Errorf("invalid nameserver address %q: %w", address, err)
 	}
+	// A mapped address is queried over IPv4.
+	addr = addr.Unmap()
 
 	if client == nil {
 		client = &transport.Client{}

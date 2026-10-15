@@ -66,7 +66,7 @@ export const t = derived([locale, _version], ([$locale]) => (key, vars = {}) => 
   const catalog = catalogs[$locale] ?? catalogs.en;
   let str = catalog?.[key] ?? catalogs.en?.[key] ?? key;
   for (const [k, v] of Object.entries(vars)) {
-    str = str.replaceAll(`{${k}}`, String(v));
+    str = str.replaceAll(`{${k}}`, () => String(v));
   }
   return str;
 });

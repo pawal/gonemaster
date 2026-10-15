@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - engine: DNSSEC tests match an RRSIG to DNSKEYs by key tag and algorithm, not key tag alone
+- admin-ui, ui-public: a message value containing `$&` renders verbatim
 
 ### Security
 

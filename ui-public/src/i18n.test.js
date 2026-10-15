@@ -52,6 +52,11 @@ describe("i18n store", () => {
         .toBe("Testing 123…");
     });
 
+    it("inserts a value with replacement patterns verbatim", () => {
+      expect(get(t)("pub.progress_testing", { domain: "$&$`$$" }))
+        .toBe("Testing $&$`$$…");
+    });
+
     it("ignores extra vars with no matching placeholder", () => {
       expect(get(t)("pub.app_title", { unused: "x" })).toBe("Gonemaster");
     });

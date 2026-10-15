@@ -43,6 +43,10 @@ describe("i18n store", () => {
       expect(get(t)("job_created", { id: 42 })).toBe("Job 42 created.");
     });
 
+    it("inserts a value with replacement patterns verbatim", () => {
+      expect(get(t)("job_created", { id: "$&$'$$" })).toBe("Job $&$'$$ created.");
+    });
+
     it("ignores extra vars that have no matching placeholder", () => {
       expect(get(t)("app_title", { unused: "x" })).toBe("Gonemaster");
     });

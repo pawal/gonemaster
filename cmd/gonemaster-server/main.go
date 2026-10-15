@@ -127,7 +127,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--listen ADDR", detail: "Address to listen on (default 127.0.0.1:8080)"},
 			{flag: "--max-body-size BYTES", detail: "Max request body size in bytes (default 1048576)"},
 			{flag: "--debug", detail: "Enable request/response logging"},
-			{flag: "--dump-config", detail: "Print effective config as JSON and exit"},
+			{flag: "--dump-config", detail: "Print effective config as JSON, password masked, and exit"},
 			{flag: "--version", detail: "Print version information and exit"},
 			{flag: "--shutdown-timeout DURATION", detail: "Graceful shutdown timeout (default 10s)"},
 		})
@@ -549,7 +549,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if dumpConfig {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(cfg); err != nil {
+		if err := enc.Encode(cfg.Redacted()); err != nil {
 			fmt.Fprintln(errOut, err.Error())
 			return 2
 		}

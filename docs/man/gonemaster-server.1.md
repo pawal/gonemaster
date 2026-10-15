@@ -37,7 +37,7 @@ variables, CLI flags. Later sources override earlier ones.
 : Graceful shutdown timeout (default: 10s).
 
 **--dump-config**
-: Print effective configuration as JSON and exit.
+: Print effective configuration as JSON, with the database password masked, and exit.
 
 **--version**
 : Print version information and exit.

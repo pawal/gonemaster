@@ -447,6 +447,12 @@ func (c Config) EffectivePurgeInterval() time.Duration {
 	return time.Duration(secs) * time.Second
 }
 
+// Redacted returns c with the database password masked.
+func (c Config) Redacted() Config {
+	c.Database.DSN = redactDSN(c.Database.Driver, c.Database.DSN)
+	return c
+}
+
 // IPv6 modes for Config.IPv6Mode.
 const (
 	IPv6ModeAuto = "auto"

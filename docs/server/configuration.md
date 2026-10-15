@@ -13,7 +13,7 @@ Configuration is applied in this order:
 
 Use environment variables for secrets such as database connection strings.
 
-Print the effective config and exit:
+Print the effective config, with the database password masked, and exit:
 
 ```sh
 gonemaster-server --dump-config

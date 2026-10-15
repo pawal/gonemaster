@@ -92,6 +92,15 @@ func TestRunDumpConfig(t *testing.T) {
 	}
 }
 
+func TestRunDumpConfigRedactsDSN(t *testing.T) {
+	res := clitest.Run(t, run, "--dump-config", "--db-driver", "postgres", "--db-dsn", "postgres://gm:s3cret@db.example/gm")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, `"dsn": "postgres://gm:xxxxx@db.example/gm"`)
+	if strings.Contains(res.Out, "s3cret") {
+		t.Fatalf("dump-config printed the password:\n%s", res.Out)
+	}
+}
+
 func TestRunDBRetentionDaysValidation(t *testing.T) {
 	res := clitest.Run(t, run, "--db-retention-days", "-1")
 	res.RequireCode(t, 2)

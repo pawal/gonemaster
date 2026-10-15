@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
 
@@ -40,5 +41,19 @@ func TestWriteQueryTraceCanceledColumn(t *testing.T) {
 		if got := strings.Fields(ch.line); !slices.Equal(got, ch.want) {
 			t.Errorf("%s fields = %q, want %q", ch.name, got, ch.want)
 		}
+	}
+}
+
+func TestWriteQueryTraceSanitizesNames(t *testing.T) {
+	c := querytrace.NewCollector()
+	c.AttemptDone(querytrace.AttemptEvent{NSName: "ns\x1b[2J\u009b.example", NSAddr: "192.0.2.1", Elapsed: time.Millisecond, Outcome: querytrace.OutcomeOK})
+
+	var buf bytes.Buffer
+	if err := writeQueryTrace(&buf, c); err != nil {
+		t.Fatal(err)
+	}
+	clitest.RequireNoControlBytes(t, buf.Bytes(), '\n')
+	if !strings.Contains(buf.String(), `ns\x1b[2J\x9b.example/192.0.2.1`) {
+		t.Errorf("escaped label missing:\n%s", buf.String())
 	}
 }

@@ -31,6 +31,7 @@ All notable changes to all gonemaster components will be documented in this file
 - admin-ui: hash routes take only well formed job, run and batch ids
 - server: DNSSEC19 reads the badkeys blocklist once, not once per run
 - engine: control octets in log arg strings and query trace names are written as `\DDD`
+- cli: `--debug-queries` and `--nstimes` escape control characters in names
 
 ## [v1.7.22] - 2026-10-12
 

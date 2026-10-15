@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/cliterm"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 )
 
@@ -31,7 +32,7 @@ func writeNSTimes(out io.Writer, timings map[string][]time.Duration, timeouts, r
 	entries := make([]entry, 0, len(timings)+len(timeouts))
 	for key, times := range timings {
 		entries = append(entries, entry{
-			key:      key,
+			key:      cliterm.Sanitize(key),
 			stats:    nameserver.ComputeTimingStats(times),
 			timeouts: timeouts[key],
 			refused:  refused[key],
@@ -44,7 +45,7 @@ func writeNSTimes(out io.Writer, timings map[string][]time.Duration, timeouts, r
 		if _, ok := timings[key]; ok {
 			continue
 		}
-		entries = append(entries, entry{key: key, timeouts: count, refused: refused[key], unreachable: true})
+		entries = append(entries, entry{key: cliterm.Sanitize(key), timeouts: count, refused: refused[key], unreachable: true})
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].key != entries[j].key {

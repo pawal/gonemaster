@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/cliterm"
 	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
 
@@ -100,9 +101,9 @@ func writeQueryTrace(out io.Writer, c *querytrace.Collector) error {
 // traceNSLabel renders "name/addr" when the host name is known, else the address.
 func traceNSLabel(s querytrace.NSStats) string {
 	if s.Name != "" {
-		return s.Name + "/" + s.Addr
+		return cliterm.Sanitize(s.Name + "/" + s.Addr)
 	}
-	return s.Addr
+	return cliterm.Sanitize(s.Addr)
 }
 
 // formatDecisions renders the decision tally as "kind:count" pairs, sorted for

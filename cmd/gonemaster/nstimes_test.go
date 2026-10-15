@@ -302,3 +302,19 @@ func TestRunJSONWithoutNSTimesIsArray(t *testing.T) {
 		t.Fatalf("output should be a JSON array without --nstimes: %v\noutput: %s", err, res.Out)
 	}
 }
+
+func TestWriteNSTimesSanitizesNames(t *testing.T) {
+	timings := map[string][]time.Duration{"ns\x1b[2J.example/192.0.2.1": {10 * time.Millisecond}}
+	timeouts := map[string]int{"\x07dead.example/192.0.2.2": 2}
+
+	var buf bytes.Buffer
+	if err := writeNSTimes(&buf, timings, timeouts, nil); err != nil {
+		t.Fatal(err)
+	}
+	clitest.RequireNoControlBytes(t, buf.Bytes(), '\n')
+	for _, want := range []string{`ns\x1b[2J.example/192.0.2.1`, `\x07dead.example/192.0.2.2`} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("escaped label %q missing:\n%s", want, buf.String())
+		}
+	}
+}

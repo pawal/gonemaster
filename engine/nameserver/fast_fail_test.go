@@ -248,3 +248,12 @@ func TestQueryEmitsFastFailDecision(t *testing.T) {
 		t.Fatalf("expected a skipped-fast-fail decision on the suppressed query, got none")
 	}
 }
+
+func TestDecisionEventEscapesNames(t *testing.T) {
+	ctx, _ := testContext(t)
+	ns := newNS(t, ctx, "a\x1bb.example", "192.0.2.243")
+	ev := ns.decisionEvent(querytrace.DecisionSkippedFastFail, "q\x07.example", "A", false)
+	if ev.NSName != `a\027b.example` || ev.QName != `q\007.example` {
+		t.Errorf("names = %q, %q; want a\\027b.example, q\\007.example", ev.NSName, ev.QName)
+	}
+}

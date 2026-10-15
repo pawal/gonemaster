@@ -58,7 +58,7 @@ func newEntryWithTimestamp(tag string, args map[string]any, testcase string, mod
 	}
 	entry := &Entry{
 		Tag:         strings.ToUpper(tag),
-		Args:        args,
+		Args:        escapeArgs(args),
 		Timestamp:   timestamp,
 		Testcase:    testcase,
 		Module:      module,

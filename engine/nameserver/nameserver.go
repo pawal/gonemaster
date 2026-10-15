@@ -733,9 +733,9 @@ func traceDecision(ctx context.Context, ev querytrace.DecisionEvent) {
 func (ns Nameserver) decisionEvent(kind querytrace.DecisionKind, qname, qtype string, usevc bool) querytrace.DecisionEvent {
 	return querytrace.DecisionEvent{
 		Kind:     kind,
-		NSName:   ns.NameString(),
+		NSName:   dnsname.Escape(ns.NameString()),
 		NSAddr:   ns.AddressString(),
-		QName:    qname,
+		QName:    dnsname.Escape(qname),
 		QType:    qtype,
 		Protocol: errorCacheProtocol(usevc),
 	}

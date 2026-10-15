@@ -12,6 +12,15 @@ Scope:
 - Normative for all tags following the coherency contract.
 - Migration is complete; all engine emitters use canonical keys.
 
+## Value Escaping
+
+A string value, also inside a list or map, carries no control octet. The
+logger writes each octet of a C0 control (0x00 to 0x1F), of DEL (0x7F), of
+a C1 control (U+0080 to U+009F) and of invalid UTF-8 as `\DDD`, its decimal
+value (RFC 1035 section 5.1). Spaces and other UTF-8 pass unchanged, since a
+value MAY be free text. RFC 4343 section 2.1 also escapes those octets in a
+name; the query trace applies that full set to nameserver and query names.
+
 ## Core Identity Keys
 
 | Key | Type | Meaning | Notes |

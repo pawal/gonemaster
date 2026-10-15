@@ -47,6 +47,33 @@ func TestAddDefaultsAndString(t *testing.T) {
 
 // These tests build profiles by hand rather than through dnstest.DefaultProfile:
 // dnstest imports logger, so this package cannot import dnstest.
+func TestAddEscapesControlOctetsInArgs(t *testing.T) {
+	args := map[string]any{
+		"ns":      "a\x1b[2Jb.example",
+		"servers": []map[string]any{{"ns": "c\u0085d.example", "address": "192.0.2.1"}},
+		"names":   []string{"ok.example", "x\ny"},
+		"mixed":   []any{"\xff", 7},
+		"text":    "café 日本",
+		"count":   3,
+	}
+	entry, err := New().Add("CUSTOM", args, "SYSTEM", "Unspecified")
+	if err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	got, err := json.Marshal(entry.Args)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	want := `{"count":3,"mixed":["\\255",7],"names":["ok.example","x\\010y"],"ns":"a\\027[2Jb.example",` +
+		`"servers":[{"address":"192.0.2.1","ns":"c\\194\\133d.example"}],"text":"café 日本"}`
+	if string(got) != want {
+		t.Errorf("args = %s\nwant   %s", got, want)
+	}
+	if args["ns"] != "a\x1b[2Jb.example" {
+		t.Errorf("caller's args changed: %q", args["ns"])
+	}
+}
+
 func TestLevelFromProfile(t *testing.T) {
 	log := New()
 	prof, err := profile.Default()

@@ -43,9 +43,9 @@ func TestWriteHumanSanitizesControlCharsInArgs(t *testing.T) {
 		t.Fatalf("expected 3 newlines (header+divider+entry), got %d in %q", n, body)
 	}
 	for _, want := range []string{
-		`\x1b[34mblue\x1b[0m`,
-		`\x0d`, // CR escape
-		`\x0a`, // LF escape inside the message body
+		`\027[34mblue\027[0m`,
+		`\013`, // CR escape
+		`\010`, // LF escape inside the message body
 	} {
 		if !strings.Contains(string(body), want) {
 			t.Fatalf("expected %q in human output, got %q", want, body)
@@ -78,7 +78,7 @@ func TestHumanReporterCallbackSanitizesOutput(t *testing.T) {
 
 	body := out.Bytes()
 	clitest.RequireNoControlBytes(t, body, '\n')
-	if !strings.Contains(string(body), `evil\x1b[31mxss\x1b[0m`) {
+	if !strings.Contains(string(body), `evil\027[31mxss\027[0m`) {
 		t.Fatalf("expected escaped ANSI in streaming output, got %q", body)
 	}
 }

@@ -871,6 +871,25 @@ func TestExchangeEmitsAttemptEventPerTimeout(t *testing.T) {
 	}
 }
 
+func TestAttemptEventEscapesQueryName(t *testing.T) {
+	// Real socket: a black hole on the real clock.
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {})
+	defer shutdown()
+	rec := &dnstest.RecordingTrace{}
+	ctx := querytrace.WithContext(t.Context(), rec)
+
+	client := &Client{}
+	client.SetFallback(false)
+	client.SetRetries(0)
+	client.SetTimeout(50 * time.Millisecond)
+	_, _ = client.Exchange(ctx, addr, BuildQuery("a\x1bb.example.", dns.TypeSOA))
+
+	events := rec.Attempts()
+	if len(events) != 1 || events[0].QName != `a\027b.example.` {
+		t.Fatalf("attempts = %+v, want one with QName a\\027b.example.", events)
+	}
+}
+
 // TestExchangeWithRetriesDisabledMakesOneAttempt pins two transport promises
 // that hold for every caller: a client with retries explicitly set to zero
 // makes exactly one attempt, and ApplyProfileDefaults does not restore the

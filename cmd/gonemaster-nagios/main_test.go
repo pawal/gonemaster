@@ -100,9 +100,9 @@ func TestRunVerboseSanitizesAttackerControlChars(t *testing.T) {
 	// Newlines separate the status line from the verbose entries.
 	clitest.RequireNoControlBytes(t, body, '\n')
 	for _, want := range []string{
-		`\x1b[34mblue\x1b[0m`,
-		`\x0d`, // CR
-		`\x00`, // NUL
+		`\027[34mblue\027[0m`,
+		`\013`, // CR
+		`\000`, // NUL
 	} {
 		if !strings.Contains(string(body), want) {
 			t.Fatalf("expected %q in nagios verbose output, got %q", want, body)

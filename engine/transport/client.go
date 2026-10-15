@@ -12,6 +12,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/ednsopt"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -249,7 +250,7 @@ func (c *Client) tracedExchangeOnce(ctx context.Context, trace querytrace.QueryT
 
 	trace.AttemptDone(querytrace.AttemptEvent{
 		NSAddr:   server,
-		QName:    qname,
+		QName:    dnsname.Escape(qname),
 		QType:    qtype,
 		Protocol: protocolName(useTCP),
 		Attempt:  attempt,

@@ -93,10 +93,10 @@ func TestFormatRawEntrySanitizesAttackerControlChars(t *testing.T) {
 	}
 	line := formatRawEntry(entry)
 	for _, want := range []string{
-		`\x1b[34mblue\x1b[0m`,
-		`\x0d`, // CR
-		`\x0a`, // LF
-		`\x00`, // NUL
+		`\027[34mblue\027[0m`,
+		`\013`, // CR
+		`\010`, // LF
+		`\000`, // NUL
 	} {
 		if !strings.Contains(line, want) {
 			t.Fatalf("expected escape %q in raw output, got %q", want, line)
@@ -120,7 +120,7 @@ func TestFormatRawEntrySanitizesNestedMap(t *testing.T) {
 		t.Fatalf("NewEntry: %v", err)
 	}
 	line := formatRawEntry(entry)
-	if !strings.Contains(line, `x\x1by`) {
+	if !strings.Contains(line, `x\027y`) {
 		t.Fatalf("expected escaped ESC inside nested map, got %q", line)
 	}
 }
@@ -171,7 +171,7 @@ func TestRawReporterCallbackSanitizesOutput(t *testing.T) {
 	}
 
 	clitest.RequireNoControlBytes(t, out.Bytes(), '\n')
-	if !strings.Contains(out.String(), `\x1b]0;hijack\x07`) {
+	if !strings.Contains(out.String(), `\027]0;hijack\007`) {
 		t.Fatalf("expected escaped OSC + BEL sequence, got %q", out.String())
 	}
 }

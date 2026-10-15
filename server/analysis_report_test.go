@@ -377,6 +377,75 @@ func TestReportClustersBounds(t *testing.T) {
 	}
 }
 
+// clusterGroup is movers sharing one nameserver and ASN.
+type clusterGroup struct {
+	ns     string
+	asn    int64
+	deltas []int
+}
+
+// clusterGroupsFixture builds one view and report row per mover of groups.
+func clusterGroupsFixture(groups []clusterGroup) (map[string]AnalysisSnapshotDomainView, []PublicAnalysisReportDomain) {
+	views := map[string]AnalysisSnapshotDomainView{}
+	rows := []PublicAnalysisReportDomain{}
+	for _, g := range groups {
+		for i, delta := range g.deltas {
+			name := fmt.Sprintf("%d.%s", i, g.ns)
+			asn := g.asn
+			views[name] = AnalysisSnapshotDomainView{
+				DomainName:  name,
+				Nameservers: []DomainViewNameserver{{Name: g.ns}},
+				Addresses:   []DomainViewAddress{{Address: "192.0.2.1", ASN: &asn}},
+			}
+			d := delta
+			rows = append(rows, PublicAnalysisReportDomain{Domain: name, ScoreDelta: &d})
+		}
+	}
+	return views, rows
+}
+
+// One build at the loosest bounds filters down to the clusters of any tighter bounds.
+func TestWithClusterBoundsFiltersLooseBuild(t *testing.T) {
+	views, rows := clusterGroupsFixture([]clusterGroup{
+		{"ns.a.example", 64501, []int{5, 5, 6, 6}},
+		{"ns.b.example", 64502, []int{-10, -12, -20}},
+		{"ns.c.example", 64503, []int{3, 3}},
+	})
+	loose := PublicAnalysisReportResponse{Clusters: buildReportClusters(views, rows, 1, maxReportMaxSpread)}
+	cases := []struct {
+		minCluster, maxSpread int
+		wantSizes             []int
+	}{
+		{1, maxReportMaxSpread, []int{4, 3, 2}},
+		{3, 3, []int{4}},
+		{2, 3, []int{4, 2}},
+		{3, 10, []int{4, 3}},
+		{5, maxReportMaxSpread, []int{}},
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%d/%d", tc.minCluster, tc.maxSpread), func(t *testing.T) {
+			got := withClusterBounds(loose, tc.minCluster, tc.maxSpread)
+			sizes := []int{}
+			for _, c := range got.Clusters {
+				sizes = append(sizes, c.Size)
+			}
+			if !slices.Equal(sizes, tc.wantSizes) {
+				t.Errorf("cluster sizes = %v, want %v", sizes, tc.wantSizes)
+			}
+			if got.MinCluster != tc.minCluster || got.MaxSpread != tc.maxSpread {
+				t.Errorf("bounds = %d/%d, want %d/%d", got.MinCluster, got.MaxSpread, tc.minCluster, tc.maxSpread)
+			}
+			direct := buildReportClusters(views, rows, tc.minCluster, tc.maxSpread)
+			if len(direct) != len(got.Clusters) {
+				t.Errorf("direct build has %d clusters, filtered %d", len(direct), len(got.Clusters))
+			}
+		})
+	}
+	if len(loose.Clusters) != 3 {
+		t.Errorf("loose build modified: %d clusters, want 3", len(loose.Clusters))
+	}
+}
+
 // Totals count membership, score movement and both sides' grade spread.
 func TestBuildReportTotals(t *testing.T) {
 	fromByName := map[string]AnalysisSnapshotDomainView{

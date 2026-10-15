@@ -96,11 +96,6 @@ func snapshotPairKey(from, to AnalysisCohortSnapshot) string {
 	return snapshotKey(from) + ":" + snapshotKey(to)
 }
 
-// reportCacheKey addresses one rendered report.
-func reportCacheKey(from, to AnalysisCohortSnapshot, minCluster, maxSpread int) string {
-	return snapshotPairKey(from, to) + ":" + strconv.Itoa(minCluster) + ":" + strconv.Itoa(maxSpread)
-}
-
 // parseReportBound reads one positive integer query parameter, or writes a
 // 400 and returns false.
 func parseReportBound(w http.ResponseWriter, r *http.Request, name string, def, limit int) (int, bool) {
@@ -190,8 +185,8 @@ func (s *Server) handlePublicAnalysisReport(w http.ResponseWriter, r *http.Reque
 		s.logger.Warn("report attribution falls back to the default scoring config", "err", err)
 		cfg = scoring.DefaultConfig()
 	}
-	key := reportCacheKey(fromSnap, toSnap, minCluster, maxSpread)
-	resp := s.reportCache.compute(key, func() PublicAnalysisReportResponse {
+	// Built at the loosest bounds; tighter bounds filter its clusters.
+	resp := s.reportCache.compute(snapshotPairKey(fromSnap, toSnap), func() PublicAnalysisReportResponse {
 		return buildAnalysisReport(reportInput{
 			DatasetTag:  cohort.SourceTag,
 			From:        fromSnap,
@@ -201,10 +196,11 @@ func (s *Server) handlePublicAnalysisReport(w http.ResponseWriter, r *http.Reque
 			FromTags:    s.snapshotTagViews(readStore, fromSnap),
 			ToTags:      s.snapshotTagViews(readStore, toSnap),
 			Scoring:     cfg,
-			MinCluster:  minCluster,
-			MaxSpread:   maxSpread,
+			MinCluster:  1,
+			MaxSpread:   maxReportMaxSpread,
 		})
 	})
+	resp = withClusterBounds(resp, minCluster, maxSpread)
 	writeSnapshotCacheHeaders(w, r, toSnap)
 	writeJSON(w, http.StatusOK, pageDomains(resp, limit, offset))
 }

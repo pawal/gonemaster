@@ -15,6 +15,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Security
 
 - server: public analysis routes are rate limited and read each snapshot once
+- server: one cached cohort report per snapshot pair serves every cluster bound
 
 ## [v1.7.22] - 2026-10-12
 

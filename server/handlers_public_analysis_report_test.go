@@ -252,6 +252,21 @@ func TestAnalysisReportCacheEviction(t *testing.T) {
 	}
 }
 
+// Reports of one pair at different cluster bounds share one cached build.
+func TestPublicAnalysisReportCachesOncePerPair(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	older := seedReportPair(t, f)
+	for _, q := range []string{"min_cluster=2", "min_cluster=5&max_spread=1", ""} {
+		got := mustJSON[PublicAnalysisReportResponse](t, getPublic(t, f.srv, f.reportURL(older.Slug, q)), http.StatusOK)
+		if q == "min_cluster=5&max_spread=1" && (got.MinCluster != 5 || got.MaxSpread != 1) {
+			t.Errorf("bounds = %d/%d, want 5/1", got.MinCluster, got.MaxSpread)
+		}
+	}
+	if n := len(f.srv.reportCache.entries); n != 1 {
+		t.Errorf("cached reports = %d, want 1", n)
+	}
+}
+
 // Movers page like every other public list, and one compute serves every
 // page: totals, tags and clusters stay whole.
 func TestPublicAnalysisReportPagesMovers(t *testing.T) {

@@ -439,6 +439,19 @@ func buildAnalysisReport(in reportInput) PublicAnalysisReportResponse {
 	return resp
 }
 
+// withClusterBounds keeps the clusters of resp with at least minCluster members and a spread within maxSpread.
+func withClusterBounds(resp PublicAnalysisReportResponse, minCluster, maxSpread int) PublicAnalysisReportResponse {
+	resp.MinCluster, resp.MaxSpread = minCluster, maxSpread
+	clusters := make([]PublicAnalysisReportCluster, 0, len(resp.Clusters))
+	for _, c := range resp.Clusters {
+		if c.Size >= minCluster && c.MaxDelta-c.MinDelta <= maxSpread {
+			clusters = append(clusters, c)
+		}
+	}
+	resp.Clusters = clusters
+	return resp
+}
+
 func reportSide(snap AnalysisCohortSnapshot, domainCount int) PublicAnalysisReportSide {
 	return PublicAnalysisReportSide{
 		Slug:               snap.Slug,

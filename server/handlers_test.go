@@ -1601,6 +1601,50 @@ func TestCreateJobRejectsExcludedTest(t *testing.T) {
 	}
 }
 
+func TestCreateJobRejectsUnknownTest(t *testing.T) {
+	srv := newTestServer(t)
+	for _, tc := range []struct{ path, body, want string }{
+		{"/api/v1/jobs", `{"domain":"example.com","tests":["basic01","Bogus99"]}`, "bogus99"},
+		{"/api/v1/jobs/batch", `{"domains":["example.com"],"tests":["bogus99"]}`, "bogus99"},
+		{"/pub/api/v1/jobs", `{"domain":"example.com","tests":["bogus99"]}`, "bogus99"},
+		{"/pub/api/v1/jobs", `{"domain":"example.com","tests":["basic"]}`, "basic"},
+	} {
+		body := wantErrorCode(t, doJSON(t, srv, http.MethodPost, tc.path, tc.body), http.StatusBadRequest, "unknown_testcase")
+		if got := body.Error.Details["testcase"]; got != tc.want {
+			t.Errorf("%s: details testcase %v, want %s", tc.path, got, tc.want)
+		}
+	}
+	if got := len(srv.store.List(JobFilter{Limit: 10}).Items); got != 0 {
+		t.Fatalf("%d job(s) created despite the rejection", got)
+	}
+}
+
+func TestCreateJobNormalizesTests(t *testing.T) {
+	for _, path := range []string{"/api/v1/jobs", "/pub/api/v1/jobs", "/api/v1/jobs/batch"} {
+		t.Run(path, func(t *testing.T) {
+			srv := newTestServer(t)
+			body := `{"domain":"example.com","tests":["Basic01","basic01"," BASIC01 ","","zone11"]}`
+			if strings.HasSuffix(path, "batch") {
+				body = `{"domains":["example.com"],"tests":["Basic01","basic01"," BASIC01 ","","zone11"]}`
+			}
+			if resp := doJSON(t, srv, http.MethodPost, path, body); resp.Code >= 300 {
+				t.Fatalf("create: status %d: %s", resp.Code, resp.Body.String())
+			}
+			jobs := srv.store.List(JobFilter{Limit: 10}).Items
+			if len(jobs) != 1 {
+				t.Fatalf("jobs = %d, want 1", len(jobs))
+			}
+			job, ok := srv.store.Get(jobs[0].ID)
+			if !ok {
+				t.Fatal("created job missing")
+			}
+			if want := []string{"basic01", "zone11"}; !slices.Equal(job.Tests, want) {
+				t.Errorf("tests = %q, want %q", job.Tests, want)
+			}
+		})
+	}
+}
+
 func TestCreateJobWithoutTestsIgnoresExclude(t *testing.T) {
 	srv := newTestServer(t, withConfig(excludeDNSSEC))
 	wantStatus(t, doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tests":["basic01"]}`), http.StatusCreated)

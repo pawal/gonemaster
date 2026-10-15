@@ -137,7 +137,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
-	if !validateMinLevel(w, req.MinLevel) || !validatePublicMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
+	if !validateMinLevel(w, req.MinLevel) || !validatePublicMinLevel(w, req.MinLevel) || !s.validateTests(w, &req.Tests) {
 		return
 	}
 	if !s.liveConfig().PublicAPI.AllowPrivateUndelegatedIP {

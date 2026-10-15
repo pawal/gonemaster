@@ -17,6 +17,7 @@ All notable changes to all gonemaster components will be documented in this file
 - server: public analysis routes are rate limited and read each snapshot once
 - server: one cached cohort report per snapshot pair serves every cluster bound
 - server: API metrics count a nonstandard HTTP method as `OTHER`
+- server: job `tests` run each testcase once; an unknown id is refused with `unknown_testcase`
 
 ## [v1.7.22] - 2026-10-12
 

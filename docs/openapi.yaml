@@ -2913,8 +2913,9 @@ components:
         tests:
           type: array
           description: >-
-            Testcase ids to run. An id the server excludes is rejected with
-            `400 testcase_excluded`.
+            Testcase ids to run, compared without case; a repeated id runs
+            once. An unknown id is rejected with `400 unknown_testcase`, an
+            id the server excludes with `400 testcase_excluded`.
           items:
             type: string
         profile_id:
@@ -2964,8 +2965,9 @@ components:
         tests:
           type: array
           description: >-
-            Testcase ids to run. An id the server excludes is rejected with
-            `400 testcase_excluded`.
+            Testcase ids to run, compared without case; a repeated id runs
+            once. An unknown id is rejected with `400 unknown_testcase`, an
+            id the server excludes with `400 testcase_excluded`.
           items:
             type: string
         profile_id:

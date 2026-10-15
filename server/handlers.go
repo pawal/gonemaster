@@ -77,9 +77,11 @@ func (s *Server) submitBatch(req JobBatchRequest, origin string) (JobBatchRespon
 	if rerr := checkMinLevel(req.MinLevel); rerr != nil {
 		return JobBatchResponse{}, rerr
 	}
-	if rerr := s.checkTests(req.Tests); rerr != nil {
+	tests, rerr := s.checkTests(req.Tests)
+	if rerr != nil {
 		return JobBatchResponse{}, rerr
 	}
+	req.Tests = tests
 	tagNames, rerr := s.checkTags(req.Tags)
 	if rerr != nil {
 		return JobBatchResponse{}, rerr
@@ -414,7 +416,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
-	if !validateMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
+	if !validateMinLevel(w, req.MinLevel) || !s.validateTests(w, &req.Tests) {
 		return
 	}
 	tagNames, ok := validateTags(w, s, req.Tags)
@@ -516,26 +518,42 @@ func (s *Server) isExcluded(testcase string) bool {
 	return slices.Contains(s.excludedTestcases, strings.ToLower(strings.TrimSpace(testcase)))
 }
 
-// validateTests writes 400 testcase_excluded when tests names an excluded testcase.
-func (s *Server) validateTests(w http.ResponseWriter, tests []string) bool {
-	if rerr := s.checkTests(tests); rerr != nil {
+// validateTests normalizes *tests, writing 400 for an unknown or excluded testcase.
+func (s *Server) validateTests(w http.ResponseWriter, tests *[]string) bool {
+	normalized, rerr := s.checkTests(*tests)
+	if rerr != nil {
 		rerr.write(w)
 		return false
 	}
+	*tests = normalized
 	return true
 }
 
-// checkTests is validateTests without the response writer.
-func (s *Server) checkTests(tests []string) *requestError {
-	for _, name := range tests {
-		if s.isExcluded(name) {
-			name = strings.ToLower(strings.TrimSpace(name))
-			rerr := badRequest("testcase_excluded", fmt.Sprintf("testcase %q is excluded on this instance", name))
-			rerr.details = map[string]any{"testcase": name}
-			return rerr
+// checkTests returns tests lowercased and deduplicated, refusing an unknown or excluded testcase.
+func (s *Server) checkTests(tests []string) ([]string, *requestError) {
+	out := make([]string, 0, len(tests))
+	for _, raw := range tests {
+		name := strings.ToLower(strings.TrimSpace(raw))
+		if name == "" || slices.Contains(out, name) {
+			continue
 		}
+		code, msg := "", ""
+		if _, err := engine.PlannedTestcases(engine.RunRequest{Testcases: []string{name}}); err != nil {
+			code, msg = "unknown_testcase", fmt.Sprintf("unknown testcase %q", name)
+		} else if s.isExcluded(name) {
+			code, msg = "testcase_excluded", fmt.Sprintf("testcase %q is excluded on this instance", name)
+		}
+		if code != "" {
+			rerr := badRequest(code, msg)
+			rerr.details = map[string]any{"testcase": name}
+			return nil, rerr
+		}
+		out = append(out, name)
 	}
-	return nil
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
 }
 
 func validateMinLevel(w http.ResponseWriter, minLevel string) bool {

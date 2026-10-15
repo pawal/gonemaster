@@ -209,7 +209,7 @@
     batchLoading = true;
     try {
       const params = batchQueryParams();
-      const batch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
+      const batch = await apiFetch(`/batches/${encodeURIComponent(batchId)}?${params.toString()}`);
       selectedBatch = batch;
       if (autoRefreshBatch && !hasActiveBatchJobs(batch)) {
         autoRefreshBatch = false;

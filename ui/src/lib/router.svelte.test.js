@@ -122,6 +122,15 @@ describe("parseRoute", () => {
     expect(parseRoute("#/tags/two%20words").tagName).toBe("two words");
   });
 
+  it.each([
+    ["#/single/..%2Fsettings", "jobId"],
+    ["#/single/job%3F1", "jobId"],
+    ["#/batches/..%2F..%2Fsettings", "batchId"],
+    ["#/domains/example.com/runs/..%2Fsettings", "runId"],
+  ])("drops the id of %s", (hash, field) => {
+    expect(parseRoute(hash)[field]).toBe(null);
+  });
+
   it("resolves tab aliases in the hash", () => {
     expect(parseRoute("#/analysis").tab).toBe("cohorts");
     expect(parseRoute("#/job/job_9")).toMatchObject({ tab: "single", jobId: "job_9" });

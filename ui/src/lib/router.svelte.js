@@ -43,6 +43,12 @@ const decode = (value) => {
   }
 };
 
+// Job, run and batch ids are letters, digits, "_" and "-"; anything else is dropped.
+const decodeId = (value) => {
+  const id = decode(value);
+  return /^[A-Za-z0-9_-]+$/.test(id) ? id : null;
+};
+
 const baseRoute = (tab) => ({
   tab,
   jobId: null,
@@ -68,16 +74,16 @@ export const parseRoute = (hash) => {
   const route = baseRoute(tab);
 
   if (tab === "single" && parts[1]) {
-    route.jobId = decode(parts[1]);
+    route.jobId = decodeId(parts[1]);
   } else if (tab === "domains" && parts[1]) {
     route.domainName = decode(parts[1]);
     if ((parts[2] || "").toLowerCase() === "runs" && parts[3]) {
-      route.runId = decode(parts[3]);
+      route.runId = decodeId(parts[3]);
     }
   } else if (tab === "tags" && parts[1]) {
     route.tagName = decode(parts[1]);
   } else if (tab === "batches" && parts[1]) {
-    route.batchId = decode(parts[1]);
+    route.batchId = decodeId(parts[1]);
   } else if (tab === "settings") {
     route.settingsSub = normalizeSettingsSub(parts[1]);
   }

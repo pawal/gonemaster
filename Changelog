@@ -25,6 +25,7 @@ All notable changes to all gonemaster components will be documented in this file
 - server: `--dump-config` masks the database password
 - mcp: the bridge logs and reports its server URL without user and password
 - client, mcp, engine: HTTP responses and the badkeys download are read up to a size limit
+- admin-ui: hash routes take only well formed job, run and batch ids
 
 ## [v1.7.22] - 2026-10-12
 

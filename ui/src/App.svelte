@@ -329,7 +329,7 @@
       jobLoading = true;
     }
     try {
-      const job = await apiFetch(`/jobs/${jobId}`);
+      const job = await apiFetch(`/jobs/${encodeURIComponent(jobId)}`);
       selectedJob = job;
       selectedJobResult = null;
       selectedRun = null;
@@ -357,7 +357,7 @@
     if (!jobId) return;
     try {
       const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
-      selectedJobResult = await apiFetch(`/jobs/${jobId}/result${locale}`);
+      selectedJobResult = await apiFetch(`/jobs/${encodeURIComponent(jobId)}/result${locale}`);
     } catch (error) {
       setStatus($t("error_load_result", { error: error.message }), "warn");
     }
@@ -366,7 +366,7 @@
   const loadRun = async (jobId = selectedJobId) => {
     if (!jobId) return;
     try {
-      selectedRun = await apiFetch(`/runs/${jobId}`);
+      selectedRun = await apiFetch(`/runs/${encodeURIComponent(jobId)}`);
     } catch (_) {
       selectedRun = null;
     }
@@ -584,7 +584,7 @@
     const check = async () => {
       if (!watchedBatchId) return;
       try {
-        const batch = await apiFetch(`/batches/${watchedBatchId}?limit=1`);
+        const batch = await apiFetch(`/batches/${encodeURIComponent(watchedBatchId)}?limit=1`);
         if (!hasActiveBatchJobs(batch)) {
           stopBatchWatch();
           sendBatchNotification(batch);

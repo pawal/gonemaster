@@ -146,7 +146,7 @@
     domainRunResultLoading = true;
     try {
       const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
-      selectedDomainRunResult = await apiFetch(`/jobs/${runId}/result${locale}`);
+      selectedDomainRunResult = await apiFetch(`/jobs/${encodeURIComponent(runId)}/result${locale}`);
     } catch (_) {
       // result not available for this run
     } finally {

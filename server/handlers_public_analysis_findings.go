@@ -51,7 +51,7 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	rows := readStore.ListSnapshotTagViews(snapshot.ID)
+	rows := s.snapshotTagViews(readStore, snapshot)
 	items := make([]PublicAnalysisTagView, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, PublicAnalysisTagView{
@@ -152,7 +152,7 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 		worstLevel string
 	}
 	buckets := map[testcaseKey]*testcaseAgg{}
-	for _, row := range readStore.ListSnapshotTagViews(snapshot.ID) {
+	for _, row := range s.snapshotTagViews(readStore, snapshot) {
 		if strings.TrimSpace(row.Testcase) == "" {
 			continue
 		}

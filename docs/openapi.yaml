@@ -2177,6 +2177,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/version:
     get:
@@ -2206,6 +2208,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/overview:
     get:
@@ -2223,6 +2227,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains:
     get:
@@ -2262,6 +2268,8 @@ paths:
                 additionalProperties: true
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers:
     get:
@@ -2279,6 +2287,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers/{name}:
     get:
@@ -2297,6 +2307,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/endpoints:
     get:
@@ -2314,6 +2326,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/endpoints/{address}:
     get:
@@ -2332,6 +2346,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/asns:
     get:
@@ -2349,6 +2365,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/asns/{asn}:
     get:
@@ -2367,6 +2385,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/prefixes:
     get:
@@ -2384,6 +2404,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/prefix:
     get:
@@ -2401,6 +2423,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/tags:
     get:
@@ -2418,6 +2442,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/tags/{tag}:
     get:
@@ -2436,6 +2462,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcases:
     get:
@@ -2453,6 +2481,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcase:
     get:
@@ -2470,6 +2500,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}:
     get:
@@ -2488,6 +2520,8 @@ paths:
                 additionalProperties: true
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots:
     get:
@@ -2505,6 +2539,8 @@ paths:
                 $ref: '#/components/schemas/PublicAnalysisSnapshotListResponse'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}:
     get:
@@ -2523,6 +2559,8 @@ paths:
                 $ref: '#/components/schemas/PublicAnalysisSnapshotDetail'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/trends:
     get:
@@ -2552,6 +2590,8 @@ paths:
                 $ref: '#/components/schemas/PublicAnalysisTrendResponse'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/diff:
     get:
@@ -2695,6 +2735,8 @@ paths:
                 $ref: '#/components/schemas/PublicAnalysisEntityHistoryResponse'
         '400':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
 components:
   securitySchemes:

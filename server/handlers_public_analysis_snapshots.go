@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
@@ -460,12 +459,10 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Detached: a shared, cached build must not stop on one caller's timeout.
-	ctx := context.WithoutCancel(r.Context())
 	resp := s.diffCache.compute(snapshotPairKey(fromSnap, toSnap), func() PublicAnalysisDiffResponse {
 		return buildAnalysisDiff(cohort, fromSnap, toSnap,
-			readStore.ListSnapshotDomainViews(ctx, fromSnap.ID),
-			readStore.ListSnapshotDomainViews(ctx, toSnap.ID))
+			s.snapshotDomainViews(r.Context(), readStore, fromSnap),
+			s.snapshotDomainViews(r.Context(), readStore, toSnap))
 	})
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -569,8 +566,8 @@ func sortDiffEntries(items []PublicAnalysisDiffEntry) {
 // snapshots from their materialized tag views.
 func (s *Server) writeTagDiff(w http.ResponseWriter, cohort AnalysisCohort, fromSnap, toSnap AnalysisCohortSnapshot, readStore AnalysisReadStore) {
 	appeared, cleared, levelChanged := diffTagViews(
-		readStore.ListSnapshotTagViews(fromSnap.ID),
-		readStore.ListSnapshotTagViews(toSnap.ID),
+		s.snapshotTagViews(readStore, fromSnap),
+		s.snapshotTagViews(readStore, toSnap),
 	)
 	writeJSON(w, http.StatusOK, PublicAnalysisTagDiffResponse{
 		DatasetTag:   cohort.SourceTag,

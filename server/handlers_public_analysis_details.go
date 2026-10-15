@@ -252,7 +252,7 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 	if readStore, canRead := s.store.(AnalysisReadStore); canRead && snapshot.ID != 0 {
 		snapshotView := publicAnalysisSnapshotView(snapshot)
 		detail.Snapshot = &snapshotView
-		populateCohortDetailFromViews(r.Context(), &detail, readStore, snapshot.ID)
+		s.populateCohortDetailFromViews(r.Context(), &detail, readStore, snapshot)
 	} else if snapshot.ID == 0 {
 		detail.Status = PublicAnalysisStatusNoSnapshot
 	}
@@ -261,8 +261,8 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 
 // populateCohortDetailFromViews fills totals + distributions from the
 // overview_v2 aggregate and the per-snapshot view tables.
-func populateCohortDetailFromViews(ctx context.Context, detail *PublicAnalysisCohortDetail, readStore AnalysisReadStore, snapshotID int64) {
-	if overview, ok := loadSnapshotOverviewV2(readStore, snapshotID); ok {
+func (s *Server) populateCohortDetailFromViews(ctx context.Context, detail *PublicAnalysisCohortDetail, readStore AnalysisReadStore, snapshot AnalysisCohortSnapshot) {
+	if overview, ok := loadSnapshotOverviewV2(readStore, snapshot.ID); ok {
 		detail.DomainCount = overview.Totals.DomainCount
 		detail.NameserverCount = overview.Totals.NameserverCount
 		detail.EndpointCount = overview.Totals.EndpointCount
@@ -273,11 +273,11 @@ func populateCohortDetailFromViews(ctx context.Context, detail *PublicAnalysisCo
 		}
 		return
 	}
-	detail.DomainCount = len(readStore.ListSnapshotDomainViews(ctx, snapshotID))
-	detail.NameserverCount = len(readStore.ListSnapshotNameserverViews(snapshotID))
-	detail.EndpointCount = len(readStore.ListSnapshotEndpointViews(snapshotID))
-	detail.ASNCount = len(readStore.ListSnapshotASNViews(snapshotID))
-	detail.PrefixCount = len(readStore.ListSnapshotPrefixViews(snapshotID))
+	detail.DomainCount = len(s.snapshotDomainViews(ctx, readStore, snapshot))
+	detail.NameserverCount = len(s.snapshotNameserverViews(readStore, snapshot))
+	detail.EndpointCount = len(s.snapshotEndpointViews(readStore, snapshot))
+	detail.ASNCount = len(s.snapshotASNViews(readStore, snapshot))
+	detail.PrefixCount = len(s.snapshotPrefixViews(readStore, snapshot))
 }
 
 // ── domain detail ──────────────────────────────────────────────────────────────
@@ -689,7 +689,7 @@ func (s *Server) handlePublicAnalysisTestcaseDetail(w http.ResponseWriter, r *ht
 	tagSet := map[string]struct{}{}
 	entryCount := 0
 	worstLevel := ""
-	for _, row := range readStore.ListSnapshotTagViews(snapshot.ID) {
+	for _, row := range s.snapshotTagViews(readStore, snapshot) {
 		if row.Testcase != testcase {
 			continue
 		}

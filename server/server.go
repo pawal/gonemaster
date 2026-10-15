@@ -72,6 +72,7 @@ type Server struct {
 	reportCache *analysisReportCache
 	// diffCache holds domain-level diffs per snapshot pair.
 	diffCache   *analysisCache[PublicAnalysisDiffResponse]
+	views       *snapshotViewCache
 	adminTokens atomic.Pointer[tokenSet]
 	extData     *extdata.Provider
 	registry    registryLookup
@@ -198,6 +199,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		snapshotSweepsInFlight:        map[int64]struct{}{},
 		reportCache:                   newAnalysisReportCache(),
 		diffCache:                     newAnalysisCache[PublicAnalysisDiffResponse](),
+		views:                         newSnapshotViewCache(),
 		engineRunner:                  engine.Run,
 		cancels:                       map[string]context.CancelFunc{},
 	}
@@ -420,53 +422,53 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /lookup/{domain}", s.limitGET(s.handlePublicLookupDomain))
 	pubMux.HandleFunc("GET /version", s.handlePublicVersion)
 	pubMux.HandleFunc("GET /info", s.handlePublicInfo)
-	pubMux.HandleFunc("GET /analysis/catalog", s.handlePublicAnalysisCatalog)
-	pubMux.HandleFunc("GET /analysis/cohorts", s.handlePublicAnalysisCohorts)
+	pubMux.HandleFunc("GET /analysis/catalog", s.limitGET(s.handlePublicAnalysisCatalog))
+	pubMux.HandleFunc("GET /analysis/cohorts", s.limitGET(s.handlePublicAnalysisCohorts))
 	pubMux.HandleFunc("GET /analysis/version", s.handlePublicVersion)
 
 	// Path-segmented snapshot reads. Each one resolves the cohort + slug
 	// from the path; immutable cache headers fire because ?snapshot= is
 	// effectively explicit.
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/overview",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisOverview))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisOverview)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains",
 		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisDomains)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains/{domain}",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisDomainDetail))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisDomainDetail)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisNameservers))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisNameservers)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers/{name}",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisNameserverDetail))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisNameserverDetail)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/endpoints",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisEndpoints))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisEndpoints)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/endpoints/{address}",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisEndpointDetail))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisEndpointDetail)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/asns",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisASNs))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisASNs)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/asns/{asn}",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisASNDetail))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisASNDetail)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/prefixes",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisPrefixes))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisPrefixes)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/prefix",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisPrefixDetail))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisPrefixDetail)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/tags",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisTags))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisTags)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/tags/{tag}",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisTagDetail))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisTagDetail)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcases",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisTestcases))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisTestcases)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcase",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisTestcaseDetail))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisTestcaseDetail)))
 
 	// Cohort/snapshot-list/diff/trends are inherently multi-snapshot or
 	// auto-latest by URL design, so they stay as-is.
-	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots", s.handlePublicAnalysisSnapshots)
-	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}", s.handlePublicAnalysisSnapshotDetail)
-	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/trends", s.handlePublicAnalysisTrends)
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots", s.limitGET(s.handlePublicAnalysisSnapshots))
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}", s.limitGET(s.handlePublicAnalysisSnapshotDetail))
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/trends", s.limitGET(s.handlePublicAnalysisTrends))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/diff", s.limitGET(s.handlePublicAnalysisDiff))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/report", s.limitGET(s.handlePublicAnalysisReport))
-	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/history", s.handlePublicAnalysisEntityHistory)
-	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}", s.handlePublicAnalysisCohortDetail)
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/history", s.limitGET(s.handlePublicAnalysisEntityHistory))
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}", s.limitGET(s.handlePublicAnalysisCohortDetail))
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", captureRoute("/pub/api/v1", pubMux))
 	if d := s.cfg.PublicAPI.AnalysisRequestTimeout.Duration; d > 0 {
 		pubHandler = analysisTimeoutMiddleware(d, pubHandler)

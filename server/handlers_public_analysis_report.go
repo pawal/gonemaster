@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -24,13 +23,18 @@ type analysisCache[T any] struct {
 	group   singleflight.Group
 	entries map[string]T
 	order   []string
+	size    int
 }
 
 // analysisReportCache holds rendered cohort reports.
 type analysisReportCache = analysisCache[PublicAnalysisReportResponse]
 
 func newAnalysisCache[T any]() *analysisCache[T] {
-	return &analysisCache[T]{entries: map[string]T{}}
+	return newSizedAnalysisCache[T](analysisReportCacheSize)
+}
+
+func newSizedAnalysisCache[T any](size int) *analysisCache[T] {
+	return &analysisCache[T]{entries: map[string]T{}, size: size}
 }
 
 func newAnalysisReportCache() *analysisReportCache {
@@ -51,7 +55,7 @@ func (c *analysisCache[T]) put(key string, resp T) {
 		c.order = append(c.order, key)
 	}
 	c.entries[key] = resp
-	for len(c.order) > analysisReportCacheSize {
+	for len(c.order) > c.size {
 		delete(c.entries, c.order[0])
 		c.order = c.order[1:]
 	}
@@ -89,12 +93,7 @@ func (c *analysisCache[T]) compute(key string, build func() T) T {
 // snapshotPairKey addresses one snapshot pair. Both snapshots' update times
 // are part of it so a rematerialize does not serve a stale response.
 func snapshotPairKey(from, to AnalysisCohortSnapshot) string {
-	return strings.Join([]string{
-		strconv.FormatInt(from.ID, 10),
-		strconv.FormatInt(from.UpdatedAt.UnixNano(), 10),
-		strconv.FormatInt(to.ID, 10),
-		strconv.FormatInt(to.UpdatedAt.UnixNano(), 10),
-	}, ":")
+	return snapshotKey(from) + ":" + snapshotKey(to)
 }
 
 // reportCacheKey addresses one rendered report.
@@ -192,17 +191,15 @@ func (s *Server) handlePublicAnalysisReport(w http.ResponseWriter, r *http.Reque
 		cfg = scoring.DefaultConfig()
 	}
 	key := reportCacheKey(fromSnap, toSnap, minCluster, maxSpread)
-	// Detached: a shared, cached build must not stop on one caller's timeout.
-	ctx := context.WithoutCancel(r.Context())
 	resp := s.reportCache.compute(key, func() PublicAnalysisReportResponse {
 		return buildAnalysisReport(reportInput{
 			DatasetTag:  cohort.SourceTag,
 			From:        fromSnap,
 			To:          toSnap,
-			FromDomains: readStore.ListSnapshotDomainViews(ctx, fromSnap.ID),
-			ToDomains:   readStore.ListSnapshotDomainViews(ctx, toSnap.ID),
-			FromTags:    readStore.ListSnapshotTagViews(fromSnap.ID),
-			ToTags:      readStore.ListSnapshotTagViews(toSnap.ID),
+			FromDomains: s.snapshotDomainViews(r.Context(), readStore, fromSnap),
+			ToDomains:   s.snapshotDomainViews(r.Context(), readStore, toSnap),
+			FromTags:    s.snapshotTagViews(readStore, fromSnap),
+			ToTags:      s.snapshotTagViews(readStore, toSnap),
 			Scoring:     cfg,
 			MinCluster:  minCluster,
 			MaxSpread:   maxSpread,

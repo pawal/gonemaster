@@ -136,7 +136,7 @@ variables, CLI flags. Later sources override earlier ones.
 : Maximum job submissions per IP per window (default: 10).
 
 **--public-api-rate-limit-get-max** *N*
-: Maximum metered GET requests per IP per window: public reads by ID, the lookup, and whole-snapshot analysis reads (default: 600).
+: Maximum metered GET requests per IP per window: public reads by ID, the lookup, and analysis reads (default: 600).
 
 **--public-api-rate-limit-window** *DURATION*
 : Sliding window for rate limiting, e.g. **5m** or **1h** (default: 10m).

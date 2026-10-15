@@ -509,6 +509,29 @@ func TestRateLimitGETMetersRoutes(t *testing.T) {
 			"/pub/api/v1/analysis/cohorts/tag/diff",
 			"/pub/api/v1/analysis/cohorts/tag/report",
 		}},
+		{"analysis reads", []string{
+			"/pub/api/v1/analysis/catalog",
+			"/pub/api/v1/analysis/cohorts",
+			"/pub/api/v1/analysis/cohorts/tag",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest",
+			"/pub/api/v1/analysis/cohorts/tag/trends",
+			"/pub/api/v1/analysis/cohorts/tag/history",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/overview",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/domains/a.example",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/nameservers",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/nameservers/ns.example",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/endpoints",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/endpoints/192.0.2.1",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/asns",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/asns/64500",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/prefixes",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/prefix",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/tags",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/tags/X",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/testcases",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/testcase",
+		}},
 		{"public id reads", []string{
 			"/pub/api/v1/jobs/abcd1234",
 			"/pub/api/v1/jobs/abcd1234/result",
@@ -542,9 +565,11 @@ func TestRateLimitGETLeavesOtherRoutesUnmetered(t *testing.T) {
 		c.RateLimitEnabled = true
 		c.RateLimitGetMax = 1
 	}))
-	for range 3 {
-		resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/version", nil, withRemoteAddr("192.0.2.1:1234"))
-		wantStatus(t, resp, http.StatusOK)
+	for _, path := range []string{"/pub/api/v1/version", "/pub/api/v1/analysis/version"} {
+		for range 3 {
+			resp := doJSON(t, srv, http.MethodGet, path, nil, withRemoteAddr("192.0.2.1:1234"))
+			wantStatus(t, resp, http.StatusOK)
+		}
 	}
 }
 

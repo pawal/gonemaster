@@ -89,14 +89,13 @@ Equivalent JSON config:
 
 The limiter keeps two budgets per client and window. `rate_limit_max` counts
 every `POST` on `/pub/api/v1/`. `rate_limit_get_max` counts the `GET` requests
-that resolve a public ID, query DNS, or read a whole snapshot:
+that resolve a public ID, query DNS, or read analysis data:
 
 - `/pub/api/v1/jobs/{public_id}`, and its `/result`, `/dnssec-chain`, and
   `/asn-names`
 - `/public/result/{public_id}`
 - `/pub/api/v1/lookup/{domain}`
-- `/pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains`
-- `/pub/api/v1/analysis/cohorts/{dataset_tag}/diff` and `/report`
+- every route under `/pub/api/v1/analysis/` except `/pub/api/v1/analysis/version`
 
 Other reads are not counted; see [Caching](#caching). A client is one IPv4
 address or one IPv6 /64. A rate limit change on the admin Settings page applies

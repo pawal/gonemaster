@@ -15,6 +15,7 @@ type countingAnalysisStore struct {
 	asnGets     int
 	asnLists    [][]int64
 	domainLists int
+	nsLists     int
 }
 
 func (c *countingAnalysisStore) GetAnalysisASN(asn int64) (AnalysisASN, bool) {
@@ -36,6 +37,13 @@ func (c *countingAnalysisStore) ListSnapshotDomainViews(ctx context.Context, sna
 	c.domainLists++
 	c.mu.Unlock()
 	return c.SQLJobStore.ListSnapshotDomainViews(ctx, snapshotID)
+}
+
+func (c *countingAnalysisStore) ListSnapshotNameserverViews(snapshotID int64) []AnalysisSnapshotNameserverView {
+	c.mu.Lock()
+	c.nsLists++
+	c.mu.Unlock()
+	return c.SQLJobStore.ListSnapshotNameserverViews(snapshotID)
 }
 
 // seedLabelledEndpoints seeds alpha on AS64500 and beta on AS64600, both labelled.
@@ -121,6 +129,46 @@ func TestDiffIsServedFromCacheOnRepeat(t *testing.T) {
 	}
 	if len(first.Added) != 1 || len(second.Added) != 1 || second.Added[0].Domain != "added.example" {
 		t.Errorf("added = %+v then %+v, want added.example twice", first.Added, second.Added)
+	}
+}
+
+func TestSnapshotViewsAreReadOncePerVersion(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	seedLabelledEndpoints(t, f)
+	counting := &countingAnalysisStore{SQLJobStore: f.store}
+	f.srv.store = counting
+
+	for _, sub := range []string{"domains", "domains?sort=domain_desc", "nameservers", "nameservers?sort=domain_count_asc"} {
+		wantStatus(t, getPublic(t, f.srv, f.publicURL(sub)), http.StatusOK)
+	}
+	if counting.domainLists != 1 || counting.nsLists != 1 {
+		t.Fatalf("view reads = %d domain, %d nameserver, want 1 and 1", counting.domainLists, counting.nsLists)
+	}
+
+	snap, ok := f.store.GetAnalysisCohortSnapshotByBatch(f.cohort.ID, f.batchID)
+	if !ok {
+		t.Fatal("missing snapshot")
+	}
+	snap.UpdatedAt = snap.UpdatedAt.Add(time.Second)
+	if _, err := f.store.UpsertAnalysisCohortSnapshot(snap); err != nil {
+		t.Fatalf("restamp snapshot: %v", err)
+	}
+	wantStatus(t, getPublic(t, f.srv, f.publicURL("domains")), http.StatusOK)
+	if counting.domainLists != 2 {
+		t.Errorf("domain view reads after a restamp = %d, want 2", counting.domainLists)
+	}
+}
+
+func TestSnapshotViewsKeepNoEmptyRead(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	counting := &countingAnalysisStore{SQLJobStore: f.store}
+	f.srv.store = counting
+
+	for range 2 {
+		wantStatus(t, getPublic(t, f.srv, f.publicURL("nameservers")), http.StatusOK)
+	}
+	if counting.nsLists != 2 {
+		t.Errorf("nameserver view reads = %d, want 2", counting.nsLists)
 	}
 }
 

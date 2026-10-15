@@ -393,7 +393,7 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		postureFilter = normalized
 	}
 
-	rows := readStore.ListSnapshotDomainViews(r.Context(), snapshot.ID)
+	rows := s.snapshotDomainViews(r.Context(), readStore, snapshot)
 	items := make([]PublicAnalysisDomainView, 0, len(rows))
 	for _, row := range rows {
 		if worstLevelFilter != "" && severityBucket(row.WorstLevel) != worstLevelFilter {

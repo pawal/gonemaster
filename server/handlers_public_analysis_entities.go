@@ -91,7 +91,7 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 		return
 	}
 
-	rows := readStore.ListSnapshotNameserverViews(snapshot.ID)
+	rows := s.snapshotNameserverViews(readStore, snapshot)
 	items := make([]PublicAnalysisNameserverView, 0, len(rows))
 	for _, row := range rows {
 		view := PublicAnalysisNameserverView{
@@ -323,7 +323,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	rows := readStore.ListSnapshotEndpointViews(snapshot.ID)
+	rows := s.snapshotEndpointViews(readStore, snapshot)
 	items := make([]PublicAnalysisEndpointView, 0, len(rows))
 	for _, row := range rows {
 		v := PublicAnalysisEndpointView{
@@ -383,7 +383,7 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	rows := readStore.ListSnapshotASNViews(snapshot.ID)
+	rows := s.snapshotASNViews(readStore, snapshot)
 	items := make([]PublicAnalysisASNView, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, PublicAnalysisASNView{
@@ -489,7 +489,7 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	rows := readStore.ListSnapshotPrefixViews(snapshot.ID)
+	rows := s.snapshotPrefixViews(readStore, snapshot)
 
 	items := make([]PublicAnalysisPrefixView, 0, len(rows))
 	for _, b := range rows {

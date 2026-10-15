@@ -676,6 +676,30 @@ var sqlMigrations = []sqlMigration{
 			}
 		},
 	},
+	{
+		// MariaDB TEXT holds 64 KiB; JSON lists and profiles outgrow it.
+		version: 17,
+		stmtsFn: func(d sqlDialect) []string {
+			if _, ok := d.(mariadbDialect); !ok {
+				return nil
+			}
+			const list = "MEDIUMTEXT NOT NULL DEFAULT '[]'"
+			return []string{
+				"ALTER TABLE analysis_snapshot_nameserver_view MODIFY addresses_json " + list + ", MODIFY asns_json " + list + ", MODIFY domains_json " + list,
+				"ALTER TABLE analysis_snapshot_endpoint_view MODIFY domains_json " + list,
+				"ALTER TABLE analysis_snapshot_asn_view MODIFY domains_json " + list + ", MODIFY nameservers_json " + list + ", MODIFY prefixes_json " + list,
+				"ALTER TABLE analysis_snapshot_tag_view MODIFY domains_json " + list,
+				"ALTER TABLE analysis_snapshot_domain_view MODIFY nameservers_json " + list + ", MODIFY addresses_json " + list + ", MODIFY tags_json " + list,
+				"ALTER TABLE analysis_snapshot_prefix_view MODIFY asns_json " + list + ", MODIFY domains_json " + list + ", MODIFY addresses_json " + list,
+				"ALTER TABLE analysis_snapshot_overview_view MODIFY top_tags_json " + list + ", MODIFY top_nameservers_json " + list +
+					", MODIFY top_asns_json " + list + ", MODIFY fact_distributions_json MEDIUMTEXT NOT NULL DEFAULT '{}'",
+				"ALTER TABLE run_dnssec_chain MODIFY chain_json MEDIUMTEXT NOT NULL",
+				"ALTER TABLE analysis_cohort_snapshots MODIFY vocabulary_json MEDIUMTEXT NOT NULL DEFAULT ''",
+				"ALTER TABLE runs MODIFY nameserver_timings_json MEDIUMTEXT, MODIFY effective_profile MEDIUMTEXT NOT NULL DEFAULT ''",
+				"ALTER TABLE profiles MODIFY config MEDIUMTEXT NOT NULL DEFAULT '{}'",
+			}
+		},
+	},
 }
 
 // bigintType is the 64-bit integer column type of d.

@@ -324,6 +324,33 @@ func TestReplaceSnapshotEntityViewsRoundTrip(t *testing.T) {
 	})
 }
 
+func TestSnapshotViewListOver64KiBRoundTrips(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
+		}
+		domains := make([]string, 8000)
+		for i := range domains {
+			domains[i] = fmt.Sprintf("domain-%04d.example", i)
+		}
+		views.Tags = append(views.Tags, AnalysisSnapshotTagView{Tag: "WIDE_TAG", DomainCount: len(domains), Domains: domains})
+		if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
+			t.Fatalf("replace: %v", err)
+		}
+		for _, row := range s.ListSnapshotTagViews(snapID) {
+			if row.Tag == "WIDE_TAG" {
+				if len(row.Domains) != 8000 || row.Domains[7999] != "domain-7999.example" {
+					t.Fatalf("domains read back = %d, want 8000 ending domain-7999.example", len(row.Domains))
+				}
+				return
+			}
+		}
+		t.Fatal("WIDE_TAG missing")
+	})
+}
+
 func TestReplaceSnapshotEntityViewsIdempotent(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
 		cohortID, snapID := snapshotViewFixture(t, s)

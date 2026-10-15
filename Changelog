@@ -21,6 +21,7 @@ All notable changes to all gonemaster components will be documented in this file
 - server: public history validates its key and hides store errors
 - server: admin list filters match `%` and `_` literally
 - server: a nameserver name over 255 characters no longer stops cohort capture
+- server: MariaDB stores snapshot lists, chains and profiles over 64 KiB
 
 ## [v1.7.22] - 2026-10-12
 

@@ -21,7 +21,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Attempt to load the badkeys blocklist from the filesystem search path (CLI flag, XDG data dir, system dir) or embedded fallback. If the blocklist is not available, set `blocklist_available = false`.
+2. Attempt to load the badkeys blocklist from the filesystem search path (CLI flag, XDG data dir, system dir) or embedded fallback. If the blocklist is not available, set `blocklist_available = false`. A caller MAY share one loaded blocklist across runs; the shared copy is read again when `blocklist.dat` or `badkeysdata.json` changes size or modification time.
 3. Build nameserver set from delegation+zone NS items, grouped by IP.
 4. For each unique nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip.

@@ -6913,7 +6913,7 @@ func DNSSEC19(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	prof := profile.FromContext(ctx)
 	blocklistPath := strings.TrimSpace(prof.Badkeys.Path)
-	bl, err := badkeys.LoadBlocklist(blocklistPath)
+	bl, err := badkeys.LoaderFromContext(ctx).Load(blocklistPath)
 	if err != nil {
 		bl = nil
 	}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
+	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -93,6 +94,8 @@ type RunRequest struct {
 	NegativeCacheTTL *int
 	// BadkeysPath overrides badkeys.path when non-nil.
 	BadkeysPath *string
+	// Badkeys shares blocklist loads across runs; nil loads per run.
+	Badkeys *badkeys.Loader
 	// NameserverCache optionally provides the per-run nameserver cache store.
 	NameserverCache *ns.CacheStore
 	// Recursor optionally supplies a prepared recursor. When set, the engine
@@ -656,6 +659,9 @@ func RunWithRunner(req RunRequest, runner *Runner) (_ []LogEntry, err error) {
 	ctx = nsdiscovery.WithCache(ctx, nsdiscovery.NewCache())
 	if req.ASNCache != nil {
 		ctx = asnlookup.WithCache(ctx, req.ASNCache)
+	}
+	if req.Badkeys != nil {
+		ctx = badkeys.WithLoader(ctx, req.Badkeys)
 	}
 	if runner.StartedAt.IsZero() {
 		runner.StartedAt = time.Now()

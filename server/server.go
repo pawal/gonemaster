@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/scoring"
 	serveranalysisui "codeberg.org/pawal/gonemaster/server/analysisui"
 	"codeberg.org/pawal/gonemaster/server/extdata"
@@ -73,6 +74,7 @@ type Server struct {
 	// diffCache holds domain-level diffs per snapshot pair.
 	diffCache   *analysisCache[PublicAnalysisDiffResponse]
 	views       *snapshotViewCache
+	badkeys     *badkeys.Loader
 	adminTokens atomic.Pointer[tokenSet]
 	extData     *extdata.Provider
 	registry    registryLookup
@@ -201,6 +203,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		diffCache:                     newAnalysisCache[PublicAnalysisDiffResponse](),
 		views:                         newSnapshotViewCache(),
 		engineRunner:                  engine.Run,
+		badkeys:                       new(badkeys.Loader),
 		cancels:                       map[string]context.CancelFunc{},
 	}
 	s.engineLimiter.Store(newEngineLimiter(cfg.MaxConcurrentJobs))

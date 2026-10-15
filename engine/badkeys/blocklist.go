@@ -3,6 +3,7 @@ package badkeys
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/share"
 )
@@ -33,31 +36,98 @@ type Blocklist struct {
 //
 // Returns nil, nil if no blocklist is available anywhere.
 func LoadBlocklist(profilePath string) (*Blocklist, error) {
-	// Try explicit path first.
-	if profilePath != "" {
-		return loadFromDir(profilePath)
-	}
+	return new(Loader).Load(profilePath)
+}
 
-	// Try default user data directory.
-	dataDir := DefaultDataDir()
-	if bl, err := loadFromDir(dataDir); err == nil && bl != nil {
+// Loader is LoadBlocklist with a cache shared by the runs that hold it.
+type Loader struct {
+	mu       sync.Mutex
+	dirs     map[string]loadedDir
+	embedded *Blocklist
+}
+
+// loadedDir is a blocklist read from files of the recorded size and time.
+type loadedDir struct {
+	stamp [2]fileStamp
+	bl    *Blocklist
+}
+
+type fileStamp struct {
+	size    int64
+	modTime time.Time
+}
+
+// Load returns the blocklist LoadBlocklist would, reading files only when they changed.
+func (l *Loader) Load(profilePath string) (*Blocklist, error) {
+	if profilePath != "" {
+		return l.fromDir(profilePath)
+	}
+	if bl, err := l.fromDir(DefaultDataDir()); err == nil && bl != nil {
 		return bl, nil
 	}
-
-	// Try system data directories per XDG_DATA_DIRS.
 	for _, sysDir := range systemDataDirs() {
-		candidate := filepath.Join(sysDir, "gonemaster", "badkeys")
-		if bl, err := loadFromDir(candidate); err == nil && bl != nil {
+		if bl, err := l.fromDir(filepath.Join(sysDir, "gonemaster", "badkeys")); err == nil && bl != nil {
 			return bl, nil
 		}
 	}
-
-	// Try embedded data.
 	if share.BadkeysBlocklist != nil && share.BadkeysMetadata != nil {
-		return loadFromEmbedded()
+		return l.fromEmbedded()
 	}
-
 	return nil, nil
+}
+
+func (l *Loader) fromDir(dir string) (*Blocklist, error) {
+	data, err := os.Stat(filepath.Join(dir, "blocklist.dat"))
+	if err != nil {
+		return nil, err
+	}
+	stamp := [2]fileStamp{{data.Size(), data.ModTime()}}
+	if meta, err := os.Stat(filepath.Join(dir, "badkeysdata.json")); err == nil {
+		stamp[1] = fileStamp{meta.Size(), meta.ModTime()}
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if cached, ok := l.dirs[dir]; ok && cached.stamp == stamp {
+		return cached.bl, nil
+	}
+	bl, err := loadFromDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	if l.dirs == nil {
+		l.dirs = map[string]loadedDir{}
+	}
+	l.dirs[dir] = loadedDir{stamp: stamp, bl: bl}
+	return bl, nil
+}
+
+func (l *Loader) fromEmbedded() (*Blocklist, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.embedded != nil {
+		return l.embedded, nil
+	}
+	bl, err := loadFromEmbedded()
+	if err != nil {
+		return nil, err
+	}
+	l.embedded = bl
+	return bl, nil
+}
+
+type loaderKey struct{}
+
+// WithLoader returns ctx carrying l.
+func WithLoader(ctx context.Context, l *Loader) context.Context {
+	return context.WithValue(ctx, loaderKey{}, l)
+}
+
+// LoaderFromContext returns the Loader of ctx, or a new one.
+func LoaderFromContext(ctx context.Context) *Loader {
+	if l, ok := ctx.Value(loaderKey{}).(*Loader); ok && l != nil {
+		return l
+	}
+	return new(Loader)
 }
 
 // systemDataDirs returns the directories from XDG_DATA_DIRS, falling back to

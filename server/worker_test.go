@@ -17,6 +17,7 @@ import (
 	"codeberg.org/miekg/dns/rdata"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -245,6 +246,23 @@ func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 	}
 	if captured.UndelegatedDSInfo[0].KeyTag != 12345 {
 		t.Fatalf("unexpected DS key tag: %d", captured.UndelegatedDSInfo[0].KeyTag)
+	}
+}
+
+func TestRunEngineForJobSharesBadkeysLoader(t *testing.T) {
+	srv := newTestServer(t)
+	var loaders []*badkeys.Loader
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		loaders = append(loaders, req.Badkeys)
+		return nil, nil
+	}
+	for _, id := range []string{"job-bk-1", "job-bk-2"} {
+		if _, err := srv.runEngineForJob(Job{ID: id, Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()}, t.Context()); err != nil {
+			t.Fatalf("runEngineForJob: %v", err)
+		}
+	}
+	if len(loaders) != 2 || loaders[0] == nil || loaders[0] != loaders[1] || loaders[0] != srv.badkeys {
+		t.Errorf("loaders = %v, want the server's loader twice", loaders)
 	}
 }
 

@@ -364,6 +364,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (_ jobArtifacts, 
 		UndelegatedDSInfo:      job.UndelegatedDS,
 		MinLevel:               minLevel,
 		Context:                ctx,
+		Badkeys:                s.badkeys,
 	}
 	if job.IPv4Disabled {
 		disabled := false

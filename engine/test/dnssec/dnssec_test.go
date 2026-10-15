@@ -5843,6 +5843,59 @@ func TestDNSSEC19CleanZone(t *testing.T) {
 	tctest.RequireTags(t, entries, "DS19_KEY_OK", "DS19_BLOCKLIST_NOT_FOUND")
 }
 
+func TestDNSSEC19ReadsBlocklistThroughContextLoader(t *testing.T) {
+	key := dnssec19P256Key("example")
+	dir := t.TempDir()
+	writeDNSSEC19BlocklistFixture(t, dir, key.Algorithm, key.PublicKey, 7, "unit-blocklist")
+	if err := profile.Effective().Set("badkeys.path", dir); err != nil {
+		t.Fatalf("set badkeys.path: %v", err)
+	}
+	loader := new(badkeys.Loader)
+	if _, err := loader.Load(dir); err != nil {
+		t.Fatalf("preload: %v", err)
+	}
+	// Same size and time, no entries: only the loader's copy still lists the key.
+	path := filepath.Join(dir, "blocklist.dat")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if err := os.WriteFile(path, make([]byte, info.Size()), 0o644); err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+	ctx := badkeys.WithLoader(tctest.Context(t), loader)
+
+	tctest.NS(t, ctx, "ns1.example", "192.0.2.203", func(q tctest.Query) packet.Packet {
+		if q.Type != "DNSKEY" {
+			return packet.Packet{}
+		}
+		return dnskeyPacket(q.Name, dnssec19P256Key(q.Name))
+	})
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
+			Name:       dnsname.New("ns1.example"),
+			Address:    netip.MustParseAddr("192.0.2.203"),
+			HasAddress: true,
+		}}, nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC19(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec19: %v", err)
+	}
+	tctest.RequireTags(t, entries, "DS19_BADKEY_BLOCKLIST")
+}
+
 func TestDNSSEC19BlocklistedKey(t *testing.T) {
 	ctx := tctest.Context(t)
 

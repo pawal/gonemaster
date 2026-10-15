@@ -29,6 +29,7 @@ All notable changes to all gonemaster components will be documented in this file
 - mcp: the bridge logs and reports its server URL without user and password
 - client, mcp, engine: HTTP responses and the badkeys download are read up to a size limit
 - admin-ui: hash routes take only well formed job, run and batch ids
+- server: DNSSEC19 reads the badkeys blocklist once, not once per run
 
 ## [v1.7.22] - 2026-10-12
 

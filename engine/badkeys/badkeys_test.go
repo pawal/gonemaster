@@ -325,6 +325,52 @@ func TestLoadBlocklistFromSystemDataDir(t *testing.T) {
 	}
 }
 
+// writeBlocklist writes n zero blocks of source 1 into dir.
+func writeBlocklist(t *testing.T, dir string, n int) {
+	t.Helper()
+	data := make([]byte, n*blockSize)
+	for i := range n {
+		data[i*blockSize+15] = 1
+	}
+	if err := os.WriteFile(filepath.Join(dir, "blocklist.dat"), data, 0o644); err != nil {
+		t.Fatalf("write blocklist.dat: %v", err)
+	}
+}
+
+func TestLoaderReadsAChangedBlocklistOnly(t *testing.T) {
+	dir := t.TempDir()
+	writeBlocklist(t, dir, 1)
+	var l Loader
+
+	first, err := l.Load(dir)
+	if err != nil || first == nil {
+		t.Fatalf("first load: %v", err)
+	}
+	again, err := l.Load(dir)
+	if err != nil || again != first {
+		t.Fatalf("second load = %p, %v; want the cached %p", again, err, first)
+	}
+	if fresh, _ := LoadBlocklist(dir); fresh == first {
+		t.Error("LoadBlocklist returned the Loader's copy")
+	}
+
+	writeBlocklist(t, dir, 3)
+	changed, err := l.Load(dir)
+	if err != nil || changed == first || changed.Entries != 3 {
+		t.Fatalf("load after a change = %+v, %v; want a fresh blocklist of 3 entries", changed, err)
+	}
+}
+
+func TestLoaderFromContext(t *testing.T) {
+	l := new(Loader)
+	if got := LoaderFromContext(WithLoader(t.Context(), l)); got != l {
+		t.Errorf("LoaderFromContext = %p, want %p", got, l)
+	}
+	if got := LoaderFromContext(t.Context()); got == nil || got == l {
+		t.Errorf("LoaderFromContext without a loader = %p, want a new one", got)
+	}
+}
+
 func TestSystemDataDirsDefault(t *testing.T) {
 	t.Setenv("XDG_DATA_DIRS", "")
 	got := systemDataDirs()

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -107,17 +109,39 @@ func TestPublicEntityHistoryValidation(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedHistoryFixture(t, f)
 
-		for _, q := range []string{
-			"entity=nameserver",  // missing key
-			"key=ns1.example",    // missing entity
-			"entity=bogus&key=x", // unknown entity
+		for _, tc := range []struct{ query, code string }{
+			{"entity=nameserver", "missing_params"},
+			{"key=ns1.example", "missing_params"},
+			{"entity=bogus&key=x", "invalid_entity"},
+			{"entity=asn&key=not-a-number", "invalid_key"},
+			{"entity=asn&key=AS99999999999", "invalid_key"},
+			{"entity=domain&key=" + strings.Repeat("a", 256), "invalid_key"},
 		} {
-			resp := getPublic(t, f.srv, f.historyURL(q))
-			if resp.Code != http.StatusBadRequest {
-				t.Errorf("%s: status = %d, want 400", q, resp.Code)
+			body := wantErrorCode(t, getPublic(t, f.srv, f.historyURL(tc.query)), http.StatusBadRequest, tc.code)
+			if strings.Contains(body.Error.Message, "invalid asn") {
+				t.Errorf("%s: message %q carries store text", tc.query, body.Error.Message)
 			}
 		}
+		resp := getPublic(t, f.srv, f.historyURL("entity=asn&key=AS64500"))
+		wantStatus(t, resp, http.StatusOK)
 	})
+}
+
+// failingHistoryStore fails every history read with driver text.
+type failingHistoryStore struct{ *SQLJobStore }
+
+func (failingHistoryStore) AnalysisEntityHistory(int64, string, string) ([]AnalysisEntityHistoryPoint, error) {
+	return nil, errors.New(`pq: relation "analysis_snapshot_tag_view" does not exist`)
+}
+
+func TestPublicEntityHistoryHidesStoreError(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	f.srv.store = failingHistoryStore{f.store}
+
+	body := wantErrorCode(t, getPublic(t, f.srv, f.historyURL("entity=tag&key=X")), http.StatusInternalServerError, "history_error")
+	if body.Error.Message != "history is unavailable" {
+		t.Errorf("message = %q, want %q", body.Error.Message, "history is unavailable")
+	}
 }
 
 // A rebuild restamps captured_at out of order; history stays oldest first.

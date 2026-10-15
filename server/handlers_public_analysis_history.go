@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -45,10 +46,15 @@ func (s *Server) handlePublicAnalysisEntityHistory(w http.ResponseWriter, r *htt
 			"entity must be one of nameserver, asn, tag, domain", nil)
 		return
 	}
+	if !validHistoryKey(entity, key) {
+		writeError(w, http.StatusBadRequest, "invalid_key", "key is not a valid "+entity, nil)
+		return
+	}
 
 	points, err := readStore.AnalysisEntityHistory(cohort.ID, entity, key)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "history_error", err.Error(), nil)
+		s.logger.Warn("analysis history read failed", "entity", entity, "err", err)
+		writeError(w, http.StatusInternalServerError, "history_error", "history is unavailable", nil)
 		return
 	}
 	if points == nil {
@@ -60,4 +66,16 @@ func (s *Server) handlePublicAnalysisEntityHistory(w http.ResponseWriter, r *htt
 		Key:        key,
 		Points:     points,
 	})
+}
+
+// validHistoryKey accepts a key of at most 255 octets; an asn key is a number with an optional "AS" prefix.
+func validHistoryKey(entity, key string) bool {
+	if len(key) > 255 {
+		return false
+	}
+	if entity == "asn" {
+		_, err := strconv.ParseUint(strings.TrimPrefix(strings.ToLower(key), "as"), 10, 32)
+		return err == nil
+	}
+	return true
 }

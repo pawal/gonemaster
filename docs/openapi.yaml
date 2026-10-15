@@ -2723,9 +2723,13 @@ paths:
         - name: key
           in: query
           required: true
-          description: Entity identifier (nameserver name, ASN number, tag, or domain).
+          description: >-
+            Entity identifier (nameserver name, ASN number, tag, or domain), at
+            most 255 octets. An ASN takes an optional `AS` prefix. Any other
+            key is rejected with `400 invalid_key`.
           schema:
             type: string
+            maxLength: 255
       responses:
         '200':
           description: History response
@@ -2734,6 +2738,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/PublicAnalysisEntityHistoryResponse'
         '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
           $ref: '#/components/responses/ErrorResponse'
         '429':
           $ref: '#/components/responses/RateLimited'

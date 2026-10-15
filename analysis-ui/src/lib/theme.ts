@@ -7,9 +7,13 @@ const STORAGE_KEY = "gonemaster.analysis.theme.v1";
 export type Theme = "light" | "dark";
 
 export function readStoredTheme(): Theme | null {
-  if (typeof localStorage === "undefined") return null;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  return raw === "light" || raw === "dark" ? raw : null;
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw === "light" || raw === "dark" ? raw : null;
+  } catch {
+    return null;
+  }
 }
 
 export function systemPrefersDark(): boolean {
@@ -23,8 +27,12 @@ export function applyTheme(theme: Theme): void {
 }
 
 export function persistTheme(theme: Theme): void {
-  if (typeof localStorage === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, theme);
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(STORAGE_KEY, theme);
+  } catch {
+    // Blocked storage keeps the choice for this page only.
+  }
 }
 
 export function initialTheme(): Theme {

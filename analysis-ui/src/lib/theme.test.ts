@@ -41,6 +41,19 @@ describe("theme helpers", () => {
     expect(initialTheme()).toBe("light");
   });
 
+  it("falls back to the system preference when storage is blocked", () => {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("denied", "SecurityError");
+      }
+    });
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
+    expect(() => persistTheme("light")).not.toThrow();
+    expect(readStoredTheme()).toBeNull();
+    expect(initialTheme()).toBe("dark");
+  });
+
   it("sets data-theme on the document root", () => {
     applyTheme("dark");
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");

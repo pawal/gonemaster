@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"flag"
+
+	"codeberg.org/pawal/gonemaster/internal/readlimit"
 )
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -102,7 +104,7 @@ func (c *apiClient) doBytes(ctx context.Context, path string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
+	data, err := readlimit.ReadAll(resp.Body, maxResponseBytes)
 	if err != nil {
 		return nil, err
 	}

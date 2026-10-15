@@ -14,12 +14,18 @@ import (
 	"runtime"
 
 	"github.com/ulikunitz/xz"
+
+	"codeberg.org/pawal/gonemaster/internal/readlimit"
 )
 
 const (
 	// UpdateURL is the upstream badkeys metadata endpoint.
 	UpdateURL = "https://update.badkeys.info/v0/badkeysdata.json"
 	bkFormat  = 0
+	// maxDownloadBytes caps one download; the compressed blocklist is far smaller.
+	maxDownloadBytes = 512 << 20
+	// maxBlocklistBytes caps the decompressed blocklist, about 60 MB in 2026.
+	maxBlocklistBytes = 1 << 30
 )
 
 // Metadata is the subset of badkeysdata.json needed for blocklist management.
@@ -112,7 +118,7 @@ func (u Updater) Update(outputDir string, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("xz reader: %w", err)
 	}
-	plainBytes, err := io.ReadAll(r)
+	plainBytes, err := readlimit.ReadAll(r, maxBlocklistBytes)
 	if err != nil {
 		return fmt.Errorf("xz decompress: %w", err)
 	}
@@ -173,7 +179,7 @@ func (u Updater) httpGet(url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d for %s", resp.StatusCode, url)
 	}
-	return io.ReadAll(resp.Body)
+	return readlimit.ReadAll(resp.Body, maxDownloadBytes)
 }
 
 func fileSHA256(path string) (string, error) {

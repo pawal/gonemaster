@@ -130,6 +130,23 @@ func TestPingHidesUserinfo(t *testing.T) {
 	}
 }
 
+func TestClientRefusesOversizedResponse(t *testing.T) {
+	// Real socket: httptest stays on the real clock.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		chunk := make([]byte, 1<<20)
+		for range maxResponseBytes>>20 + 1 {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	}))
+	t.Cleanup(srv.Close)
+	_, err := clientFor(t, srv.URL, "").whoami(t.Context())
+	if err == nil || !strings.Contains(err.Error(), "stream exceeds") {
+		t.Fatalf("whoami error = %v, want stream exceeds", err)
+	}
+}
+
 func TestPingOpenMode(t *testing.T) {
 	out := callPing(t, fakeAPI(t, apitest.Opts{}))
 	if !out.Reachable {

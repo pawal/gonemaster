@@ -22,12 +22,15 @@ import (
 	"codeberg.org/pawal/gonemaster/cmd/internal/cliterm"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/internal/readlimit"
 	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 const (
 	defaultServer = "http://localhost:8080/api/v1"
 	defaultFormat = "pretty"
+	// maxResponseBytes caps one server response.
+	maxResponseBytes = 256 << 20
 )
 
 var doneStatuses = map[string]bool{
@@ -601,7 +604,7 @@ func (c *apiClient) doJSONURL(ctx context.Context, method string, full string, b
 		return err
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := readlimit.ReadAll(resp.Body, maxResponseBytes)
 	if err != nil {
 		return err
 	}

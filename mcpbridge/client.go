@@ -13,10 +13,14 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/internal/publicapi"
+	"codeberg.org/pawal/gonemaster/internal/readlimit"
 )
 
 // DefaultServerURL is the admin API base when none is configured.
 const DefaultServerURL = "http://localhost:8080/api/v1"
+
+// maxResponseBytes caps one admin API response.
+const maxResponseBytes = 64 << 20
 
 // Client is a thin bearer-authenticated HTTP client for the admin API.
 type Client struct {
@@ -122,7 +126,7 @@ func (c *Client) doJSONURL(ctx context.Context, method, full string, body, out a
 		return err
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := readlimit.ReadAll(resp.Body, maxResponseBytes)
 	if err != nil {
 		return err
 	}

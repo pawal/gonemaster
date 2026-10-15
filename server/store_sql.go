@@ -379,6 +379,16 @@ func sqlJobOrderBy(sort JobSort) string {
 	}
 }
 
+// likeEscape is the ESCAPE clause of a likeContains pattern.
+const likeEscape = ` ESCAPE '!'`
+
+// likeContains is a lowercase LIKE pattern matching s anywhere, its wildcards taken literally.
+func likeContains(s string) string {
+	return "%" + likeEscaper.Replace(strings.ToLower(s)) + "%"
+}
+
+var likeEscaper = strings.NewReplacer("!", "!!", "%", "!%", "_", "!_")
+
 // List returns in-flight jobs matching filter with sorting and pagination.
 func (s *SQLJobStore) List(filter JobFilter) JobList {
 	normalizedSort := normalizeJobSort(filter.Sort)
@@ -399,7 +409,7 @@ func (s *SQLJobStore) List(filter JobFilter) JobList {
 		conds = append(conds, "batch_id = "+addArg(filter.BatchID))
 	}
 	if filter.Domain != "" {
-		conds = append(conds, "LOWER(domain) LIKE "+addArg("%"+strings.ToLower(filter.Domain)+"%"))
+		conds = append(conds, "LOWER(domain) LIKE "+addArg(likeContains(filter.Domain))+likeEscape)
 	}
 	if !filter.CreatedAfter.IsZero() {
 		conds = append(conds, "created_at > "+addArg(formatSortableTimestamp(filter.CreatedAfter)))
@@ -945,7 +955,7 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 		conds = append(conds, "id IN (SELECT domain_id FROM domain_tags WHERE tag = "+addArg(filter.Tag)+")")
 	}
 	if filter.Name != "" {
-		conds = append(conds, "LOWER(name) LIKE "+addArg("%"+strings.ToLower(filter.Name)+"%"))
+		conds = append(conds, "LOWER(name) LIKE "+addArg(likeContains(filter.Name))+likeEscape)
 	}
 	if filter.LatestLevel != "" {
 		conds = append(conds, "latest_level = "+addArg(filter.LatestLevel))
@@ -1554,7 +1564,7 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	if filter.Domain != "" && filter.DomainExact {
 		conds = append(conds, "LOWER(domain) = "+addArg(strings.ToLower(filter.Domain)))
 	} else if filter.Domain != "" {
-		conds = append(conds, "LOWER(domain) LIKE "+addArg("%"+strings.ToLower(filter.Domain)+"%"))
+		conds = append(conds, "LOWER(domain) LIKE "+addArg(likeContains(filter.Domain))+likeEscape)
 	}
 	if filter.BatchID != "" {
 		conds = append(conds, "batch_id = "+addArg(filter.BatchID))
@@ -1855,8 +1865,8 @@ func (s *SQLJobStore) ListBatches(tagLike string, limit, offset int) BatchList {
 	where := ""
 	var filterArgs []any
 	if tagLike != "" {
-		where = fmt.Sprintf(" WHERE LOWER(tag) LIKE %s", s.ph(1))
-		filterArgs = append(filterArgs, "%"+strings.ToLower(tagLike)+"%")
+		where = " WHERE LOWER(tag) LIKE " + s.ph(1) + likeEscape
+		filterArgs = append(filterArgs, likeContains(tagLike))
 	}
 
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM batches`+where, filterArgs...).Scan(&out.Total); err != nil {

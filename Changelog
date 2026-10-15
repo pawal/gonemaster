@@ -19,6 +19,7 @@ All notable changes to all gonemaster components will be documented in this file
 - server: API metrics count a nonstandard HTTP method as `OTHER`
 - server: job `tests` run each testcase once; an unknown id is refused with `unknown_testcase`
 - server: public history validates its key and hides store errors
+- server: admin list filters match `%` and `_` literally
 
 ## [v1.7.22] - 2026-10-12
 

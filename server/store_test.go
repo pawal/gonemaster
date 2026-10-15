@@ -726,6 +726,37 @@ func TestInMemoryJobStoreConcurrentBasic(t *testing.T) {
 	}
 }
 
+func TestListFiltersTakeWildcardsLiterally(t *testing.T) {
+	forEachStore(t, func(t *testing.T, store JobStore) {
+		now := time.Now().UTC()
+		seedGraduatedRun(t, store, runSpec{ID: "r_us", Domain: "a_b.example"})
+		seedGraduatedRun(t, store, runSpec{ID: "r_x", Domain: "axb.example"})
+		for _, d := range []string{"c%d.example", "cxd.example"} {
+			if _, err := store.Create(Job{ID: "job-" + d, Domain: d, Status: JobQueued, CreatedAt: now}); err != nil {
+				t.Fatalf("create job: %v", err)
+			}
+		}
+		for _, b := range []Batch{{ID: "b1", Tag: "t_x!", CreatedAt: now}, {ID: "b2", Tag: "tyx!", CreatedAt: now}} {
+			if err := store.CreateBatch(b); err != nil {
+				t.Fatalf("create batch: %v", err)
+			}
+		}
+
+		if got := store.ListRuns(RunFilter{Domain: "a_b", Limit: 10}); got.Total != 1 || got.Items[0].ID != "r_us" {
+			t.Errorf("runs matching a_b = %d, want r_us only", got.Total)
+		}
+		if got := store.ListDomains(DomainFilter{Name: "A_B", Limit: 10}); got.Total != 1 || got.Items[0].Name != "a_b.example" {
+			t.Errorf("domains matching A_B = %d, want a_b.example only", got.Total)
+		}
+		if got := store.List(JobFilter{Domain: "c%d", Limit: 10}); got.Total != 1 || got.Items[0].Domain != "c%d.example" {
+			t.Errorf("jobs matching c%%d = %d, want c%%d.example only", got.Total)
+		}
+		if got := store.ListBatches("t_x!", 10, 0); got.Total != 1 || got.Items[0].ID != "b1" {
+			t.Errorf("batches matching t_x! = %d, want b1 only", got.Total)
+		}
+	})
+}
+
 func TestListRunsDomainExact(t *testing.T) {
 	forEachStore(t, func(t *testing.T, store JobStore) {
 		seedGraduatedRun(t, store, runSpec{ID: "r_exact", Domain: "example.se"})

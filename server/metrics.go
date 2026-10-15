@@ -3,6 +3,7 @@ package server
 import (
 	"maps"
 	"math"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -434,15 +435,24 @@ func (m *MetricsCollector) ObserveJobStatusTransition(fromStatus, toStatus JobSt
 	m.mu.Unlock()
 }
 
+// metricsMethod folds a method outside the standard set into OTHER.
+func metricsMethod(method string) string {
+	switch m := strings.ToUpper(method); m {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut,
+		http.MethodPatch, http.MethodDelete, http.MethodOptions:
+		return m
+	case "":
+		return "UNKNOWN"
+	}
+	return "OTHER"
+}
+
 // ObserveAPIRequest records one API request observation.
 func (m *MetricsCollector) ObserveAPIRequest(route string, method string, statusCode int, duration time.Duration, errorCode string) {
 	if route == "" {
 		route = "/api/v1/unknown"
 	}
-	if method == "" {
-		method = "UNKNOWN"
-	}
-	method = strings.ToUpper(method)
+	method = metricsMethod(method)
 	statusClass := statusClassFromCode(statusCode)
 	key := method + " " + route
 

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -393,6 +394,25 @@ func TestMetricsCollectorTracksAPIRequests(t *testing.T) {
 	}
 	if second.LatencyMs.P50 != 25 || second.LatencyMs.P90 != 25 || second.LatencyMs.P99 != 25 {
 		t.Fatalf("second.latency_ms = %+v, want p50=25 p90=25 p99=25", second.LatencyMs)
+	}
+}
+
+func TestMetricsCollectorFoldsUnknownMethods(t *testing.T) {
+	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	collector := newMetricsCollector(DefaultConfig(), startedAt)
+
+	for _, method := range []string{"FOO1", "FOO2", "get", "PROPFIND", ""} {
+		collector.ObserveAPIRequest("/pub/api/v1/jobs", method, 405, time.Millisecond, "")
+	}
+
+	snapshot := collector.snapshotAt(startedAt.Add(time.Minute))
+	got := map[string]int64{}
+	for _, route := range snapshot.API.Routes {
+		got[route.Method] = route.RequestsTotal
+	}
+	want := map[string]int64{"OTHER": 3, "GET": 1, "UNKNOWN": 1}
+	if !maps.Equal(got, want) {
+		t.Errorf("requests by method = %v, want %v", got, want)
 	}
 }
 

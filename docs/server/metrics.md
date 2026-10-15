@@ -135,7 +135,7 @@ Included families:
 - Server gauges for build info, start time, worker counts, queue paused, queue depth, and in-flight jobs.
 - DNS counters for external queries by family, cache lookups by result, and cache evictions.
 - Job lifecycle counters and current-status gauges.
-- API request counters plus per-route/per-method latency histograms.
+- API request counters plus per-route/per-method latency histograms. A method other than `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` or `OPTIONS` is counted as `OTHER`.
 - `gonemaster_forwarded_headers_stripped_total` and the `gonemaster_rate_limit_keys` gauge.
 - `gonemaster_scheduled_runs_total{outcome}` and the `gonemaster_scheduler_enabled` gauge.
 - Job duration histogram, severity totals, and locale usage totals.

@@ -149,6 +149,7 @@ var registryEntries = []registryEntry{
 	{"192.31.196.1", ""},
 	{"192.52.193.1", ""},
 	{"192.88.99.1", "Deprecated (6to4 Relay Anycast)"},
+	{"192.88.99.2", "6a44-relay anycast address"},
 	{"192.168.1.1", "Private-Use"},
 	{"192.175.48.6", ""},
 	{"198.18.0.1", "Benchmarking"},
@@ -200,8 +201,8 @@ func TestNotQueryableReasonPerRegistryEntry(t *testing.T) {
 
 func TestRegistryEntriesCoverEveryBlock(t *testing.T) {
 	blocks := slices.Concat(IPv4SpecialAddresses, IPv6SpecialAddresses)
-	if len(blocks) != 50 {
-		t.Fatalf("registry has %d blocks, want 50", len(blocks))
+	if len(blocks) != 51 {
+		t.Fatalf("registry has %d blocks, want 51", len(blocks))
 	}
 	seen := map[netip.Prefix]bool{}
 	for _, e := range registryEntries {

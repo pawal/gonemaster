@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- engine: the IPv4 special-purpose registry includes the 6a44 relay anycast address `192.88.99.2/32` (RFC 6751)
+
 ## [v1.7.23] - 2026-10-15
 
 Public analysis reads are rate limited and cached, job test lists are checked, and control octets from zone data are escaped in every output. On MariaDB the first start widens the JSON columns of the runs, profiles and analysis tables to MEDIUMTEXT, which can take minutes on a large database. An unknown testcase in `tests` gets 400 `unknown_testcase`.

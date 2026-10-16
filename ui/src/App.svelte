@@ -45,6 +45,7 @@
   let jobSort = $state("started_at_desc");
   let jobBatchFilter = $state("");
   let recentDomainFilter = $state("");
+  let jobClientFilter = $state("");
   let recentPageSize = $state(20);
   let recentCursor = $state(0);
 
@@ -206,6 +207,7 @@
     if (state.severityFilter) severityFilter = state.severityFilter;
     if (typeof state.jobBatchFilter === "string") jobBatchFilter = state.jobBatchFilter;
     if (typeof state.recentDomainFilter === "string") recentDomainFilter = state.recentDomainFilter;
+    if (typeof state.jobClientFilter === "string") jobClientFilter = state.jobClientFilter;
     if (state.recentPageSize !== undefined) recentPageSize = normalizeRecentPageSize(state.recentPageSize);
     if (state.recentCursor !== undefined) recentCursor = normalizeCursor(state.recentCursor);
     if (state.batchSort) batchSort = state.batchSort;
@@ -223,6 +225,7 @@
       severityFilter,
       jobBatchFilter: jobBatchFilter.trim(),
       recentDomainFilter: recentDomainFilter.trim(),
+      jobClientFilter: jobClientFilter.trim(),
       recentPageSize: normalizeRecentPageSize(recentPageSize),
       recentCursor: normalizeCursor(recentCursor),
       batchSort,
@@ -269,6 +272,15 @@
   };
   const navigateToDomainDetail = (d) => {
     if (d?.name) navigate("domains", { domainName: d.name });
+  };
+  const filterJobsByClient = (ip) => {
+    if (!dirtyGuard.confirmLeave()) return;
+    jobClientFilter = ip;
+    jobBatchFilter = "";
+    recentDomainFilter = "";
+    severityFilter = "all";
+    recentCursor = 0;
+    navigate("recent");
   };
   const goToDomainDetail = () => navigate("domains");
   const goToTagList = () => navigate("tags");
@@ -637,6 +649,7 @@
     severityFilter,
     jobBatchFilter,
     recentDomainFilter,
+    jobClientFilter,
     String(recentPageSize),
     String(recentCursor),
     batchSort,
@@ -843,6 +856,7 @@
         onLoadResult={() => loadJobResult()}
         onNavigateDomain={navigateToDomainByName}
         onNavigateBatch={openBatch}
+        onFilterClient={filterJobsByClient}
       />
     </div>
   {:else if activeTab === "recent"}
@@ -858,6 +872,7 @@
       bind:severityFilter
       bind:jobBatchFilter
       bind:recentDomainFilter
+      bind:jobClientFilter
       bind:recentPageSize
       bind:recentCursor
       onNavigateJob={navigateToJob}

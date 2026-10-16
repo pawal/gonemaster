@@ -123,4 +123,29 @@ describe("JobInspector", () => {
     });
     expect(screen.getByText("#99")).toBeInTheDocument();
   });
+
+  it("shows the submitting client and filters jobs by its address", async () => {
+    const onFilterClient = vi.fn();
+    render(JobInspector, {
+      props: {
+        selectedJob: {
+          id: "j1", status: "succeeded", domain: "example.com", created_at: "2026-01-01T00:00:00Z",
+          client_ip: "198.51.100.7", client_user_agent: "python-requests/2.32", client_via: "api",
+        },
+        onFilterClient,
+      },
+    });
+    expect(screen.getByText("python-requests/2.32")).toBeInTheDocument();
+    expect(screen.getByText("API")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "198.51.100.7" }));
+    expect(onFilterClient).toHaveBeenCalledWith("198.51.100.7");
+  });
+
+  it("omits the client rows for a job without a recorded client", () => {
+    render(JobInspector, {
+      props: { selectedJob: { id: "j1", status: "running", domain: "example.com", created_at: "2026-01-01T00:00:00Z" } },
+    });
+    expect(screen.queryByText("Client")).toBeNull();
+    expect(screen.queryByText("User-Agent")).toBeNull();
+  });
 });

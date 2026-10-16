@@ -30,7 +30,7 @@ describe("constants", () => {
 
   it("lists all persisted URL query keys", () => {
     expect(persistedQueryKeys).toEqual(
-      ["r_sort", "r_sev", "r_batch", "r_domain", "r_limit", "r_cursor",
+      ["r_sort", "r_sev", "r_batch", "r_domain", "r_client", "r_limit", "r_cursor",
        "b_id", "b_sort", "b_limit", "b_cursor", "b_status", "b_domain"],
     );
   });
@@ -91,13 +91,14 @@ describe("decodeStateFromURL", () => {
 
   it("decodes a typical query string", () => {
     const params = new URLSearchParams(
-      "r_sort=domain_asc&r_sev=errors_only&r_batch=batch1&r_domain=example.com&r_limit=50&r_cursor=10&b_id=b2&b_sort=started_at_asc&b_limit=10&b_cursor=5&b_status=running&b_domain=foo",
+      "r_sort=domain_asc&r_sev=errors_only&r_batch=batch1&r_domain=example.com&r_client=192.0.2.1&r_limit=50&r_cursor=10&b_id=b2&b_sort=started_at_asc&b_limit=10&b_cursor=5&b_status=running&b_domain=foo",
     );
     expect(decodeStateFromURL(params, validators)).toEqual({
       jobSort: "domain_asc",
       severityFilter: "errors_only",
       jobBatchFilter: "batch1",
       recentDomainFilter: "example.com",
+      jobClientFilter: "192.0.2.1",
       recentPageSize: 50,
       recentCursor: 10,
       selectedBatchId: "b2",
@@ -149,6 +150,7 @@ describe("decodeStateFromStorage", () => {
       severityFilter: "warnings_plus",
       jobBatchFilter: "  b1  ",
       recentDomainFilter: "  example.com  ",
+      jobClientFilter: "  192.0.2.1  ",
       recentPageSize: 50,
       recentCursor: 3,
       selectedBatchId: "  bid  ",
@@ -163,6 +165,7 @@ describe("decodeStateFromStorage", () => {
       severityFilter: "warnings_plus",
       jobBatchFilter: "b1",
       recentDomainFilter: "example.com",
+      jobClientFilter: "192.0.2.1",
       recentPageSize: 50,
       recentCursor: 3,
       selectedBatchId: "bid",
@@ -191,6 +194,7 @@ describe("encodeStateToURLParams", () => {
       severityFilter: "all",
       jobBatchFilter: "",
       recentDomainFilter: "",
+      jobClientFilter: "",
       recentPageSize: 20,
       recentCursor: 0,
       selectedBatchId: "",
@@ -210,6 +214,7 @@ describe("encodeStateToURLParams", () => {
       severityFilter: "errors_only",
       jobBatchFilter: "b1",
       recentDomainFilter: "example.com",
+      jobClientFilter: "192.0.2.1",
       recentPageSize: 50,
       recentCursor: 10,
       selectedBatchId: "bid",
@@ -225,6 +230,7 @@ describe("encodeStateToURLParams", () => {
     expect(parsed.get("r_sev")).toBe("errors_only");
     expect(parsed.get("r_batch")).toBe("b1");
     expect(parsed.get("r_domain")).toBe("example.com");
+    expect(parsed.get("r_client")).toBe("192.0.2.1");
     expect(parsed.get("r_limit")).toBe("50");
     expect(parsed.get("r_cursor")).toBe("10");
     expect(parsed.get("b_id")).toBe("bid");
@@ -242,6 +248,7 @@ describe("encodeStateToURLParams", () => {
       severityFilter: "all",
       jobBatchFilter: "",
       recentDomainFilter: "",
+      jobClientFilter: "",
       recentPageSize: 20,
       recentCursor: 0,
       selectedBatchId: "",

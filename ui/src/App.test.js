@@ -505,6 +505,30 @@ describe("App", () => {
     });
   });
 
+  it("opens recent tests filtered by the client address shown in the inspector", async () => {
+    const job = {
+      id: "job_client",
+      domain: "client.example",
+      status: "running",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 25,
+      client_ip: "198.51.100.7",
+      client_via: "api",
+    };
+    const calls = installFetchRoutes({ "/api/v1/jobs?": { items: [job], total: 1 }, [`/api/v1/jobs/${job.id}`]: job });
+    window.history.replaceState(null, "", `/#/single/${job.id}`);
+
+    render(App);
+    await fireEvent.click(await screen.findByRole("button", { name: "198.51.100.7" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Recent Tests" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByLabelText("Client address")).toHaveValue("198.51.100.7");
+      expect(calls.some((value) => value.includes("client_ip=198.51.100.7"))).toBe(true);
+      expect(new URLSearchParams(window.location.search).get("r_client")).toBe("198.51.100.7");
+    });
+  });
+
   it("normalizes invalid persisted URL filters and pagination values", async () => {
     window.history.replaceState(
       null,

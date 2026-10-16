@@ -5,6 +5,7 @@ export const persistedQueryKeys = [
   "r_sev",
   "r_batch",
   "r_domain",
+  "r_client",
   "r_limit",
   "r_cursor",
   "b_id",
@@ -46,6 +47,7 @@ export const decodeStateFromURL = (params, validators) => {
 
   if (params.has("r_batch")) next.jobBatchFilter = (params.get("r_batch") || "").trim();
   if (params.has("r_domain")) next.recentDomainFilter = (params.get("r_domain") || "").trim();
+  if (params.has("r_client")) next.jobClientFilter = (params.get("r_client") || "").trim();
   if (params.has("r_limit")) next.recentPageSize = validators.normalizeRecentPageSize(params.get("r_limit"));
   if (params.has("r_cursor")) next.recentCursor = normalizeCursor(params.get("r_cursor"));
 
@@ -86,6 +88,7 @@ export const decodeStateFromStorage = (raw, validators) => {
   }
   if (typeof parsed.jobBatchFilter === "string") next.jobBatchFilter = parsed.jobBatchFilter.trim();
   if (typeof parsed.recentDomainFilter === "string") next.recentDomainFilter = parsed.recentDomainFilter.trim();
+  if (typeof parsed.jobClientFilter === "string") next.jobClientFilter = parsed.jobClientFilter.trim();
 
   next.recentPageSize = validators.normalizeRecentPageSize(parsed.recentPageSize);
   next.recentCursor = normalizeCursor(parsed.recentCursor);
@@ -114,6 +117,7 @@ export const encodeStateToURLParams = (params, state) => {
   if (state.severityFilter !== "all") params.set("r_sev", state.severityFilter);
   if (state.jobBatchFilter) params.set("r_batch", state.jobBatchFilter);
   if (state.recentDomainFilter) params.set("r_domain", state.recentDomainFilter);
+  if (state.jobClientFilter) params.set("r_client", state.jobClientFilter);
   if (state.recentPageSize !== 20) params.set("r_limit", String(state.recentPageSize));
   if (state.recentCursor > 0) params.set("r_cursor", String(state.recentCursor));
   if (state.selectedBatchId) params.set("b_id", state.selectedBatchId);

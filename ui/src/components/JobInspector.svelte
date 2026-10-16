@@ -21,6 +21,7 @@
     onLoadResult = () => {},
     onNavigateDomain = () => {},
     onNavigateBatch = () => {},
+    onFilterClient = () => {},
   } = $props();
 
   const formatJobTotalRuntime = (job) => formatJobTotalRuntimeRaw(job, isActiveJobStatus);
@@ -74,6 +75,19 @@
       {/if}
       <span>{$t("created_label")}</span>
       <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
+      {#if selectedJob.client_ip}
+        <span>{$t("job_client_label")}</span>
+        <strong class="client">
+          <button class="ghost btn-text-mono" type="button" title={$t("job_client_filter_title")} onclick={() => onFilterClient(selectedJob.client_ip)}>{selectedJob.client_ip}</button>
+          {#if selectedJob.client_via}
+            <span class="badge">{selectedJob.client_via === "ui" ? $t("job_client_via_ui") : $t("job_client_via_api")}</span>
+          {/if}
+        </strong>
+      {/if}
+      {#if selectedJob.client_user_agent}
+        <span>{$t("job_user_agent_label")}</span>
+        <strong class="user-agent">{selectedJob.client_user_agent}</strong>
+      {/if}
       {#if selectedRun}
         <span>{$t("col_duration")}</span>
         <strong>{selectedRun.duration_ms != null ? formatDurationMs(selectedRun.duration_ms) : "-"}</strong>
@@ -104,3 +118,16 @@
     </button>
   {/if}
 </div>
+
+<style>
+  .client {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .user-agent {
+    overflow-wrap: anywhere;
+  }
+</style>

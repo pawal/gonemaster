@@ -20,6 +20,7 @@
     severityFilter = $bindable("all"),
     jobBatchFilter = $bindable(""),
     recentDomainFilter = $bindable(""),
+    jobClientFilter = $bindable(""),
     recentPageSize = $bindable(20),
     recentCursor = $bindable(0),
     onNavigateJob = () => {},
@@ -74,7 +75,7 @@
   });
 
   const filtersActive = $derived(
-    severityFilter !== "all" || recentDomainFilter.trim() !== "" || jobBatchFilter.trim() !== "",
+    severityFilter !== "all" || recentDomainFilter.trim() !== "" || jobBatchFilter.trim() !== "" || jobClientFilter.trim() !== "",
   );
 
   async function loadJobs(options = {}) {
@@ -92,6 +93,8 @@
       if (normalizedBatchID) params.set("batch_id", normalizedBatchID);
       const normalizedDomain = recentDomainFilter.trim();
       if (normalizedDomain) params.set("domain", normalizedDomain);
+      const normalizedClient = jobClientFilter.trim();
+      if (normalizedClient) params.set("client_ip", normalizedClient);
       if (severityFilter !== "all") params.set("severity", severityFilter);
       const list = await apiFetch(`/jobs?${params.toString()}`);
       jobs = list.items || [];
@@ -117,6 +120,7 @@
   async function clearRecentFilters() {
     jobBatchFilter = "";
     recentDomainFilter = "";
+    jobClientFilter = "";
     severityFilter = "all";
     await loadJobs({ resetCursor: true });
   }
@@ -196,6 +200,21 @@
         type="text"
         placeholder="batch_123"
         bind:value={jobBatchFilter}
+        onkeydown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            applyRecentFilters();
+          }
+        }}
+      />
+    </div>
+    <div class="sort-control grow">
+      <label for="recent-client-filter">{$t("client_ip_filter_label")}</label>
+      <input
+        id="recent-client-filter"
+        type="text"
+        placeholder="192.0.2.1"
+        bind:value={jobClientFilter}
         onkeydown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();

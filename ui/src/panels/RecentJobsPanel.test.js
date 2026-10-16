@@ -30,6 +30,7 @@ const baseProps = (overrides = {}) => ({
   severityFilter: "all",
   jobBatchFilter: "",
   recentDomainFilter: "",
+  jobClientFilter: "",
   recentPageSize: 20,
   recentCursor: 0,
   ...overrides,
@@ -51,6 +52,7 @@ describe("RecentJobsPanel", () => {
         jobSort: "domain_asc",
         jobBatchFilter: "batch_x",
         recentDomainFilter: "example.com",
+        jobClientFilter: "2001:db8::1",
         recentPageSize: 50,
         severityFilter: "errors_only",
       }),
@@ -60,6 +62,7 @@ describe("RecentJobsPanel", () => {
     expect(url).toMatch(/sort=domain_asc/);
     expect(url).toMatch(/batch_id=batch_x/);
     expect(url).toMatch(/domain=example.com/);
+    expect(url).toMatch(/client_ip=2001%3Adb8%3A%3A1/);
     expect(url).toMatch(/limit=50/);
     expect(url).toMatch(/severity=errors_only/);
   });

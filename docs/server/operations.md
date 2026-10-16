@@ -30,6 +30,24 @@ curl -s -X POST http://127.0.0.1:8080/api/v1/jobs/batch \
 Batch submission does not support undelegated input. Use a single job when you
 need explicit nameservers or DS records.
 
+### Submitting client
+
+Every job created through `POST /api/v1/jobs`, `POST /api/v1/jobs/batch` or
+`POST /pub/api/v1/jobs` records its client, and the run keeps the values:
+
+| Field | Value |
+|---|---|
+| `client_ip` | The peer address, or the `X-Forwarded-For` hop selected under `trusted_proxy_cidrs`; the address the rate limiter keys on. |
+| `client_user_agent` | The `User-Agent` header, characters outside printable ASCII replaced by `?`, cut to 256 bytes. |
+| `client_via` | `ui` when the request carries an `Origin` of this server, as a browser on the admin or public UI sends; `api` otherwise. A client can forge `Origin`, so `ui` is evidence, not proof. |
+
+Scheduled batches record no client. The fields appear on the admin job and run
+routes and in the admin UI job inspector; no public route returns them.
+`client_ip` on `GET /api/v1/jobs` and `GET /api/v1/runs` selects by address.
+
+An IP address and a User-Agent are personal data. Both are deleted with the
+run, by the retention purge or by batch deletion; no shorter retention applies.
+
 ## Queue Controls
 
 The admin API and admin UI can:
@@ -181,8 +199,8 @@ One `http_request` line per request, on the API mounts (`/api/v1`,
 fonts, and icons a page pulls in, are served without a line, so the log holds
 roughly one entry per page view rather than one per file.
 
-Page views are visitor activity and each line carries the client IP in `remote`,
-so the retention policy of whatever collects stderr also governs this data.
+Page views are visitor activity and each line carries the client IP in `remote`
+and its User-Agent in `user_agent`, so the retention policy of whatever collects stderr also governs this data.
 
 The line's level follows the response status: 2xx/3xx -> `info`, 4xx -> `warn`,
 5xx -> `error`. Fields:
@@ -196,13 +214,14 @@ The line's level follows the response status: 2xx/3xx -> `info`, 4xx -> `warn`,
 | `duration_ms` | Handler wall time in milliseconds. |
 | `bytes` | Response body bytes written. |
 | `remote` | Client IP (honors `trusted_proxy_cidrs`). |
+| `user_agent` | `User-Agent` header, as stored in `client_user_agent`. |
 | `request_id` | Correlation ID, also returned in the `X-Request-Id` header. |
 | `body` | Response body preview, only when `--debug`/`log_level=debug` is set. |
 
 A sample JSON access line:
 
 ```json
-{"time":"2026-07-19T10:00:00Z","level":"INFO","msg":"http_request","method":"GET","path":"/api/v1/runs/r1","route":"/api/v1/runs/{id}","status":200,"duration_ms":12,"bytes":842,"remote":"203.0.113.7","request_id":"9f1c2a3b4d5e6f70"}
+{"time":"2026-07-19T10:00:00Z","level":"INFO","msg":"http_request","method":"GET","path":"/api/v1/runs/r1","route":"/api/v1/runs/{id}","status":200,"duration_ms":12,"bytes":842,"remote":"203.0.113.7","user_agent":"curl/8.7.1","request_id":"9f1c2a3b4d5e6f70"}
 ```
 
 ### Request IDs

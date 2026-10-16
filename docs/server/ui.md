@@ -13,6 +13,7 @@ Features include:
 
 - single and batch job submission
 - job and batch inspectors with auto-refresh
+- the submitting client of each job, with a filter by address
 - queue controls
 - domain registry browsing
 - tag creation, editing, deletion, and membership management

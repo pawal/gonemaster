@@ -123,6 +123,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: client_ip
+          in: query
+          schema:
+            type: string
+          description: Exact submitting client address; an IPv6 address matches in any notation.
         - name: severity
           in: query
           description: Filter by aggregated severity totals before pagination.
@@ -507,6 +512,11 @@ paths:
           schema:
             type: string
           description: Filter by batch ID.
+        - name: client_ip
+          in: query
+          schema:
+            type: string
+          description: Exact submitting client address; an IPv6 address matches in any notation.
         - name: status
           in: query
           schema:
@@ -2908,6 +2918,16 @@ components:
           type: string
         error:
           type: string
+        client_ip:
+          type: string
+          description: Address of the submitting client, the peer address or, behind a trusted proxy, the X-Forwarded-For hop. Empty for scheduled batches and for jobs stored before the field existed.
+        client_user_agent:
+          type: string
+          description: User-Agent of the submitting client; printable ASCII, at most 256 bytes.
+        client_via:
+          type: string
+          enum: [ui, api]
+          description: "`ui` when the submission carried an Origin header of this server, as a browser on its own pages sends; `api` otherwise. A client can forge the header."
 
     JobCreateRequest:
       type: object
@@ -3604,6 +3624,16 @@ components:
         grade:
           type: string
           description: Letter grade derived from score ("A+", "A", "B", "C", "D", or "F").
+        client_ip:
+          type: string
+          description: Address of the submitting client, the peer address or, behind a trusted proxy, the X-Forwarded-For hop. Empty for scheduled batches and for jobs stored before the field existed.
+        client_user_agent:
+          type: string
+          description: User-Agent of the submitting client; printable ASCII, at most 256 bytes.
+        client_via:
+          type: string
+          enum: [ui, api]
+          description: "`ui` when the submission carried an Origin header of this server, as a browser on its own pages sends; `api` otherwise. A client can forge the header."
 
     Profile:
       type: object

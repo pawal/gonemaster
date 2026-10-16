@@ -882,6 +882,7 @@
     <DomainsPanel
       {apiFetch}
       {setStatus}
+      onFilterClient={filterJobsByClient}
       routeDomainName={router.route.domainName}
       routeRunId={router.route.runId}
       onOpenDomain={navigateToDomainByName}

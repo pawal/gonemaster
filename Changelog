@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- admin-ui: the domains view shows the submitting client
+
 ## [v1.7.24] - 2026-10-17
 
 Jobs and runs record the submitting client. The first start adds three columns to the jobs and runs tables and an index on `runs.client_ip`.

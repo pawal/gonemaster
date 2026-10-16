@@ -99,4 +99,25 @@ describe("DomainsPanel", () => {
       expect(onNavigateJob).toHaveBeenCalledWith("job_new");
     });
   });
+
+  it("shows the submitting client of the selected run and filters jobs by its address", async () => {
+    const onFilterClient = vi.fn();
+    apiFetch.mockImplementation((path) => {
+      if (path.startsWith("/domains?")) return Promise.resolve(sampleDomains());
+      if (path.match(/^\/domains\/\d+\/runs/)) {
+        return Promise.resolve({
+          items: [{ ...sampleRuns().items[0], client_ip: "90.230.143.105", client_via: "api", client_user_agent: "mimir-gonemaster-worker/1" }],
+          total: 1,
+        });
+      }
+      if (path.match(/^\/jobs\/.+\/result/)) return Promise.resolve(sampleResult());
+      return Promise.resolve({});
+    });
+    render(DomainsPanel, { props: { apiFetch, routeDomainName: "example.com", onFilterClient } });
+
+    expect(await screen.findByText("mimir-gonemaster-worker/1")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Client" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "90.230.143.105" }));
+    expect(onFilterClient).toHaveBeenCalledWith("90.230.143.105");
+  });
 });

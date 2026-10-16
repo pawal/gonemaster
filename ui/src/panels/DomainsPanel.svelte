@@ -14,6 +14,7 @@
   } from "../lib/sort.js";
   import { hasScore, chipGrade, chipScore } from "../lib/result.js";
   import RunResultView from "../components/RunResultView.svelte";
+  import ClientRows from "../components/ClientRows.svelte";
   import GradeChip from "../components/GradeChip.svelte";
   import { href } from "../lib/router.svelte.js";
 
@@ -30,6 +31,7 @@
     nameserverTimingsEnabled = false,
     resultLocale = "",
     onNavigateJob = () => {},
+    onFilterClient = () => {},
   } = $props();
 
   let selectedDomain = $state(null);
@@ -92,8 +94,11 @@
       score: (left, right) => compareNumber(chipScore(left), chipScore(right)),
       duration_ms: (left, right) => compareNumber(left?.duration_ms, right?.duration_ms),
       entry_count: (left, right) => compareNumber(left?.entry_count, right?.entry_count),
+      client_ip: (left, right) => compareText(left?.client_ip, right?.client_ip),
     }, (left, right) => compareText(left?.id, right?.id))
   );
+
+  const selectedDomainRun = $derived(domainRuns.find((run) => run.id === selectedDomainRunId) ?? null);
 
   async function loadDomains(options = {}) {
     const { reset = false } = options;
@@ -287,6 +292,11 @@
       {#if domainRunResultLoading}
         <p class="muted mt-one">{$t("loading")}</p>
       {:else if selectedDomainRunResult}
+        {#if selectedDomainRun?.client_ip || selectedDomainRun?.client_user_agent}
+          <div class="kv mt-1-25">
+            <ClientRows item={selectedDomainRun} {onFilterClient} />
+          </div>
+        {/if}
         <div class="stack mt-1-25">
           <RunResultView result={selectedDomainRunResult} {scoringEnabled} {nameserverTimingsEnabled} idPrefix="dm-" />
         </div>
@@ -307,6 +317,7 @@
               {#if scoringEnabled}<th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "score")}><button class="table-sort-button" type="button" onclick={() => { sortDomainRuns("score", "desc"); }}><span>{$t("col_score")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "score")}</span></button></th>{/if}
               <th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "duration_ms")}><button class="table-sort-button" type="button" onclick={() => { sortDomainRuns("duration_ms", "desc"); }}><span>{$t("col_duration")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "duration_ms")}</span></button></th>
               <th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "entry_count")}><button class="table-sort-button" type="button" onclick={() => { sortDomainRuns("entry_count", "desc"); }}><span>{$t("col_entries")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "entry_count")}</span></button></th>
+              <th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "client_ip")}><button class="table-sort-button" type="button" onclick={() => { sortDomainRuns("client_ip"); }}><span>{$t("job_client_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "client_ip")}</span></button></th>
             </tr>
           </thead>
           <tbody>
@@ -324,6 +335,7 @@
                 {#if scoringEnabled}<td>{#if hasScore(run)}<GradeChip grade={chipGrade(run)} score={chipScore(run)} />{:else}-{/if}</td>{/if}
                 <td>{run.duration_ms != null ? formatDurationMs(run.duration_ms) : "-"}</td>
                 <td>{run.entry_count ?? 0}</td>
+                <td class="mono">{run.client_ip || "-"}{#if run.client_via} <span class="badge">{run.client_via === "ui" ? $t("job_client_via_ui") : $t("job_client_via_api")}</span>{/if}</td>
               </tr>
             {/each}
           </tbody>

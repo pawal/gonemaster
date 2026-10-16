@@ -42,7 +42,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
 		return
 	}
-	resp, rerr := s.submitBatch(req, "")
+	resp, rerr := s.submitBatch(req, "", s.submitterOf(r))
 	if rerr != nil {
 		rerr.write(w)
 		return
@@ -51,7 +51,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 // submitBatch creates and enqueues a batch; origin is "" or BatchOriginSchedule.
-func (s *Server) submitBatch(req JobBatchRequest, origin string) (JobBatchResponse, *requestError) {
+func (s *Server) submitBatch(req JobBatchRequest, origin string, client submitter) (JobBatchResponse, *requestError) {
 	if req.Nameservers != nil || req.DSInfo != nil {
 		return JobBatchResponse{}, badRequest("undelegated_not_supported_for_batch", "undelegated input is only supported for POST /jobs")
 	}
@@ -130,6 +130,7 @@ func (s *Server) submitBatch(req JobBatchRequest, origin string) (JobBatchRespon
 			ProfileName: resolvedProfile.Name,
 			Origin:      JobOriginBatch,
 		}
+		client.stamp(&job)
 		created, err := s.store.Create(job)
 		if err != nil {
 			return JobBatchResponse{}, &requestError{status: http.StatusInternalServerError, code: "store_error", message: err.Error()}
@@ -457,6 +458,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		IPv6Disabled:  req.IPv6Disabled,
 		Origin:        JobOriginAdmin,
 	}
+	s.submitterOf(r).stamp(&job)
 	created, err := s.store.Create(job)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
@@ -667,6 +669,7 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 		runFilter := RunFilter{
 			Domain:   filter.Domain,
 			BatchID:  filter.BatchID,
+			ClientIP: filter.ClientIP,
 			Severity: filter.Severity,
 			Sort:     filter.Sort,
 			Limit:    offset + limit + len(inFlight),
@@ -718,6 +721,7 @@ func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, stri
 	}
 	filter.BatchID = strings.TrimSpace(query.Get("batch_id"))
 	filter.Domain = strings.TrimSpace(query.Get("domain"))
+	filter.ClientIP = clientIPFilter(query.Get("client_ip"))
 	if rawSeverity := strings.TrimSpace(query.Get("severity")); rawSeverity != "" {
 		severity := JobSeverityFilter(rawSeverity)
 		if !isValidJobSeverityFilter(severity) {

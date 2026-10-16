@@ -700,6 +700,19 @@ var sqlMigrations = []sqlMigration{
 			}
 		},
 	},
+	{
+		// Submitting client of a job, kept on its run.
+		version: 18,
+		stmts: []string{
+			`ALTER TABLE jobs ADD COLUMN client_ip VARCHAR(64) NOT NULL DEFAULT ''`,
+			`ALTER TABLE jobs ADD COLUMN client_user_agent VARCHAR(256) NOT NULL DEFAULT ''`,
+			`ALTER TABLE jobs ADD COLUMN client_via VARCHAR(8) NOT NULL DEFAULT ''`,
+			`ALTER TABLE runs ADD COLUMN client_ip VARCHAR(64) NOT NULL DEFAULT ''`,
+			`ALTER TABLE runs ADD COLUMN client_user_agent VARCHAR(256) NOT NULL DEFAULT ''`,
+			`ALTER TABLE runs ADD COLUMN client_via VARCHAR(8) NOT NULL DEFAULT ''`,
+			`CREATE INDEX IF NOT EXISTS idx_runs_client_ip ON runs(client_ip)`,
+		},
+	},
 }
 
 // bigintType is the 64-bit integer column type of d.

@@ -122,6 +122,10 @@ type Job struct {
 	IPv6Disabled  bool                           `json:"-"`
 	// Origin records the creation site; empty behaves like admin.
 	Origin string `json:"-"`
+	// Submitting client; admin API only.
+	ClientIP        string `json:"client_ip,omitempty"`
+	ClientUserAgent string `json:"client_user_agent,omitempty"`
+	ClientVia       string `json:"client_via,omitempty"`
 	// NameserverTimings carries per-run timing summaries into graduation.
 	NameserverTimings []NameserverTiming `json:"-"`
 	// DNSSECChainJSON carries the extracted chain summary into graduation.
@@ -453,6 +457,10 @@ type Run struct {
 	NameserverTimings []NameserverTiming `json:"nameserver_timings,omitempty"`
 	// Failure reason carried over from the originating job at graduation.
 	Error string `json:"error,omitempty"`
+	// Submitting client; admin API only.
+	ClientIP        string `json:"client_ip,omitempty"`
+	ClientUserAgent string `json:"client_user_agent,omitempty"`
+	ClientVia       string `json:"client_via,omitempty"`
 }
 
 // Entry is a single engine log entry stored as a row for SQL analysis.
@@ -887,6 +895,7 @@ type JobFilter struct {
 	Status        JobStatus
 	BatchID       string
 	Domain        string
+	ClientIP      string
 	Severity      JobSeverityFilter
 	CreatedAfter  time.Time
 	CreatedBefore time.Time
@@ -928,6 +937,7 @@ type RunFilter struct {
 	Domain         string
 	DomainExact    bool // match Domain whole, not as a substring
 	BatchID        string
+	ClientIP       string
 	Tag            string // domain tag (join via domain_tags)
 	EntryTag       string // log event tag (presence in entries)
 	Status         JobStatus

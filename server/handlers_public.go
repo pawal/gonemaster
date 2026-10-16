@@ -175,6 +175,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		IPv6Disabled:  req.IPv6Disabled,
 		Origin:        JobOriginPublic,
 	}
+	s.submitterOf(r).stamp(&job)
 	created, err := s.store.Create(job)
 	if err != nil {
 		s.reqLog(r, slog.LevelError, "public job create failed", "err", err)

@@ -420,6 +420,10 @@ type runSpec struct {
 	Timings  []NameserverTiming
 	Origin   string
 	Progress int
+	// Submitting client recorded on the run.
+	ClientIP        string
+	ClientUserAgent string
+	ClientVia       string
 	// ChainJSON is stored on the run, which only graduation can do because
 	// Create assigns the public id the chain is looked up by.
 	ChainJSON string
@@ -538,6 +542,9 @@ func seedGraduatedRun(t testing.TB, store JobStore, spec runSpec) Job {
 		Progress:          spec.Progress,
 		Origin:            spec.Origin,
 		NameserverTimings: spec.Timings,
+		ClientIP:          spec.ClientIP,
+		ClientUserAgent:   spec.ClientUserAgent,
+		ClientVia:         spec.ClientVia,
 	}
 	if spec.ResolveDomain {
 		d, err := store.GetOrCreateDomain(domain)

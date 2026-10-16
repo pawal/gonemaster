@@ -186,6 +186,7 @@ func (s *Server) accessLogMiddleware(fallbackRoute string, next http.Handler) ht
 			slog.Int64("duration_ms", time.Since(start).Milliseconds()),
 			slog.Int("bytes", rec.bytes),
 			slog.String("remote", clientIP(r, s.trustedProxies)),
+			slog.String("user_agent", clientField(r.UserAgent(), maxClientUserAgentLen)),
 			slog.String("request_id", requestIDFromContext(r.Context())),
 		}
 		if captureBody && rec.body != nil && rec.body.Len() > 0 {

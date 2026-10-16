@@ -573,6 +573,9 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 		if filter.Domain != "" && !strings.Contains(strings.ToLower(job.Domain), strings.ToLower(filter.Domain)) {
 			continue
 		}
+		if filter.ClientIP != "" && job.ClientIP != filter.ClientIP {
+			continue
+		}
 		if !filter.CreatedAfter.IsZero() && job.CreatedAt.Before(filter.CreatedAfter) {
 			continue
 		}
@@ -689,6 +692,9 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 		Grade:             gradePtr,
 		NameserverTimings: cloneNameserverTimings(job.NameserverTimings),
 		Error:             job.Error,
+		ClientIP:          job.ClientIP,
+		ClientUserAgent:   job.ClientUserAgent,
+		ClientVia:         job.ClientVia,
 	}
 	run.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,
@@ -1197,6 +1203,9 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 			continue
 		}
 		if filter.BatchID != "" && r.BatchID != filter.BatchID {
+			continue
+		}
+		if filter.ClientIP != "" && r.ClientIP != filter.ClientIP {
 			continue
 		}
 		if filter.Status != "" && r.Status != filter.Status {
@@ -1914,6 +1923,9 @@ func jobFromRun(r Run) Job {
 		Grade:             r.Grade,
 		NameserverTimings: cloneNameserverTimings(r.NameserverTimings),
 		Error:             r.Error,
+		ClientIP:          r.ClientIP,
+		ClientUserAgent:   r.ClientUserAgent,
+		ClientVia:         r.ClientVia,
 	}
 }
 

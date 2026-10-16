@@ -113,7 +113,7 @@ func (s *Server) scheduledRun(ctx context.Context, sched AnalysisCohortSchedule,
 		ProfileID:              sched.ProfileID,
 		SnapshotIntent:         true,
 		PromoteSnapshotDefault: sched.PromoteDefault,
-	}, BatchOriginSchedule)
+	}, BatchOriginSchedule, submitter{})
 	switch {
 	case rerr == nil:
 		return ScheduleOutcomeSubmitted, resp.BatchID, ""

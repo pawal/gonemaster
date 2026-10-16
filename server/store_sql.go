@@ -159,7 +159,8 @@ func nullFloat64Value(v *float64) sql.NullFloat64 {
 // ── job column helpers ────────────────────────────────────────────────────────
 
 const jobCols = `id, domain_id, domain, batch_id, status, created_at, started_at,
-	progress, error, profile, profile_id, profile_name, config_json, public_id, priority`
+	progress, error, profile, profile_id, profile_name, config_json, public_id, priority,
+	client_ip, client_user_agent, client_via`
 
 type jobConfigJSON struct {
 	Tests         []string                       `json:"tests,omitempty"`
@@ -174,22 +175,24 @@ type jobConfigJSON struct {
 
 func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 	var (
-		id, domain, batchID, status    string
-		domainID                       int64
-		createdAt                      string
-		startedAt                      sql.NullString
-		progress                       int
-		jobError, profile, profileName string
-		profileID                      sql.NullInt64
-		configJSON                     sql.NullString
-		publicID                       sql.NullString
-		priority                       int
+		id, domain, batchID, status          string
+		domainID                             int64
+		createdAt                            string
+		startedAt                            sql.NullString
+		progress                             int
+		jobError, profile, profileName       string
+		profileID                            sql.NullInt64
+		configJSON                           sql.NullString
+		publicID                             sql.NullString
+		priority                             int
+		clientIP, clientUserAgent, clientVia string
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
 		&createdAt, &startedAt,
 		&progress, &jobError, &profile,
 		&profileID, &profileName, &configJSON, &publicID, &priority,
+		&clientIP, &clientUserAgent, &clientVia,
 	); err != nil {
 		return Job{}, err
 	}
@@ -202,28 +205,31 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 	}
 
 	return Job{
-		ID:            id,
-		PublicID:      publicID.String,
-		DomainID:      domainID,
-		BatchID:       batchID,
-		Domain:        domain,
-		Status:        JobStatus(status),
-		CreatedAt:     parseTimestampStr(createdAt),
-		StartedAt:     parseTimestampNullStr(startedAt),
-		Progress:      progress,
-		Error:         jobError,
-		Profile:       profile,
-		ProfileID:     nullInt64Ptr(profileID),
-		ProfileName:   profileName,
-		Priority:      JobPriority(priority),
-		Tests:         cfg.Tests,
-		Overrides:     cfg.Overrides,
-		UndelegatedNS: cfg.UndelegatedNS,
-		UndelegatedDS: cfg.UndelegatedDS,
-		MinLevel:      cfg.MinLevel,
-		IPv4Disabled:  cfg.IPv4Disabled,
-		IPv6Disabled:  cfg.IPv6Disabled,
-		Origin:        cfg.Origin,
+		ID:              id,
+		PublicID:        publicID.String,
+		DomainID:        domainID,
+		BatchID:         batchID,
+		Domain:          domain,
+		Status:          JobStatus(status),
+		CreatedAt:       parseTimestampStr(createdAt),
+		StartedAt:       parseTimestampNullStr(startedAt),
+		Progress:        progress,
+		Error:           jobError,
+		Profile:         profile,
+		ProfileID:       nullInt64Ptr(profileID),
+		ProfileName:     profileName,
+		Priority:        JobPriority(priority),
+		Tests:           cfg.Tests,
+		Overrides:       cfg.Overrides,
+		UndelegatedNS:   cfg.UndelegatedNS,
+		UndelegatedDS:   cfg.UndelegatedDS,
+		MinLevel:        cfg.MinLevel,
+		IPv4Disabled:    cfg.IPv4Disabled,
+		IPv6Disabled:    cfg.IPv6Disabled,
+		Origin:          cfg.Origin,
+		ClientIP:        clientIP,
+		ClientUserAgent: clientUserAgent,
+		ClientVia:       clientVia,
 	}, nil
 }
 
@@ -251,14 +257,14 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 	_, err = s.db.Exec(
 		fmt.Sprintf(`INSERT INTO jobs (id, domain_id, domain, batch_id, status,
 			created_at, started_at, progress, error, profile, profile_id, profile_name,
-			config_json, public_id, priority
-		) VALUES (%s)`, s.phRange(1, 15)),
+			config_json, public_id, priority, client_ip, client_user_agent, client_via
+		) VALUES (%s)`, s.phRange(1, 18)),
 		job.ID, job.DomainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt),
 		job.Progress, job.Error, job.Profile, nullInt64Value(job.ProfileID), job.ProfileName,
 		configJSON,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
-		int(job.Priority),
+		int(job.Priority), job.ClientIP, job.ClientUserAgent, job.ClientVia,
 	)
 	if err != nil {
 		if s.dialect.IsDuplicateKey(err) {
@@ -410,6 +416,9 @@ func (s *SQLJobStore) List(filter JobFilter) JobList {
 	}
 	if filter.Domain != "" {
 		conds = append(conds, "LOWER(domain) LIKE "+addArg(likeContains(filter.Domain))+likeEscape)
+	}
+	if filter.ClientIP != "" {
+		conds = append(conds, "client_ip = "+addArg(filter.ClientIP))
 	}
 	if !filter.CreatedAfter.IsZero() {
 		conds = append(conds, "created_at > "+addArg(formatSortableTimestamp(filter.CreatedAfter)))
@@ -577,8 +586,8 @@ func (s *SQLJobStore) graduateJobOnce(job Job, engineEntries []engine.LogEntry, 
 			sev_notice, sev_warning, sev_error, sev_critical,
 			worst_level, entry_count, profile, profile_id, profile_name,
 			effective_profile, public_id, priority, score, grade, nameserver_timings_json,
-			error
-		) VALUES (%s)`, s.phRange(1, 25)),
+			error, client_ip, client_user_agent, client_via
+		) VALUES (%s)`, s.phRange(1, 28)),
 		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), vals.durationMs,
 		vals.sevNotice, vals.sevWarning, vals.sevError, vals.sevCritical,
@@ -586,7 +595,7 @@ func (s *SQLJobStore) graduateJobOnce(job Job, engineEntries []engine.LogEntry, 
 		job.EffectiveProfile,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
 		int(job.Priority), vals.scoreVal, vals.gradeVal, vals.nameserverTimingsJSON,
-		job.Error,
+		job.Error, job.ClientIP, job.ClientUserAgent, job.ClientVia,
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("insert run: %w", err)
@@ -1338,7 +1347,7 @@ const runCols = `id, domain_id, domain, batch_id, status,
 	sev_notice, sev_warning, sev_error, sev_critical,
 	worst_level, entry_count, profile, profile_id, profile_name,
 	effective_profile, public_id, priority, score, grade, nameserver_timings_json,
-	error`
+	error, client_ip, client_user_agent, client_via`
 
 func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	var (
@@ -1354,7 +1363,7 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		score                                                                           sql.NullInt64
 		grade                                                                           sql.NullString
 		nameserverTimingsJSON                                                           sql.NullString
-		runError                                                                        string
+		runError, clientIP, clientUserAgent, clientVia                                  string
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
@@ -1362,7 +1371,7 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		&sevNotice, &sevWarning, &sevError, &sevCritical,
 		&worstLevel, &entryCount, &profile, &profileID, &profileName,
 		&effectiveProfile, &publicID, &priority, &score, &grade, &nameserverTimingsJSON,
-		&runError,
+		&runError, &clientIP, &clientUserAgent, &clientVia,
 	); err != nil {
 		return Run{}, err
 	}
@@ -1389,6 +1398,9 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		PublicID:         publicID.String,
 		Priority:         JobPriority(priority),
 		Error:            runError,
+		ClientIP:         clientIP,
+		ClientUserAgent:  clientUserAgent,
+		ClientVia:        clientVia,
 	}
 	timings, err := unmarshalNullJSON[[]NameserverTiming](nameserverTimingsJSON)
 	if err != nil {
@@ -1568,6 +1580,9 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	}
 	if filter.BatchID != "" {
 		conds = append(conds, "batch_id = "+addArg(filter.BatchID))
+	}
+	if filter.ClientIP != "" {
+		conds = append(conds, "client_ip = "+addArg(filter.ClientIP))
 	}
 	if filter.Status != "" {
 		conds = append(conds, "status = "+addArg(string(filter.Status)))

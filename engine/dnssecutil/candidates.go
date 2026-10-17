@@ -1,9 +1,13 @@
 package dnssecutil
 
 import (
+	"errors"
+	"slices"
+	"strings"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 )
 
 // Caps on RRSIG verification; a key tag is not a unique identifier (RFC 4034 Appendix B).
@@ -11,6 +15,9 @@ const (
 	MaxKeysPerTag     = 4
 	MaxRRSIGsPerRRset = 8
 )
+
+// ErrLabels reports an RRSIG Labels field that does not fit its owner and signer.
+var ErrLabels = errors.New("rrsig labels field outside owner or signer zone")
 
 // CandidateKeys returns the first MaxKeysPerTag keys with sig's key tag and algorithm, in order, and how many carry both.
 func CandidateKeys(sig *dns.RRSIG, keys []*dns.DNSKEY) ([]*dns.DNSKEY, int) {
@@ -43,6 +50,9 @@ func VerifyCandidates(sig *dns.RRSIG, rrset []dns.RR, keys []*dns.DNSKEY, at tim
 	if sig == nil {
 		return fail(errMissing)
 	}
+	if slices.ContainsFunc(rrset, func(rr dns.RR) bool { return rr != nil && !labelsContained(sig, rr.Header().Name) }) {
+		return fail(ErrLabels)
+	}
 	if !sig.ValidPeriod(at) {
 		return fail(errOutOfRange)
 	}
@@ -58,4 +68,19 @@ func VerifyCandidates(sig *dns.RRSIG, rrset []dns.RR, keys []*dns.DNSKEY, at tim
 		return key, errs
 	}
 	return nil, errs
+}
+
+// labelsContained reports whether sig's Labels field fits owner and reconstructs a name in the signer zone, below its apex unless it is owner.
+func labelsContained(sig *dns.RRSIG, owner string) bool {
+	if !dnsutil.IsFqdn(owner) || !dnsutil.IsFqdn(sig.SignerName) {
+		return false
+	}
+	n, l := dnsutil.Labels(owner), int(sig.Labels)
+	if l > n || !dnsutil.IsBelow(sig.SignerName, owner) {
+		return false
+	}
+	if l == n || l == n-1 && strings.HasPrefix(owner, "*.") {
+		return true // reconstructs owner itself
+	}
+	return l >= dnsutil.Labels(sig.SignerName)
 }

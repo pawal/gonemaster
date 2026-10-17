@@ -537,7 +537,11 @@ Implementation-defined choices, none of them mandated by the protocol:
   that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset`
   or `keys_per_tag`, once per testcase
   ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is
-  verified over one copy of the RRset.
+  verified over one copy of the RRset. An RRSIG does not verify when its Labels
+  field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It
+  also fails when the owner name rebuilt from that field (RFC 4035 section
+  5.3.2) is not at or below the Signer's Name, or is the Signer's Name but
+  differs from the RRset owner.
 
 ## Evidence In Gonemaster
 - Code paths:

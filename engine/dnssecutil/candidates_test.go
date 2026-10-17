@@ -81,6 +81,20 @@ func TestVerifyCandidatesWildcardAfterFailedKeys(t *testing.T) {
 	}
 }
 
+func TestVerifyCandidatesWildcardAboveSigner(t *testing.T) {
+	kp := dnstest.GenKey(t, "c.example.test", dns.ED25519, false)
+	a := &dns.A{Hdr: dns.Header{Name: "*.example.test.", Class: dns.ClassINET, TTL: 300}}
+	a.Addr = netip.MustParseAddr("192.0.2.1")
+	now := time.Now().UTC()
+	sig := dnstest.SignRRset(t, kp, []dns.RR{a}, "*.example.test", "c.example.test", now.Add(-time.Hour), now.Add(time.Hour))
+	a.Hdr.Name = "a.c.example.test."
+
+	key, errs := dnssecutil.VerifyCandidates(sig, []dns.RR{a}, []*dns.DNSKEY{kp.Key}, now)
+	if key != nil || len(errs) != 1 || !errors.Is(errs[0], dnssecutil.ErrLabels) {
+		t.Fatalf("key = %v, errors = %v; want nil and one ErrLabels", key, errs)
+	}
+}
+
 func TestVerifyCandidatesOutsideWindowTriesNoKey(t *testing.T) {
 	kp, rrset, sig, _ := signedA(t, "www.example.test")
 	keys := append(dnstest.SameTagKeys(t, kp.Key, 1), kp.Key)

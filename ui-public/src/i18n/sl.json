@@ -490,7 +490,7 @@
   "pub.tag.delegation.TOTAL_NAME_MISMATCH.header": "Nadrejena cona in cona navajata različne imenske strežnike",
   "pub.tag.delegation.TOTAL_NAME_MISMATCH.desc": "Nabor imenskih strežnikov v delegaciji nadrejene cone in nabor imenskih strežnikov, ki jih objavlja vaša cona sama, nimata nobenega skupnega imena. Razreševalniki in preverjalniki, ki oba primerjajo, bodo vašo domeno obravnavali kot napačno nastavljeno; odvisno od tega, kateri strani razreševalnik zaupa, lahko izbere povsem drug strežnik kot tistega, ki ga trenutno uporabljate.",
   "pub.tag.syntax.NON_ALLOWED_CHARS.header": "Nedovoljeni znaki v imenu domene",
-  "pub.tag.syntax.NON_ALLOWED_CHARS.desc": "Ime domene vsebuje vsaj en znak zunaj dovoljenega nabora črk, števk in vezaja. Registratorji in razreševalniki, ki upoštevajo pravila DNS za imena gostiteljev, ga ne bodo želeli poiskati, zato domena za marsikaterega uporabnika ne bo delovala, tudi če jo nekateri sistemi dopuščajo.",
+  "pub.tag.syntax.NON_ALLOWED_CHARS.desc": "Ime domene vsebuje vsaj en znak zunaj dovoljenega nabora črk, števk in vezaja. Registrarji in razreševalniki, ki upoštevajo pravila DNS za imena gostiteljev, ga ne bodo želeli poiskati, zato domena za marsikaterega uporabnika ne bo delovala, tudi če jo nekateri sistemi dopuščajo.",
   "pub.tag.syntax.INITIAL_HYPHEN.header": "Oznaka se začne z vezajem",
   "pub.tag.syntax.INITIAL_HYPHEN.desc": "Ena od oznak v imenu vaše domene se začne z vezajem, kar po pravilih DNS za imena gostiteljev ni dovoljeno. Programska oprema, ki pravila uveljavlja, bo ime obravnavala kot neveljavno, zato se domena na več mestih, kjer se sicer zdi, da deluje, ne bo razrešila ali registrirala.",
   "pub.tag.syntax.TERMINAL_HYPHEN.header": "Oznaka se konča z vezajem",

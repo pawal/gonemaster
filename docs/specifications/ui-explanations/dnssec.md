@@ -114,6 +114,12 @@ Description:
 
 NSEC and NSEC3 records carry a type bitmap telling resolvers which record types exist at a name. If the bitmap lists fewer types than actually exist, resolvers using aggressive negative caching can be fooled into caching a wrong "does not exist" answer. This check compares the bitmap at the apex with the types really present and flags any mismatch.
 
+## Testcase dnssec21
+
+Description:
+
+DNSSEC delegations require the parent zone to sign the DS RRset for the child with one of its own DNSKEYs. If that signature is missing, expired, or signed by a key the parent no longer publishes, validating resolvers reject the delegation with SERVFAIL even when the child zone is configured correctly. This check queries each parent nameserver for the DS records and the parent apex DNSKEYs and verifies that at least one parent nameserver returns a DS RRset whose RRSIG validates against a published parent DNSKEY.
+
 ## Testcase dnssec22
 
 Description:
@@ -1266,6 +1272,62 @@ Header: NSEC bitmap misses present record type
 Description:
 
 An NSEC record's type bitmap is missing an RR type that exists at the owner name. Resolvers using RFC 8198 aggressive negative caching can then serve wrong "no such type" answers from cache, so this is a correctness and security issue that must be fixed at the signer.
+
+## Tag DS21_DS_RRSIG_EXPIRED
+
+Header: Parent DS signature expired
+
+Description:
+
+The signature that the parent zone serves over your DS record has passed its expiration date. A validating resolver that receives it cannot authenticate the DS record, so your zone fails to validate for the users of that resolver. Only the operator of the parent zone can fix this; for a domain registered under a top-level domain, report it to your registrar.
+
+## Tag DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY
+
+Header: Parent DS signature invalid
+
+Description:
+
+The signature over your DS record does not verify against the parent zone key it names; the signature may be corrupt or malformed, or the DS records may have changed after signing. A validating resolver that receives it cannot authenticate the DS record. Only the operator of the parent zone can fix this; for a domain registered under a top-level domain, report it to your registrar.
+
+## Tag DS21_DS_RRSIG_NOT_VERIFIABLE
+
+Header: No valid parent DS signature
+
+Description:
+
+No nameserver of the parent zone returned your DS record with a signature that verifies against the parent zone's keys. Validating resolvers cannot authenticate the DS record, so your zone fails to validate even when it is signed correctly. Only the operator of the parent zone can fix this; for a domain registered under a top-level domain, report it to your registrar.
+
+## Tag DS21_DS_RRSIG_NOT_YET_VALID
+
+Header: Parent DS signature not yet valid
+
+Description:
+
+The signature that the parent zone serves over your DS record has a "not valid before" time in the future. Resolvers refuse a signature that is not yet active, so they cannot authenticate the DS record until that time. Only the operator of the parent zone can fix this; for a domain registered under a top-level domain, report it to your registrar.
+
+## Tag DS21_NO_DNSKEY_FOR_DS_RRSIG
+
+Header: Parent DS signed by unknown key
+
+Description:
+
+The signature over your DS record names a key that the parent zone does not publish, which happens when the parent removes a key before replacing its signatures. Resolvers cannot find the key to check the signature, so they cannot authenticate the DS record. Only the operator of the parent zone can fix this; for a domain registered under a top-level domain, report it to your registrar.
+
+## Tag DS21_NO_DS_RRSIG
+
+Header: Parent DS unsigned
+
+Description:
+
+A nameserver of the parent zone returns your DS record without the signature that must accompany it. A validating resolver that receives this answer cannot authenticate the DS record. Only the operator of the parent zone can fix this; for a domain registered under a top-level domain, report it to your registrar.
+
+## Tag DS21_PARENT_DNSKEY_MISSING
+
+Header: Parent DNSKEY not served
+
+Description:
+
+A nameserver of the parent zone did not answer authoritatively for the parent zone's own DNSKEY records, so the signature over your DS record could not be checked. A resolver that asks this server for the keys cannot build the chain of trust down to your zone. Only the operator of the parent zone can fix this; for a domain registered under a top-level domain, report it to your registrar.
 
 ## Tag DS22_NS_ADDRESS_CHAIN_BROKEN
 

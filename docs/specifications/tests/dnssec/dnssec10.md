@@ -117,7 +117,7 @@ query NSEC at apex (DNSSEC=on)
    +- sig.Inception  > now                   -> *RRSIGNotYetValid[keytag]
    +- verify succeeds against any DNSKEY     -> *RRSIGVerified  (sets per-NS flag)
    +- verify fails with dns.ErrAlg           -> algoNotSupportedByZM[keytag][algo]
-   +- verify fails for any other reason      -> *RRSIGVerifyError[keytag]
+   +- verify fails for any other reason      -> *RRSIGVerifyError[keytag, reason]
 ```
 {{% /expand %}}
 
@@ -186,7 +186,9 @@ After the per-nameserver phase, with:
 
 3. Signature conditions
      One tag per (kind, keytag):
-       DS10_{NSEC,NSEC3}_RRSIG_{NO_DNSKEY, EXPIRED, NOT_YET_VALID, VERIFY_ERROR}
+       DS10_{NSEC,NSEC3}_RRSIG_{NO_DNSKEY, EXPIRED, NOT_YET_VALID}
+     One tag per (kind, keytag, reason):
+       DS10_{NSEC,NSEC3}_RRSIG_VERIFY_ERROR
      One tag per (keytag, algo):
        DS10_ALGO_NOT_SUPPORTED_BY_ZM
      DS10_{NSEC,NSEC3}_NO_VERIFIED_SIGNATURE =
@@ -279,7 +281,7 @@ After the per-nameserver phase, with:
 | `DS10_NSEC3_RRSIG_EXPIRED` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
 | `DS10_NSEC3_RRSIG_NOT_YET_VALID` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
 | `DS10_NSEC3_RRSIG_NO_DNSKEY` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
-| `DS10_NSEC3_RRSIG_VERIFY_ERROR` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
+| `DS10_NSEC3_RRSIG_VERIFY_ERROR` | `keytag`, `reason`, `servers` | `int`, `string`, `array<object>` | Keytag, reason and affected nameservers as `{ns,address}` items. `reason` is `labels` when the Labels field does not fit the owner and Signer's Name, `signature` otherwise (Implementation Notes). |
 | `DS10_NSEC_ERR_TYPE_LIST` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC_GIVES_ERR_ANSWER` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC_MISMATCHES_APEX` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
@@ -291,7 +293,7 @@ After the per-nameserver phase, with:
 | `DS10_NSEC_RRSIG_EXPIRED` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
 | `DS10_NSEC_RRSIG_NOT_YET_VALID` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
 | `DS10_NSEC_RRSIG_NO_DNSKEY` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
-| `DS10_NSEC_RRSIG_VERIFY_ERROR` | `keytag`, `servers` | `int`, `array<object>` | Keytag and affected nameservers as `{ns,address}` items. |
+| `DS10_NSEC_RRSIG_VERIFY_ERROR` | `keytag`, `reason`, `servers` | `int`, `string`, `array<object>` | Keytag, reason and affected nameservers as `{ns,address}` items. `reason` is `labels` when the Labels field does not fit the owner and Signer's Name, `signature` otherwise (Implementation Notes). |
 | `DS10_SERVER_NO_DNSSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) without DNSKEY among mixed responders. |
 | `DS10_ZONE_NO_DNSSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) without DNSKEY when zone appears unsigned. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
@@ -369,7 +371,7 @@ The following behaviors are implementation choices, not mandated by RFC 4034, RF
 - **Deduplication by IP**: The nameserver set is built by IP address; delegation and zone NS entries sharing the same IP are merged.  First-seen nameserver identity string (`name/ip`) is used in output arguments.  The protocol does not specify how to handle NS records for the same IP from different sources.
 - **`servers` vs `addresses` argument name**: Most DS10 tags use `servers` (nameserver identity strings) while `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `addresses` (raw IPs from the signature verification path).  This asymmetry is an implementation-defined output format.
 - **RFC 4470 / RFC 9824 white-lies NSEC handling**: When the NSEC query returns a NODATA response with NSEC in the authority section (rather than NSEC in the answer section), this is recognized as NSEC evidence from an on-line signing / minimally covering NSEC (RFC 4470) or compact denial of existence (RFC 9824) implementation.  RFC 9824 section 7.2 explicitly permits dynamically generated NSEC records for owner names that don't exist or are ENTs, relaxing the RFC 4035 section 2.3 constraint.  The synthesized NSEC record's type bitmap intentionally excludes the queried type (NSEC) and may include normally-forbidden types (NSEC3PARAM), so type-list validation is skipped for this record.  All other checks (SOA, count, apex owner, signature) are performed normally.  For consistency purposes this evidence is treated identically to NSEC-in-answer.
-- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset. An RRSIG does not verify when its Labels field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It also fails when the owner name rebuilt from that field (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name but differs from the RRset owner.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset. An RRSIG does not verify when its Labels field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It also fails when the owner name rebuilt from that field (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name but differs from the RRset owner. `DS10_NSEC_RRSIG_VERIFY_ERROR` and `DS10_NSEC3_RRSIG_VERIFY_ERROR` carry `reason` `labels` for such an RRSIG and `signature` for any other failure, one finding per key tag and reason.
 
 ## Edge Cases And Limitations
 - Nameserver processing is deduplicated by IP; all DS10 output tags except `DS10_ALGO_NOT_SUPPORTED_BY_ZM` report `servers` as nameserver identity strings (`name/ip`) rather than raw IPs.

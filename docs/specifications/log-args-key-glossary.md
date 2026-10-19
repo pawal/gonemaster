@@ -68,6 +68,12 @@ name; the query trace applies that full set to nameserver and query names.
 | `ds_key_algo_descr` | `string` | Text description of the DS algorithm field value. | |
 | `ds_key_algo_mnemo` | `string` | DNSSEC algorithm mnemonic for the DS algorithm field value (for example `PRIVATEDNS`). | |
 
+## DNSSEC Signature Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `reason` | `string` | Why an RRSIG does not verify, on the tags of a signature that does not verify. | `labels`: the Labels field exceeds the owner's label count (RFC 4035 section 5.3.1), or the owner rebuilt from it (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name and differs from the owner. `signature`: any other failure. On a tag outside DNSSEC, such as `IPV6_AUTO_DISABLED`, free text. |
+
 ## Denial Of Existence Keys
 
 | Key | Type | Meaning | Notes |

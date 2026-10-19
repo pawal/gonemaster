@@ -60,7 +60,7 @@ For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
          no DNSKEY with that keytag and algorithm in answer
                                 -> noMatchingDNSKEY[keytag][ns]
          verify over SOA rrset against matching DNSKEYs:
-            no candidate validates -> rrsigNotValidByDNSKEY[keytag][ns]
+            no candidate validates -> rrsigNotValidByDNSKEY[keytag, reason][ns]
             success                -> mark ns as having at least one valid RRSIG
 
 Emit per category:
@@ -68,7 +68,9 @@ Emit per category:
   per keytag soaRRSIGNotYetValid    -> DS09_SOA_RRSIG_NOT_YET_VALID    (keytag, addresses)
   per keytag soaRRSIGExpired        -> DS09_SOA_RRSIG_EXPIRED          (keytag, addresses)
   per keytag noMatchingDNSKEY       -> DS09_NO_MATCHING_DNSKEY         (keytag, addresses)
-  per keytag rrsigNotValidByDNSKEY  -> DS09_RRSIG_NOT_VALID_BY_DNSKEY  (keytag, addresses)
+  per (keytag, reason) rrsigNotValidByDNSKEY
+                                    -> DS09_RRSIG_NOT_VALID_BY_DNSKEY  (keytag, reason,
+                                                                       addresses)
   per (keytag, algo) algoNotSupportedByZM
                                     -> DS09_ALGO_NOT_SUPPORTED_BY_ZM  (keytag, algo_num,
                                                                        algo_mnemo, addresses)
@@ -107,6 +109,7 @@ emit TEST_CASE_END
 | `DS09_NO_MATCHING_DNSKEY` | `keytag` | `int` | RRSIG keytag with no DNSKEY of that keytag and algorithm. |
 | `DS09_NO_MATCHING_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | RRSIG keytag that failed DNSKEY verification. |
+| `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `reason` | `string` | `labels` when the Labels field does not fit the owner and Signer's Name, `signature` otherwise (Implementation Notes). |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS09_RSA_EXPONENT_UNSUPPORTED` | `keytag` | `int` | RRSIG keytag whose matching DNSKEY RSA public exponent the local verifier cannot use. |
 | `DS09_RSA_EXPONENT_UNSUPPORTED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
@@ -156,4 +159,4 @@ emit TEST_CASE_END
 - An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag and algorithm of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS09_RRSIG_NOT_VALID_BY_DNSKEY`.
 
 ## Implementation Notes
-- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset. An RRSIG does not verify when its Labels field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It also fails when the owner name rebuilt from that field (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name but differs from the RRset owner.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset. An RRSIG does not verify when its Labels field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It also fails when the owner name rebuilt from that field (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name but differs from the RRset owner. `DS09_RRSIG_NOT_VALID_BY_DNSKEY` carries `reason` `labels` for such an RRSIG and `signature` for any other failure, one finding per key tag and reason.

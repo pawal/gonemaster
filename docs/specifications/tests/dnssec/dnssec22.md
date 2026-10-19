@@ -130,8 +130,8 @@ Status: Final
             `keytag`.
           - Inception in the future, no DNSKEY with that keytag, or
             verification failure:
-            `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` with `signer` and
-            `keytag`.
+            `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` with `signer`, and
+            the `keytag` and `reason` of the first failing RRSIG.
           - At least one covering RRSIG verifies: N validates on X, no finding.
         - S is a member of the walk order strictly below E and `cutStatus(X, S)`
           is `not a cut`: `DS22_NS_ADDRESS_ORPHAN_ZONE` with `signer` S. X
@@ -141,8 +141,9 @@ Status: Final
           is `indeterminate`: no finding. X stated nothing about S as a zone
           cut, so neither the orphan nor the signer conclusion is available.
         - Otherwise: `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` with `signer`
-          S and the `keytag` of the first covering RRSIG. The signature cannot
-          verify under the chain of trust of the zone.
+          S, the `keytag` of the first covering RRSIG and `reason`
+          `signature`. The signature cannot verify under the chain of trust of
+          the zone.
 5. For each zone cut C with a name deferred in step 4, once per run. The
    nameservers of C are the `NS` names of its retained referrals that have
    glue, deduplicated by IP across every nameserver that referred to C. An `NS`
@@ -338,7 +339,7 @@ emit TEST_CASE_END
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | The address records are signed by a name the nameserver serves as a zone apex, while the NSEC or NSEC3 record matching that name in the enclosing zone carries no NS bit, so no zone cut is proven. |
 | `DS22_NS_ADDRESS_RRSIG_EXPIRED` | The expiration of the RRSIG covering the address records is in the past (RFC 4035 section 5.3.1). |
 | `DS22_NS_ADDRESS_REFERRED` | The name lies below a delegation whose DS validates, and no nameserver of the delegated zone was reachable for it: no `NS` name of the referral carries glue, no such nameserver answered the `DNSKEY` question authoritatively, or the referral came from a nameserver of the delegated zone itself. |
-| `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | The RRSIG covering the address records does not verify against the DNSKEY RRset of the zone that must sign the name: bad signature, inception in the future, no DNSKEY with the keytag, or a signer that is neither the expected zone nor an orphan apex (RFC 4035 sections 5.3.1 and 5.3.3). |
+| `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | The RRSIG covering the address records does not verify against the DNSKEY RRset of the zone that must sign the name: bad signature, a Labels field that does not fit the owner and signer, inception in the future, no DNSKEY with the keytag, or a signer that is neither the expected zone nor an orphan apex (RFC 4035 sections 5.3.1 and 5.3.3). |
 | `DS22_NS_ADDRESS_UNSIGNED` | The address records, or the NODATA proof standing for them, carry no RRSIG and no insecure delegation lies between the name and the zone apex (RFC 4035 sections 2.2 and 3.1.1). |
 | `DS22_NS_ADDRESS_VALIDATES` | At least one in-domain address RRset validated and no ERROR-level `DS22_*` tag was emitted. |
 | `DS22_ZONE_NOT_SECURE` | No child nameserver returned an apex DNSKEY RRset, or no parent nameserver returned a DS RRset for the zone. |
@@ -367,6 +368,7 @@ emit TEST_CASE_END
 | `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | `ns` | `string` | In-domain nameserver name whose address records were evaluated. |
 | `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | `signer` | `string` | Signer's Name of the failing RRSIG. |
 | `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | Keytag of the failing RRSIG. |
+| `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | `reason` | `string` | `labels` when the Labels field does not fit the owner and Signer's Name, `signature` otherwise (Implementation Notes). |
 | `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that returned the failing RRSIG. |
 | `DS22_NS_ADDRESS_UNSIGNED` | `ns` | `string` | In-domain nameserver name whose address records were evaluated. |
 | `DS22_NS_ADDRESS_UNSIGNED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that returned the unsigned records. |
@@ -541,7 +543,9 @@ Implementation-defined choices, none of them mandated by the protocol:
   field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It
   also fails when the owner name rebuilt from that field (RFC 4035 section
   5.3.2) is not at or below the Signer's Name, or is the Signer's Name but
-  differs from the RRset owner.
+  differs from the RRset owner. `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY`
+  carries `reason` `labels` for such an RRSIG and `signature` for any other
+  failure.
 
 ## Evidence In Gonemaster
 - Code paths:

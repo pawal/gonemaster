@@ -97,10 +97,12 @@ CDS RRSIG verification:
                                         -> DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY
                                            (keytag, addresses)
      verify CDS rrset against each matching DNSKEY:
-        none validates                  -> DS16_CDS_INVALID_RRSIG (keytag, addresses)
+        none validates                  -> DS16_CDS_INVALID_RRSIG
+                                           (keytag, reason, addresses)
 
 Aggregation: each tag is emitted once per (keytag, joined ns IP list)
-where applicable, or once per ns IP list otherwise.
+where applicable, `DS16_CDS_INVALID_RRSIG` once per (keytag, reason, joined
+ns IP list), or once per ns IP list otherwise.
 
 emit TEST_CASE_END
 ```
@@ -129,6 +131,7 @@ emit TEST_CASE_END
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `DS16_CDS_INVALID_RRSIG` | `keytag` | `int` | RRSIG keytag with invalid signature. |
+| `DS16_CDS_INVALID_RRSIG` | `reason` | `string` | `labels` when the Labels field does not fit the owner and Signer's Name, `signature` otherwise (Implementation Notes). |
 | `DS16_CDS_INVALID_RRSIG` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS16_CDS_MATCHES_NON_SEP_DNSKEY` | `keytag` | `int` | CDS keytag referencing non-SEP DNSKEY. |
 | `DS16_CDS_MATCHES_NON_SEP_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
@@ -189,4 +192,4 @@ emit TEST_CASE_END
 - An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag and algorithm of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: an RRSIG that no considered key verifies yields `DS16_CDS_INVALID_RRSIG`.
 
 ## Implementation Notes
-- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset. An RRSIG does not verify when its Labels field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It also fails when the owner name rebuilt from that field (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name but differs from the RRset owner.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset. An RRSIG does not verify when its Labels field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It also fails when the owner name rebuilt from that field (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name but differs from the RRset owner. `DS16_CDS_INVALID_RRSIG` carries `reason` `labels` for such an RRSIG and `signature` for any other failure, one finding per key tag and reason.

@@ -114,7 +114,7 @@ For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
      matchingRRSIG = RRSIGs over DNSKEY rrset with same keytag and algorithm
      verify each; classify:
        err == ErrAlg  -> algoNotSupportedByZM[keytag][algo]
-       other error    -> rrsigNotValidByDNSKEY[keytag]
+       other error    -> rrsigNotValidByDNSKEY[keytag, reason]
        success        -> foundMatch
      no matchingRRSIG OR no success
                        -> noMatchingDNSKEYRRSIG[keytag]
@@ -124,7 +124,9 @@ Aggregation:
   per keytag per category, emit a tag with merged child NS IP list:
     DS02_NO_DNSKEY_FOR_DS, DS02_NO_MATCH_DS_DNSKEY,
     DS02_DNSKEY_NOT_FOR_ZONE_SIGNING, DS02_DNSKEY_NOT_SEP,
-    DS02_NO_MATCHING_DNSKEY_RRSIG, DS02_RRSIG_NOT_VALID_BY_DNSKEY
+    DS02_NO_MATCHING_DNSKEY_RRSIG
+  per (keytag, reason):
+    DS02_RRSIG_NOT_VALID_BY_DNSKEY (keytag, reason, addresses)
   per (keytag, algo):
     DS02_ALGO_NOT_SUPPORTED_BY_ZM (algo_num, algo_mnemo)
   per (keytag, ds algo, dnskey algo):
@@ -190,6 +192,7 @@ emit TEST_CASE_END
 | `DS02_NO_MATCH_DS_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | Keytag from DNSKEY RRSIG verification failure. |
+| `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `reason` | `string` | `labels` when the Labels field does not fit the owner and Signer's Name, `signature` otherwise (Implementation Notes). |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_RSA_EXPONENT_UNSUPPORTED` | `keytag` | `int` | DS-linked DNSKEY keytag whose RSA public exponent the local verifier cannot use. |
 | `DS02_RSA_EXPONENT_UNSUPPORTED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
@@ -242,4 +245,4 @@ emit TEST_CASE_END
 - An RRSIG past the first 8 over its RRset is not considered, and a DNSKEY past the first 4 with the key tag and algorithm of an RRSIG is not tried. A zone whose only valid signature or only verifying key lies past a cut is reported from what was considered: a DS-matched DNSKEY without a verifying RRSIG yields `DS02_NO_MATCHING_DNSKEY_RRSIG`, and an RRSIG that fails `DS02_RRSIG_NOT_VALID_BY_DNSKEY`.
 
 ## Implementation Notes
-- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset. An RRSIG does not verify when its Labels field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It also fails when the owner name rebuilt from that field (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name but differs from the RRset owner.
+- RRSIG verification is bounded: at most 8 RRSIGs over one RRset are considered, and at most 4 DNSKEYs with the key tag and algorithm of an RRSIG are tried for it, each in response order. RFC 4035 section 5.3.1 requires trying every DNSKEY that matches an RRSIG; a key tag is not a unique identifier (RFC 4034 Appendix B), so a zone chooses how many keys match, and the caps depart from that requirement. A cut logs `LIMIT_REACHED` with `bound` `rrsigs_per_rrset` or `keys_per_tag`, once per testcase ([DNSSEC Limits](../../nameserver-resolution.md#dnssec-limits)). Each RRSIG is verified over one copy of the RRset. An RRSIG does not verify when its Labels field exceeds the label count of the RRset owner (RFC 4035 section 5.3.1). It also fails when the owner name rebuilt from that field (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name but differs from the RRset owner. `DS02_RRSIG_NOT_VALID_BY_DNSKEY` carries `reason` `labels` for such an RRSIG and `signature` for any other failure, one finding per key tag and reason.

@@ -255,7 +255,7 @@ Header: RRSIG does not validate
 
 Description:
 
-An RRSIG on the DNSKEY set does not verify against the DNSKEY it claims to be made by. Either the key has been rolled, the signature is corrupted, or the records were tampered with - in any case, validating resolvers will treat the zone as bogus.
+An RRSIG on the DNSKEY set does not verify against the DNSKEY it claims to be made by. With reason signature, the cryptographic check failed: the signature may be corrupt, the key may have been rolled, or the records may have changed after signing. With reason labels, the Labels field of the RRSIG does not fit the name it covers and its signer, a fault of the signing software. Validating resolvers treat the zone as bogus.
 
 ## Tag DS03_ERROR_RESPONSE_NSEC_QUERY
 
@@ -583,7 +583,7 @@ Header: DNSKEY RRSIG does not verify
 
 Description:
 
-The RRSIG on the DNSKEY set fails cryptographic verification against the DNSKEY it claims to have been signed with. Either the data or the signature is corrupt; resolvers will mark the zone as bogus.
+The RRSIG on the DNSKEY set does not verify against the DNSKEY it claims to have been signed with. With reason signature, the cryptographic check failed: the data or the signature is corrupt. With reason labels, the Labels field of the RRSIG does not fit the name it covers and its signer, a fault of the signing software. Resolvers will mark the zone as bogus.
 
 ## Tag DS09_MISSING_RRSIG_IN_RESPONSE
 
@@ -607,7 +607,7 @@ Header: SOA RRSIG does not verify
 
 Description:
 
-The signature on the SOA record fails cryptographic verification against its DNSKEY. That makes SOA look bogus to a validating resolver, and many resolvers treat SOA failure as failure of the whole zone.
+The signature on the SOA record does not verify against its DNSKEY. With reason signature, the cryptographic check failed. With reason labels, the Labels field of the RRSIG does not fit the name it covers and its signer, a fault of the signing software. That makes SOA look bogus to a validating resolver, and many resolvers treat SOA failure as failure of the whole zone.
 
 ## Tag DS09_SOA_RRSIG_EXPIRED
 
@@ -791,7 +791,7 @@ Header: NSEC3 RRSIG verify error
 
 Description:
 
-The cryptographic check of an NSEC3 RRSIG against its DNSKEY failed with an unexpected error. Resolvers will treat the record as bogus and reject any proof of non-existence that depended on it.
+An NSEC3 RRSIG does not verify against its DNSKEY. With reason signature, the cryptographic check failed. With reason labels, the Labels field of the RRSIG does not fit the name it covers and its signer, a fault of the signing software. Resolvers will treat the record as bogus and reject any proof of nonexistence that depended on it.
 
 ## Tag DS10_NSEC_ERR_TYPE_LIST
 
@@ -887,7 +887,7 @@ Header: NSEC RRSIG verify error
 
 Description:
 
-The cryptographic verification of an NSEC RRSIG against its DNSKEY failed. The denial-of-existence record cannot be trusted, so negative answers that depend on it will be rejected by validating resolvers.
+An NSEC RRSIG does not verify against its DNSKEY. With reason signature, the cryptographic check failed. With reason labels, the Labels field of the RRSIG does not fit the name it covers and its signer, a fault of the signing software. The denial of existence record cannot be trusted, so negative answers that depend on it will be rejected by validating resolvers.
 
 ## Tag DS10_SERVER_NO_DNSSEC
 

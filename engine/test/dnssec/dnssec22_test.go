@@ -745,7 +745,7 @@ func TestDNSSEC22LeafSignatureFaults(t *testing.T) {
 				return keyTag(other)
 			},
 			wantTag:  "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
-			wantArgs: map[string]string{"ns": "ns1.example", "signer": "example"},
+			wantArgs: map[string]string{"ns": "ns1.example", "signer": "example", "reason": "signature"},
 		},
 		{
 			name: "signature does not verify",
@@ -756,7 +756,19 @@ func TestDNSSEC22LeafSignatureFaults(t *testing.T) {
 				return keyTag(f.zoneKey)
 			},
 			wantTag:  "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
-			wantArgs: map[string]string{"ns": "ns1.example"},
+			wantArgs: map[string]string{"ns": "ns1.example", "reason": "signature"},
+		},
+		{
+			name: "labels above the signer",
+			sign: func(t *testing.T, f *ds22Fixture) uint16 {
+				addr := tctest.ARR("ns1.example", "192.0.2.10")
+				sig := tctest.SignWildcard(t, f.zoneKey, f.zoneSigner, dns.TypeA, []dns.RR{addr}, 0)
+				f.answers[ds22Key("ns1.example", "A")] = tctest.Response(
+					tctest.Question("ns1.example", dns.TypeA), tctest.Secure(), tctest.Answers(addr, sig))
+				return keyTag(f.zoneKey)
+			},
+			wantTag:  "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
+			wantArgs: map[string]string{"ns": "ns1.example", "signer": "example", "reason": "labels"},
 		},
 		{
 			name: "signer outside the zone",
@@ -767,7 +779,7 @@ func TestDNSSEC22LeafSignatureFaults(t *testing.T) {
 				return keyTag(foreign)
 			},
 			wantTag:  "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
-			wantArgs: map[string]string{"ns": "ns1.example", "signer": "other"},
+			wantArgs: map[string]string{"ns": "ns1.example", "signer": "other", "reason": "signature"},
 		},
 	}
 	for _, tc := range cases {

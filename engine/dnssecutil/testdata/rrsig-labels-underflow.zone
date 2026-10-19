@@ -1,0 +1,12 @@
+; underflow.labels.panw-qzhang-test.com captured 2026-10-18T10:58:53Z over TCP from ns1.labels.panw-qzhang-test.com (34.59.71.143)
+; test zones by Qifan Zhang for draft-zhang-dnssec-wildcard-validation; RRSIGs expire 2027-01-16
+; DS from the parent, then DNSKEY, SOA and NS with covering RRSIGs
+underflow.labels.panw-qzhang-test.com. 300 IN DS 43322 13 2 9CB240FF4DD8441323717247656ADE746A1D7890F0D8BBCED75DFBD6 E65E52F4
+underflow.labels.panw-qzhang-test.com. 300 IN RRSIG DS 13 4 300 20270116000000 20261017000000 51097 labels.panw-qzhang-test.com. I9PS7d8jbeqZA9B6ZjK34xJlQIYClY7sX3IvU/AN8tEpbDJ3bFtRRPqr qpGMN4DCvudgWseAFYwWyxvmcv4AHA==
+underflow.labels.panw-qzhang-test.com. 300 IN DNSKEY 257 3 13 eHEasRMlFOoKaD4oJCKfILLCC1Gr0eDUSxYajouueP2BFJgp7lLIRz0q TZqRsxjcsOP0nVwVkShsbM894bZzzw==
+underflow.labels.panw-qzhang-test.com. 300 IN RRSIG DNSKEY 13 4 300 20270116000000 20261017000000 43322 underflow.labels.panw-qzhang-test.com. xGM8ju5G/qrESTQEkGIag1hhSgYsh+hej0BTuVTnb37db49yGSyZmVE3 O8tv+q7FGckOCWv4lPWloTM/AWv7+A==
+underflow.labels.panw-qzhang-test.com. 300 IN SOA ns1.labels.panw-qzhang-test.com. hostmaster.labels.panw-qzhang-test.com. 2026101802 3600 600 86400 300
+underflow.labels.panw-qzhang-test.com. 300 IN RRSIG SOA 13 3 300 20270116000000 20261017000000 43322 underflow.labels.panw-qzhang-test.com. 2BfGgm95NG7E+Unmq8xohiLxh8Tsao1hsLFuV45C9cbiQa44fFzdYRgG YIpXBypAdqQKF540PMsA6Ka42FBzRg==
+underflow.labels.panw-qzhang-test.com. 300 IN NS ns1.labels.panw-qzhang-test.com.
+underflow.labels.panw-qzhang-test.com. 300 IN NS ns2.labels.panw-qzhang-test.com.
+underflow.labels.panw-qzhang-test.com. 300 IN RRSIG NS 13 4 300 20270116000000 20261017000000 43322 underflow.labels.panw-qzhang-test.com. JyfwtnsQYuAvXcUEkNDqd7yHGs5jQmE+PTrQuKIsC1L3CH7mnxBvJh4l xfFAhmE74k6rXhTMK7wUa0rh29C4VA==

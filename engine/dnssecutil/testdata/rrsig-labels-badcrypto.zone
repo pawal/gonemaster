@@ -1,0 +1,12 @@
+; badcrypto.labels.panw-qzhang-test.com captured 2026-10-18T10:58:53Z over TCP from ns1.labels.panw-qzhang-test.com (34.59.71.143)
+; test zones by Qifan Zhang for draft-zhang-dnssec-wildcard-validation; RRSIGs expire 2027-01-16
+; DS from the parent, then DNSKEY, SOA and NS with covering RRSIGs
+badcrypto.labels.panw-qzhang-test.com. 300 IN DS 15650 13 2 708BB2023615091A7345CB4EC35C1C5E0F20AB5F0D21C4F47E6FD3B4 A9CC68F5
+badcrypto.labels.panw-qzhang-test.com. 300 IN RRSIG DS 13 4 300 20270116000000 20261017000000 51097 labels.panw-qzhang-test.com. IEIWtEuzUGP8wZWmfAEirZf4PN+WzDFWsfa0vxeAlLuoupid2SXmkgCx R9nGa0REce8oXyf1M8pY9p2b+KyZRQ==
+badcrypto.labels.panw-qzhang-test.com. 300 IN DNSKEY 257 3 13 I2BtgyWFfKymf1+nHHr8ZJ9RVzS4KObs0YNtXs2oQVljWFxHv/ohGjGd yfgk/4zAh0uigBX+8NeQRdRzwfleGQ==
+badcrypto.labels.panw-qzhang-test.com. 300 IN RRSIG DNSKEY 13 4 300 20270116000000 20261017000000 15650 badcrypto.labels.panw-qzhang-test.com. vA1huiM8VZhSGeuOzyhQYgtBn6nayYleO8tUYyB+J0/m0qEnCHZStumY Dy5fsJB9drp64E9X4jGu/2JJxJN5xw==
+badcrypto.labels.panw-qzhang-test.com. 300 IN SOA ns1.labels.panw-qzhang-test.com. hostmaster.labels.panw-qzhang-test.com. 2026101802 3600 600 86400 300
+badcrypto.labels.panw-qzhang-test.com. 300 IN RRSIG SOA 13 4 300 20270116000000 20261017000000 15650 badcrypto.labels.panw-qzhang-test.com. JWy0jHv3tGzfxj8bmR4flkgu3LvphcWewVMq+M5OYNuSk0EXjkcS7ouG PzJ3y/UpOxxVDesbgNzMQ9g3tmm6qg==
+badcrypto.labels.panw-qzhang-test.com. 300 IN NS ns1.labels.panw-qzhang-test.com.
+badcrypto.labels.panw-qzhang-test.com. 300 IN NS ns2.labels.panw-qzhang-test.com.
+badcrypto.labels.panw-qzhang-test.com. 300 IN RRSIG NS 13 4 300 20270116000000 20261017000000 15650 badcrypto.labels.panw-qzhang-test.com. 1uzWDDTqbNhwR5eu4Pekie8CxSSj3KFkrpBl+pq9fIqC2CkcvTOljX4r iZTlVU3O8zbG0r/1k0vgIxAXrW67Mg==

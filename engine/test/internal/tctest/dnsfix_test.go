@@ -245,6 +245,26 @@ func TestSignRejectsEmptyRRset(t *testing.T) {
 	tbtest.MustFail(t, "empty rrset", func(tb *tbtest.TB) { Sign(tb, key, signer, dns.TypeDNSKEY, nil) })
 }
 
+func TestSignWildcardPresentsTheExpansion(t *testing.T) {
+	key, signer := SignedKey(t, "example", dns.ECDSAP256SHA256)
+	rrset := []dns.RR{ARR("a.b.example", "192.0.2.1")}
+
+	sig := SignWildcard(t, key, signer, dns.TypeA, rrset, 1)
+	if sig.Hdr.Name != "a.b.example." || sig.Labels != 1 || rrset[0].Header().Name != "a.b.example." {
+		t.Fatalf("sig owner %q labels %d, rrset owner %q; want a.b.example. 1 a.b.example.", sig.Hdr.Name, sig.Labels, rrset[0].Header().Name)
+	}
+	if err := sig.Verify(key, rrset, &dns.SignOption{}); err != nil {
+		t.Fatalf("expected the expansion to verify: %v", err)
+	}
+}
+
+func TestSignWildcardRejectsLabelsAtTheOwner(t *testing.T) {
+	key, signer := SignedKey(t, "example", dns.ECDSAP256SHA256)
+	rrset := []dns.RR{ARR("a.example", "192.0.2.1")}
+
+	tbtest.MustFail(t, "leave no wildcard", func(tb *tbtest.TB) { SignWildcard(tb, key, signer, dns.TypeA, rrset, 2) })
+}
+
 func TestNSItems(t *testing.T) {
 	item := NSItem("ns1.example", "192.0.2.1")
 	if item.Name.String() != "ns1.example" || !item.HasAddress || item.Address.String() != "192.0.2.1" {

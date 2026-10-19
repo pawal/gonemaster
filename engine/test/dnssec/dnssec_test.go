@@ -3053,6 +3053,21 @@ func TestDNSSEC02LargeExponentBadSignature(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS02_RSA_EXPONENT_UNSUPPORTED")
 }
 
+func TestDNSSEC02NotValidReason(t *testing.T) {
+	now := time.Unix(1700000000, 0).UTC()
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	ds := key.ToDS(dns.SHA256)
+	if ds == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+	for _, tc := range reasonCases(t, key, signer, dns.TypeDNSKEY, []dns.RR{key}, tctest.Inception(now.Add(-time.Hour)), tctest.Expiration(now.Add(time.Hour))) {
+		t.Run(tc.reason, func(t *testing.T) {
+			entries := dnssec02Entries(t, now, key, ds, tc.sig, "198.51.100.11", "198.51.100.12")
+			requireReason(t, entries, "DS02_RRSIG_NOT_VALID_BY_DNSKEY", tc)
+		})
+	}
+}
+
 // dnssec08Entries runs DNSSEC08 against one child serving key and sig.
 func dnssec08Entries(t *testing.T, now time.Time, key *dns.DNSKEY, sig *dns.RRSIG, ip string) []*logger.Entry {
 	t.Helper()
@@ -3099,8 +3114,20 @@ func TestDNSSEC08LargeExponentBadSignature(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS08_RSA_EXPONENT_UNSUPPORTED", "DS08_DNSKEY_RRSIG_VALID")
 }
 
+func TestDNSSEC08NotValidReason(t *testing.T) {
+	now := time.Unix(1700000000, 0).UTC()
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	for _, tc := range reasonCases(t, key, signer, dns.TypeDNSKEY, []dns.RR{key}, tctest.Inception(now.Add(-time.Hour)), tctest.Expiration(now.Add(time.Hour))) {
+		t.Run(tc.reason, func(t *testing.T) {
+			entries := dnssec08Entries(t, now, key, tc.sig, "198.51.100.13")
+			requireReason(t, entries, "DS08_RRSIG_NOT_VALID_BY_DNSKEY", tc)
+			tctest.RequireNoTag(t, entries, "DS08_DNSKEY_RRSIG_VALID")
+		})
+	}
+}
+
 // dnssec09Entries runs DNSSEC09 against one child serving key, soa and sig.
-func dnssec09Entries(t *testing.T, now time.Time, key *dns.DNSKEY, soa *dns.SOA, sig *dns.RRSIG, ip string) []*logger.Entry {
+func dnssec09Entries(t *testing.T, now time.Time, key *dns.DNSKEY, soa *dns.SOA, ip string, sigs ...dns.RR) []*logger.Entry {
 	t.Helper()
 	ctx := tctest.Context(t)
 	ns := tctest.NS(t, ctx, "ns1.example", ip, func(q tctest.Query) packet.Packet {
@@ -3110,7 +3137,7 @@ func dnssec09Entries(t *testing.T, now time.Time, key *dns.DNSKEY, soa *dns.SOA,
 			pkt.Timestamp = now
 			return pkt
 		case "SOA":
-			pkt := answerPacket(q.Name, dns.TypeSOA, soa, sig)
+			pkt := answerPacket(q.Name, dns.TypeSOA, append([]dns.RR{soa}, sigs...)...)
 			pkt.Timestamp = now
 			return pkt
 		default:
@@ -3137,7 +3164,7 @@ func TestDNSSEC09LargeExponentSignatureVerifies(t *testing.T) {
 	soa := soaRecord("example")
 	sig := dnstest.SignRRset(t, kp, []dns.RR{soa}, "example", "example", now.Add(-time.Hour), now.Add(time.Hour))
 
-	entries := dnssec09Entries(t, now, kp.Key, soa, sig, "198.51.100.7")
+	entries := dnssec09Entries(t, now, kp.Key, soa, "198.51.100.7", sig)
 	tctest.RequireTags(t, entries, "DS09_SOA_RRSIG_VALID")
 	tctest.RequireNoTag(t, entries, "DS09_RSA_EXPONENT_UNSUPPORTED", "DS09_RRSIG_NOT_VALID_BY_DNSKEY")
 }
@@ -3148,9 +3175,36 @@ func TestDNSSEC09LargeExponentBadSignature(t *testing.T) {
 	soa := soaRecord("example")
 	sig := rrsigRecord("example", dns.TypeSOA, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
 
-	entries := dnssec09Entries(t, now, key, soa, sig, "198.51.100.8")
+	entries := dnssec09Entries(t, now, key, soa, "198.51.100.8", sig)
 	tctest.RequireTags(t, entries, "DS09_RRSIG_NOT_VALID_BY_DNSKEY")
 	tctest.RequireNoTag(t, entries, "DS09_RSA_EXPONENT_UNSUPPORTED", "DS09_SOA_RRSIG_VALID")
+}
+
+func TestDNSSEC09NotValidReason(t *testing.T) {
+	now := time.Unix(1700000000, 0).UTC()
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	soa := soaRecord("example")
+	for _, tc := range reasonCases(t, key, signer, dns.TypeSOA, []dns.RR{soa}, tctest.Inception(now.Add(-time.Hour)), tctest.Expiration(now.Add(time.Hour))) {
+		t.Run(tc.reason, func(t *testing.T) {
+			entries := dnssec09Entries(t, now, key, soa, "198.51.100.14", tc.sig)
+			requireReason(t, entries, "DS09_RRSIG_NOT_VALID_BY_DNSKEY", tc)
+			tctest.RequireNoTag(t, entries, "DS09_SOA_RRSIG_VALID")
+		})
+	}
+}
+
+// A valid SOA RRSIG beside one whose Labels field leaves the signer, both under one keytag.
+func TestDNSSEC09ValidAndLabelsUnderOneKeytag(t *testing.T) {
+	now := time.Unix(1700000000, 0).UTC()
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	soa := soaRecord("example")
+	window := []tctest.SigOpt{tctest.Inception(now.Add(-time.Hour)), tctest.Expiration(now.Add(time.Hour))}
+	valid := tctest.Sign(t, key, signer, dns.TypeSOA, []dns.RR{soa}, window...)
+	labels := tctest.SignWildcard(t, key, signer, dns.TypeSOA, []dns.RR{soa}, 0, window...)
+
+	entries := dnssec09Entries(t, now, key, soa, "198.51.100.15", valid, labels)
+	requireReason(t, entries, "DS09_RRSIG_NOT_VALID_BY_DNSKEY", reasonCase{"labels", labels})
+	tctest.RequireNoTag(t, entries, "DS09_SOA_RRSIG_VALID")
 }
 
 func TestDNSSEC09ParallelQueries(t *testing.T) {
@@ -3267,6 +3321,51 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 		t.Fatalf("dnssec10: %v", err)
 	}
 	tctest.RequireTags(t, entries, "DS10_NSEC_MISSING_SIGNATURE")
+}
+
+func TestDNSSEC10VerifyErrorReason(t *testing.T) {
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	kinds := []struct {
+		tag   string
+		qtype uint16
+		rr    dns.RR
+	}{
+		{"DS10_NSEC_RRSIG_VERIFY_ERROR", dns.TypeNSEC3PARAM, nsecRecord("example", dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeDNSKEY)},
+		{"DS10_NSEC3_RRSIG_VERIFY_ERROR", dns.TypeNSEC, nsec3Record("example", "example", dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG, dns.TypeDNSKEY, dns.TypeNSEC3PARAM)},
+	}
+	for _, kind := range kinds {
+		for _, tc := range reasonCases(t, key, signer, dns.RRToType(kind.rr), []dns.RR{kind.rr}) {
+			t.Run(kind.tag+" "+tc.reason, func(t *testing.T) {
+				ctx := tctest.Context(t)
+				tctest.NS(t, ctx, "ns1.example", "192.0.2.71", func(q tctest.Query) packet.Packet {
+					switch q.Type {
+					case "DNSKEY":
+						return dnskeyPacket(q.Name, key)
+					case dns.TypeToString[kind.qtype]:
+						return tctest.Response(tctest.Question(q.Name, kind.qtype), tctest.Secure(), tctest.Authority(kind.rr, tc.sig, soaRecord(q.Name)))
+					default:
+						return packet.Packet{}
+					}
+				})
+				tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+					return tctest.NSItems("ns1.example/192.0.2.71"), nil
+				})
+				tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+					return []nsdiscovery.NSItem{}, nil
+				})
+
+				z, err := zone.New("example")
+				if err != nil {
+					t.Fatalf("zone new: %v", err)
+				}
+				entries, err := DNSSEC10(ctx, &z)
+				if err != nil {
+					t.Fatalf("dnssec10: %v", err)
+				}
+				requireReason(t, entries, kind.tag, tc)
+			})
+		}
+	}
 }
 
 func TestDNSSEC10ParallelQueries(t *testing.T) {
@@ -4784,6 +4883,40 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 	tctest.RequireTags(t, entries, "DS16_CDS_WITHOUT_DNSKEY")
 }
 
+func TestDNSSEC16InvalidRRSIGReason(t *testing.T) {
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	keySig := tctest.Sign(t, key, signer, dns.TypeDNSKEY, []dns.RR{key})
+	rr := ds24CDS(t, "example", key)
+	for _, tc := range reasonCases(t, key, signer, dns.TypeCDS, []dns.RR{rr}) {
+		t.Run(tc.reason, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.96", func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "CDS":
+					return answerPacket(q.Name, dns.TypeCDS, rr, tc.sig)
+				case "DNSKEY":
+					return answerPacket(q.Name, dns.TypeDNSKEY, key, keySig)
+				default:
+					return packet.Packet{}
+				}
+			})
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns}, nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nil, nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := DNSSEC16(ctx, &z)
+			if err != nil {
+				t.Fatalf("dnssec16: %v", err)
+			}
+			requireReason(t, entries, "DS16_CDS_INVALID_RRSIG", tc)
+		})
+	}
+}
+
 func TestDNSSEC16ParallelQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)
@@ -4898,6 +5031,40 @@ func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
 		t.Fatalf("dnssec17: %v", err)
 	}
 	tctest.RequireTags(t, entries, "DS17_CDNSKEY_WITHOUT_DNSKEY")
+}
+
+func TestDNSSEC17InvalidRRSIGReason(t *testing.T) {
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	keySig := tctest.Sign(t, key, signer, dns.TypeDNSKEY, []dns.RR{key})
+	rr := ds24CDNSKEY("example", key)
+	for _, tc := range reasonCases(t, key, signer, dns.TypeCDNSKEY, []dns.RR{rr}) {
+		t.Run(tc.reason, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.97", func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "CDNSKEY":
+					return answerPacket(q.Name, dns.TypeCDNSKEY, rr, tc.sig)
+				case "DNSKEY":
+					return answerPacket(q.Name, dns.TypeDNSKEY, key, keySig)
+				default:
+					return packet.Packet{}
+				}
+			})
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns}, nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nil, nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := DNSSEC17(ctx, &z)
+			if err != nil {
+				t.Fatalf("dnssec17: %v", err)
+			}
+			requireReason(t, entries, "DS17_CDNSKEY_INVALID_RRSIG", tc)
+		})
+	}
 }
 
 func TestDNSSEC17ParallelQueries(t *testing.T) {
@@ -6202,6 +6369,34 @@ func rrsigRecord(owner string, typeCovered uint16, keytag uint16, inception int6
 		tctest.Expiration(time.Unix(expiration, 0)))
 }
 
+// reasonCase is an RRSIG that does not verify and the reason its finding carries.
+type reasonCase struct {
+	reason string
+	sig    *dns.RRSIG
+}
+
+// reasonCases signs rrset with key as the root wildcard and with a tampered signature.
+func reasonCases(t *testing.T, key *dns.DNSKEY, signer crypto.Signer, typeCovered uint16, rrset []dns.RR, opts ...tctest.SigOpt) []reasonCase {
+	t.Helper()
+	tampered := tctest.Sign(t, key, signer, typeCovered, rrset, opts...)
+	tampered.OrigTTL++
+	return []reasonCase{
+		{"labels", tctest.SignWildcard(t, key, signer, typeCovered, rrset, 0, opts...)},
+		{"signature", tampered},
+	}
+}
+
+// requireReason asserts one tag finding with the keytag and reason of tc.
+func requireReason(t *testing.T, entries []*logger.Entry, tag string, tc reasonCase) {
+	t.Helper()
+	tctest.RequireCount(t, entries, tag, 1)
+	entry := tctest.RequireTag(t, entries, tag)
+	tctest.RequireArg(t, entry, "reason", tc.reason)
+	if entry.Args["keytag"] != tc.sig.KeyTag {
+		t.Fatalf("keytag = %#v, want %d", entry.Args["keytag"], tc.sig.KeyTag)
+	}
+}
+
 // nsecRecord builds an NSEC at owner with the given type bitmap and the minimal next owner.
 func nsecRecord(owner string, types ...uint16) *dns.NSEC {
 	rr := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
@@ -6697,6 +6892,37 @@ func TestDNSSEC21RRSIGNotVerifiable(t *testing.T) {
 	}
 	tctest.RequireTags(t, entries, "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY", "DS21_DS_RRSIG_NOT_VERIFIABLE")
 	tctest.RequireNoTag(t, entries, "DS21_DS_RRSIG_VERIFIED")
+}
+
+func TestDNSSEC21NotValidReason(t *testing.T) {
+	f := newDNSSEC21Fixture(t)
+	key, signer := tctest.SignedKey(t, f.parentName, dns.ECDSAP256SHA256, tctest.SEP())
+	for _, tc := range reasonCases(t, key, signer, dns.TypeDS, []dns.RR{f.childDS}) {
+		t.Run(tc.reason, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			dsResp := tctest.Response(tctest.Question(f.childName, dns.TypeDS), tctest.Secure(), tctest.Answers(f.childDS, tc.sig))
+			parentNS := tctest.NS(t, ctx, "ns1.parent", "192.0.2.224", func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "DS":
+					return dsResp
+				case "DNSKEY":
+					return f.parentDNSKEYResponse(key)
+				}
+				return packet.Packet{}
+			})
+			f.installMocks(t, parentNS)
+
+			z, err := zone.New(f.childName)
+			if err != nil {
+				t.Fatalf("zone new: %v", err)
+			}
+			entries, err := DNSSEC21(ctx, &z)
+			if err != nil {
+				t.Fatalf("DNSSEC21: %v", err)
+			}
+			requireReason(t, entries, "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY", tc)
+		})
+	}
 }
 
 func TestDNSSEC21NoParentDNSKEY(t *testing.T) {

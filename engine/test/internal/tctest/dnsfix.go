@@ -290,6 +290,28 @@ func Sign(t TB, key *dns.DNSKEY, signer crypto.Signer, typeCovered uint16, rrset
 	return sig
 }
 
+// SignWildcard signs rrset as an expansion of the wildcard whose RRSIG Labels field is labels.
+func SignWildcard(t TB, key *dns.DNSKEY, signer crypto.Signer, typeCovered uint16, rrset []dns.RR, labels uint8, opts ...SigOpt) *dns.RRSIG {
+	t.Helper()
+	if len(rrset) == 0 {
+		t.Fatalf("cannot sign an empty rrset")
+	}
+	owner := rrset[0].Header().Name
+	n := dnsutil.Labels(owner)
+	if int(labels) >= n {
+		t.Fatalf("labels %d leave no wildcard above %s", labels, owner)
+	}
+	suffix, _ := dnsutil.Skip(owner, n-int(labels), dnsutil.SkipForward)
+	wild := make([]dns.RR, len(rrset))
+	for i, rr := range rrset {
+		wild[i] = rr.Clone()
+		wild[i].Header().Name = "*." + suffix
+	}
+	sig := Sign(t, key, signer, typeCovered, wild, opts...)
+	sig.Hdr.Name = owner
+	return sig
+}
+
 // NSItem builds a discovery item; an empty address means unresolved.
 func NSItem(name string, address string) nsdiscovery.NSItem {
 	item := nsdiscovery.NSItem{Name: dnsname.New(name)}

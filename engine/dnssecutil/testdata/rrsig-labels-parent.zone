@@ -1,0 +1,5 @@
+; labels.panw-qzhang-test.com captured 2026-10-19T06:35:09Z over TCP from ns1.labels.panw-qzhang-test.com (34.59.71.143)
+; test zones by Qifan Zhang for draft-zhang-dnssec-wildcard-validation; RRSIGs expire 2027-01-16
+; DNSKEY 51097, the signer of every DS RRSIG in the other files, with its covering RRSIG
+labels.panw-qzhang-test.com. 300 IN DNSKEY 257 3 13 lPju/cTQJSZduRN2L+xUzYw7DukxlzLe/EOOWRMVth5LIikhbai5oEG+ NPyIzAWn3IwTjbWMuxdkLEzWlqHDLA==
+labels.panw-qzhang-test.com. 300 IN RRSIG DNSKEY 13 3 300 20270116000000 20261017000000 51097 labels.panw-qzhang-test.com. DEWYNjzRnFDGJyb2Z8cUvk+rg+58tjt9VQBeN93QI9BXeWMEkad9ZLn7 Gj5eiDRnWVHRN+EoLj+pkCEQbrST+A==

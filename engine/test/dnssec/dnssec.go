@@ -1,6 +1,7 @@
 package dnssec
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -1106,7 +1107,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	dnskeyNotSEP := map[uint16][]string{}
 	noMatchingDNSKEYRRSIG := map[uint16][]string{}
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
-	rrsigNotValidByDNSKEY := map[uint16][]string{}
+	rrsigNotValidByDNSKEY := map[keytagReason][]string{}
 	rsaExponentUnsupported := map[uint16][]string{}
 	respondingChildNS := map[string]bool{}
 	hasDNSKEYMatchDS := map[string]bool{}
@@ -1217,7 +1218,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			dnskeyNotSEP            map[uint16]bool
 			noMatchingDNSKEYRRSIG   map[uint16]bool
 			algoNotSupportedByZM    map[uint16]map[uint8]bool
-			rrsigNotValidByDNSKEY   map[uint16]bool
+			rrsigNotValidByDNSKEY   map[keytagReason]bool
 			rsaExponentUnsupported  map[uint16]bool
 			hasRRSIGUnsupportedDS   bool
 		}
@@ -1249,7 +1250,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					dnskeyNotSEP:            map[uint16]bool{},
 					noMatchingDNSKEYRRSIG:   map[uint16]bool{},
 					algoNotSupportedByZM:    map[uint16]map[uint8]bool{},
-					rrsigNotValidByDNSKEY:   map[uint16]bool{},
+					rrsigNotValidByDNSKEY:   map[keytagReason]bool{},
 					rsaExponentUnsupported:  map[uint16]bool{},
 				}
 
@@ -1393,7 +1394,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							// RSA exponent we cannot verify locally: indeterminate, not a failure.
 							outcome.rsaExponentUnsupported[keytag] = true
 						} else {
-							outcome.rrsigNotValidByDNSKEY[keytag] = true
+							outcome.rrsigNotValidByDNSKEY[keytagReason{keytag, sigFailReason(err)}] = true
 						}
 					}
 
@@ -1401,7 +1402,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					case foundMatch:
 						outcome.hasRRSIGMatchDS = true
 						outcome.rrsigMatchDS[keytag] = true
-					case outcome.rsaExponentUnsupported[keytag] && !outcome.rrsigNotValidByDNSKEY[keytag] && outcome.algoNotSupportedByZM[keytag] == nil:
+					case outcome.rsaExponentUnsupported[keytag] && !hasKeytag(outcome.rrsigNotValidByDNSKEY, keytag) && outcome.algoNotSupportedByZM[keytag] == nil:
 						// Sole reason this DS-linked key did not verify is the unsupported
 						// exponent; leave it indeterminate rather than raising a failure.
 						outcome.hasRRSIGUnsupportedDS = true
@@ -1472,8 +1473,8 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					algoNotSupportedByZM[keytag][algo] = append(algoNotSupportedByZM[keytag][algo], outcome.nsIP)
 				}
 			}
-			for keytag := range outcome.rrsigNotValidByDNSKEY {
-				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
+			for kr := range outcome.rrsigNotValidByDNSKEY {
+				rrsigNotValidByDNSKEY[kr] = append(rrsigNotValidByDNSKEY[kr], outcome.nsIP)
 			}
 			for keytag := range outcome.rsaExponentUnsupported {
 				rsaExponentUnsupported[keytag] = append(rsaExponentUnsupported[keytag], outcome.nsIP)
@@ -1558,11 +1559,12 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 	}
-	for keytag, nsList := range rrsigNotValidByDNSKEY {
+	for _, kr := range sortedKeytagReasons(rrsigNotValidByDNSKEY) {
 		args := map[string]any{
-			"keytag": keytag,
+			"keytag": kr.keytag,
+			"reason": kr.reason,
 		}
-		setTypedAddressesFromValues(args, nsList)
+		setTypedAddressesFromValues(args, rrsigNotValidByDNSKEY[kr])
 		if err := appendLog(ctx, &results, testcase, "DS02_RRSIG_NOT_VALID_BY_DNSKEY", args); err != nil {
 			return results, err
 		}
@@ -2800,7 +2802,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	dnskeyRRSIGNotYetValid := map[uint16][]string{}
 	dnskeyRRSIGExpired := map[uint16][]string{}
 	noMatchingDNSKEY := map[uint16][]string{}
-	rrsigNotValidByDNSKEY := map[uint16][]string{}
+	rrsigNotValidByDNSKEY := map[keytagReason][]string{}
 	rsaExponentUnsupported := map[uint16][]string{}
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
 	var ds08PassedIPs []string
@@ -2841,7 +2843,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			dnskeyRRSIGNotYetValid map[uint16]bool
 			dnskeyRRSIGExpired     map[uint16]bool
 			noMatchingDNSKEY       map[uint16]bool
-			rrsigNotValidByDNSKEY  map[uint16]bool
+			rrsigNotValidByDNSKEY  map[keytagReason]bool
 			rsaExponentUnsupported map[uint16]bool
 			algoNotSupportedByZM   map[uint16]map[uint8]bool
 		}
@@ -2856,7 +2858,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					dnskeyRRSIGNotYetValid: map[uint16]bool{},
 					dnskeyRRSIGExpired:     map[uint16]bool{},
 					noMatchingDNSKEY:       map[uint16]bool{},
-					rrsigNotValidByDNSKEY:  map[uint16]bool{},
+					rrsigNotValidByDNSKEY:  map[keytagReason]bool{},
 					rsaExponentUnsupported: map[uint16]bool{},
 					algoNotSupportedByZM:   map[uint16]map[uint8]bool{},
 				}
@@ -2949,7 +2951,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							// RSA exponent we cannot verify locally: indeterminate, not a failure.
 							outcome.rsaExponentUnsupported[sig.KeyTag] = true
 						} else {
-							outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+							outcome.rrsigNotValidByDNSKEY[keytagReason{sig.KeyTag, sigFailReason(errs...)}] = true
 						}
 					}
 				}
@@ -2979,8 +2981,8 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for keytag := range outcome.noMatchingDNSKEY {
 				noMatchingDNSKEY[keytag] = append(noMatchingDNSKEY[keytag], outcome.nsIP)
 			}
-			for keytag := range outcome.rrsigNotValidByDNSKEY {
-				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
+			for kr := range outcome.rrsigNotValidByDNSKEY {
+				rrsigNotValidByDNSKEY[kr] = append(rrsigNotValidByDNSKEY[kr], outcome.nsIP)
 			}
 			for keytag := range outcome.rsaExponentUnsupported {
 				rsaExponentUnsupported[keytag] = append(rsaExponentUnsupported[keytag], outcome.nsIP)
@@ -3040,11 +3042,12 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	for keytag, nsList := range rrsigNotValidByDNSKEY {
+	for _, kr := range sortedKeytagReasons(rrsigNotValidByDNSKEY) {
 		args := map[string]any{
-			"keytag": keytag,
+			"keytag": kr.keytag,
+			"reason": kr.reason,
 		}
-		setTypedAddressesFromValues(args, nsList)
+		setTypedAddressesFromValues(args, rrsigNotValidByDNSKEY[kr])
 		if err := appendLog(ctx, &results, testcase, "DS08_RRSIG_NOT_VALID_BY_DNSKEY", args); err != nil {
 			return results, err
 		}
@@ -3103,7 +3106,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	soaRRSIGNotYetValid := map[uint16][]string{}
 	soaRRSIGExpired := map[uint16][]string{}
 	noMatchingDNSKEY := map[uint16][]string{}
-	rrsigNotValidByDNSKEY := map[uint16][]string{}
+	rrsigNotValidByDNSKEY := map[keytagReason][]string{}
 	rsaExponentUnsupported := map[uint16][]string{}
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
 
@@ -3143,7 +3146,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			soaRRSIGNotYetValid    map[uint16]bool
 			soaRRSIGExpired        map[uint16]bool
 			noMatchingDNSKEY       map[uint16]bool
-			rrsigNotValidByDNSKEY  map[uint16]bool
+			rrsigNotValidByDNSKEY  map[keytagReason]bool
 			rsaExponentUnsupported map[uint16]bool
 			algoNotSupportedByZM   map[uint16]map[uint8]bool
 		}
@@ -3158,7 +3161,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					soaRRSIGNotYetValid:    map[uint16]bool{},
 					soaRRSIGExpired:        map[uint16]bool{},
 					noMatchingDNSKEY:       map[uint16]bool{},
-					rrsigNotValidByDNSKEY:  map[uint16]bool{},
+					rrsigNotValidByDNSKEY:  map[keytagReason]bool{},
 					rsaExponentUnsupported: map[uint16]bool{},
 					algoNotSupportedByZM:   map[uint16]map[uint8]bool{},
 				}
@@ -3264,7 +3267,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							// RSA exponent we cannot verify locally: indeterminate, not a failure.
 							outcome.rsaExponentUnsupported[sig.KeyTag] = true
 						} else {
-							outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+							outcome.rrsigNotValidByDNSKEY[keytagReason{sig.KeyTag, sigFailReason(errs...)}] = true
 						}
 					}
 				}
@@ -3294,8 +3297,8 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for keytag := range outcome.noMatchingDNSKEY {
 				noMatchingDNSKEY[keytag] = append(noMatchingDNSKEY[keytag], outcome.nsIP)
 			}
-			for keytag := range outcome.rrsigNotValidByDNSKEY {
-				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
+			for kr := range outcome.rrsigNotValidByDNSKEY {
+				rrsigNotValidByDNSKEY[kr] = append(rrsigNotValidByDNSKEY[kr], outcome.nsIP)
 			}
 			for keytag := range outcome.rsaExponentUnsupported {
 				rsaExponentUnsupported[keytag] = append(rsaExponentUnsupported[keytag], outcome.nsIP)
@@ -3355,11 +3358,12 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	for keytag, nsList := range rrsigNotValidByDNSKEY {
+	for _, kr := range sortedKeytagReasons(rrsigNotValidByDNSKEY) {
 		args := map[string]any{
-			"keytag": keytag,
+			"keytag": kr.keytag,
+			"reason": kr.reason,
 		}
-		setTypedAddressesFromValues(args, nsList)
+		setTypedAddressesFromValues(args, rrsigNotValidByDNSKEY[kr])
 		if err := appendLog(ctx, &results, testcase, "DS09_RRSIG_NOT_VALID_BY_DNSKEY", args); err != nil {
 			return results, err
 		}
@@ -3441,8 +3445,8 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var nsecNsec3Nodata []string
 	var nsecNsecNodata []string
 	var nsec3paramNsecNodata []string
-	nsecRRSIGVerifyError := map[uint16][]string{}
-	nsec3RRSIGVerifyError := map[uint16][]string{}
+	nsecRRSIGVerifyError := map[keytagReason][]string{}
+	nsec3RRSIGVerifyError := map[keytagReason][]string{}
 	nsecRRSIGExpired := map[uint16][]string{}
 	nsec3RRSIGExpired := map[uint16][]string{}
 	nsecRRSIGNotYetValid := map[uint16][]string{}
@@ -3498,8 +3502,8 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			nsecNsec3Nodata           bool
 			nsecNsecNodata            bool
 			nsec3paramNsecNodata      bool
-			nsecRRSIGVerifyError      map[uint16]bool
-			nsec3RRSIGVerifyError     map[uint16]bool
+			nsecRRSIGVerifyError      map[keytagReason]bool
+			nsec3RRSIGVerifyError     map[keytagReason]bool
 			nsecRRSIGExpired          map[uint16]bool
 			nsec3RRSIGExpired         map[uint16]bool
 			nsecRRSIGNotYetValid      map[uint16]bool
@@ -3524,8 +3528,8 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				ns := group[0]
 				outcome := nsOutcome{
 					groupList:             nsStrings(group),
-					nsecRRSIGVerifyError:  map[uint16]bool{},
-					nsec3RRSIGVerifyError: map[uint16]bool{},
+					nsecRRSIGVerifyError:  map[keytagReason]bool{},
+					nsec3RRSIGVerifyError: map[keytagReason]bool{},
 					nsecRRSIGExpired:      map[uint16]bool{},
 					nsec3RRSIGExpired:     map[uint16]bool{},
 					nsecRRSIGNotYetValid:  map[uint16]bool{},
@@ -3650,7 +3654,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 									outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
 								} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 									// Skip an unsupported RSA exponent: indeterminate, not a verify error.
-									outcome.nsec3RRSIGVerifyError[keytag] = true
+									outcome.nsec3RRSIGVerifyError[keytagReason{keytag, sigFailReason(err)}] = true
 								}
 							}
 						}
@@ -3720,7 +3724,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 									outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
 								} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 									// Skip an unsupported RSA exponent: indeterminate, not a verify error.
-									outcome.nsecRRSIGVerifyError[keytag] = true
+									outcome.nsecRRSIGVerifyError[keytagReason{keytag, sigFailReason(err)}] = true
 								}
 							}
 						}
@@ -3807,7 +3811,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 									outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
 								} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 									// Skip an unsupported RSA exponent: indeterminate, not a verify error.
-									outcome.nsecRRSIGVerifyError[keytag] = true
+									outcome.nsecRRSIGVerifyError[keytagReason{keytag, sigFailReason(err)}] = true
 								}
 							}
 						}
@@ -3913,11 +3917,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if outcome.nsec3RRSIGVerified {
 				nsec3RRSIGVerified = append(nsec3RRSIGVerified, outcome.groupList...)
 			}
-			for keytag := range outcome.nsecRRSIGVerifyError {
-				nsecRRSIGVerifyError[keytag] = append(nsecRRSIGVerifyError[keytag], outcome.groupList...)
+			for kr := range outcome.nsecRRSIGVerifyError {
+				nsecRRSIGVerifyError[kr] = append(nsecRRSIGVerifyError[kr], outcome.groupList...)
 			}
-			for keytag := range outcome.nsec3RRSIGVerifyError {
-				nsec3RRSIGVerifyError[keytag] = append(nsec3RRSIGVerifyError[keytag], outcome.groupList...)
+			for kr := range outcome.nsec3RRSIGVerifyError {
+				nsec3RRSIGVerifyError[kr] = append(nsec3RRSIGVerifyError[kr], outcome.groupList...)
 			}
 			for keytag := range outcome.nsecRRSIGExpired {
 				nsecRRSIGExpired[keytag] = append(nsecRRSIGExpired[keytag], outcome.groupList...)
@@ -4201,21 +4205,14 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 	}
-	if len(nsecRRSIGVerifyError) > 0 {
-		keytags := make([]int, 0, len(nsecRRSIGVerifyError))
-		for keytag := range nsecRRSIGVerifyError {
-			keytags = append(keytags, int(keytag))
+	for _, kr := range sortedKeytagReasons(nsecRRSIGVerifyError) {
+		args := map[string]any{
+			"keytag": kr.keytag,
+			"reason": kr.reason,
 		}
-		sort.Ints(keytags)
-		for _, keytag := range keytags {
-			kt := uint16(keytag)
-			args := map[string]any{
-				"keytag": kt,
-			}
-			setTypedServersFromNames(args, nsecRRSIGVerifyError[kt])
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_VERIFY_ERROR", args); err != nil {
-				return results, err
-			}
+		setTypedServersFromNames(args, nsecRRSIGVerifyError[kr])
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_VERIFY_ERROR", args); err != nil {
+			return results, err
 		}
 	}
 
@@ -4313,21 +4310,14 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 	}
-	if len(nsec3RRSIGVerifyError) > 0 {
-		keytags := make([]int, 0, len(nsec3RRSIGVerifyError))
-		for keytag := range nsec3RRSIGVerifyError {
-			keytags = append(keytags, int(keytag))
+	for _, kr := range sortedKeytagReasons(nsec3RRSIGVerifyError) {
+		args := map[string]any{
+			"keytag": kr.keytag,
+			"reason": kr.reason,
 		}
-		sort.Ints(keytags)
-		for _, keytag := range keytags {
-			kt := uint16(keytag)
-			args := map[string]any{
-				"keytag": kt,
-			}
-			setTypedServersFromNames(args, nsec3RRSIGVerifyError[kt])
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_VERIFY_ERROR", args); err != nil {
-				return results, err
-			}
+		setTypedServersFromNames(args, nsec3RRSIGVerifyError[kr])
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_VERIFY_ERROR", args); err != nil {
+			return results, err
 		}
 	}
 
@@ -5365,7 +5355,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	cdsNotSignedByCDS := map[uint16][]string{}
 	cdsNotSigned := map[string]bool{}
 	cdsSignedByUnknownDNSKEY := map[uint16][]string{}
-	cdsInvalidRRSIG := map[uint16][]string{}
+	cdsInvalidRRSIG := map[keytagReason][]string{}
 
 	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
@@ -5521,7 +5511,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			dnskeyNotSignedByCDS     map[uint16]bool
 			cdsNotSignedByCDS        map[uint16]bool
 			cdsSignedByUnknownDNSKEY map[uint16]bool
-			cdsInvalidRRSIG          map[uint16]bool
+			cdsInvalidRRSIG          map[keytagReason]bool
 		}
 
 		var tasks []parallel.Task[validationOutcome]
@@ -5540,7 +5530,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					dnskeyNotSignedByCDS:     map[uint16]bool{},
 					cdsNotSignedByCDS:        map[uint16]bool{},
 					cdsSignedByUnknownDNSKEY: map[uint16]bool{},
-					cdsInvalidRRSIG:          map[uint16]bool{},
+					cdsInvalidRRSIG:          map[keytagReason]bool{},
 				}
 
 				hasDelete := false
@@ -5626,10 +5616,10 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							outcome.cdsSignedByUnknownDNSKEY[keytag] = true
 							continue
 						}
-						verified, _ := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
+						verified, errs := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
 						valid := verified != nil
 						if !valid {
-							outcome.cdsInvalidRRSIG[keytag] = true
+							outcome.cdsInvalidRRSIG[keytagReason{keytag, sigFailReason(errs...)}] = true
 						}
 					}
 				}
@@ -5676,8 +5666,8 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				for keytag := range outcome.cdsSignedByUnknownDNSKEY {
 					cdsSignedByUnknownDNSKEY[keytag] = append(cdsSignedByUnknownDNSKEY[keytag], outcome.nsIP)
 				}
-				for keytag := range outcome.cdsInvalidRRSIG {
-					cdsInvalidRRSIG[keytag] = append(cdsInvalidRRSIG[keytag], outcome.nsIP)
+				for kr := range outcome.cdsInvalidRRSIG {
+					cdsInvalidRRSIG[kr] = append(cdsInvalidRRSIG[kr], outcome.nsIP)
 				}
 			}
 		}
@@ -5796,21 +5786,14 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		if len(cdsInvalidRRSIG) > 0 {
-			keytags := make([]int, 0, len(cdsInvalidRRSIG))
-			for keytag := range cdsInvalidRRSIG {
-				keytags = append(keytags, int(keytag))
+		for _, kr := range sortedKeytagReasons(cdsInvalidRRSIG) {
+			args := map[string]any{
+				"keytag": kr.keytag,
+				"reason": kr.reason,
 			}
-			sort.Ints(keytags)
-			for _, keytag := range keytags {
-				kt := uint16(keytag)
-				args := map[string]any{
-					"keytag": kt,
-				}
-				setTypedAddressesFromValues(args, cdsInvalidRRSIG[kt])
-				if err := appendLog(ctx, &results, testcase, "DS16_CDS_INVALID_RRSIG", args); err != nil {
-					return results, err
-				}
+			setTypedAddressesFromValues(args, cdsInvalidRRSIG[kr])
+			if err := appendLog(ctx, &results, testcase, "DS16_CDS_INVALID_RRSIG", args); err != nil {
+				return results, err
 			}
 		}
 
@@ -5872,7 +5855,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	cdnskeyNotSignedByCDNSKEY := map[uint16][]string{}
 	cdnskeyNotSigned := map[string]bool{}
 	cdnskeySignedByUnknownDNSKEY := map[uint16][]string{}
-	cdnskeyInvalidRRSIG := map[uint16][]string{}
+	cdnskeyInvalidRRSIG := map[keytagReason][]string{}
 
 	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
@@ -6028,7 +6011,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			dnskeyNotSignedByCDNSKEY     map[uint16]bool
 			cdnskeyNotSignedByCDNSKEY    map[uint16]bool
 			cdnskeySignedByUnknownDNSKEY map[uint16]bool
-			cdnskeyInvalidRRSIG          map[uint16]bool
+			cdnskeyInvalidRRSIG          map[keytagReason]bool
 		}
 
 		var tasks []parallel.Task[validationOutcome]
@@ -6047,7 +6030,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					dnskeyNotSignedByCDNSKEY:     map[uint16]bool{},
 					cdnskeyNotSignedByCDNSKEY:    map[uint16]bool{},
 					cdnskeySignedByUnknownDNSKEY: map[uint16]bool{},
-					cdnskeyInvalidRRSIG:          map[uint16]bool{},
+					cdnskeyInvalidRRSIG:          map[keytagReason]bool{},
 				}
 
 				hasDelete := false
@@ -6120,10 +6103,10 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							outcome.cdnskeySignedByUnknownDNSKEY[keytag] = true
 							continue
 						}
-						verified, _ := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
+						verified, errs := verifyCandidates(sig, rrset, matchingDNSKEYs, testingTime)
 						valid := verified != nil
 						if !valid {
-							outcome.cdnskeyInvalidRRSIG[keytag] = true
+							outcome.cdnskeyInvalidRRSIG[keytagReason{keytag, sigFailReason(errs...)}] = true
 						}
 					}
 				}
@@ -6170,8 +6153,8 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				for keytag := range outcome.cdnskeySignedByUnknownDNSKEY {
 					cdnskeySignedByUnknownDNSKEY[keytag] = append(cdnskeySignedByUnknownDNSKEY[keytag], outcome.nsIP)
 				}
-				for keytag := range outcome.cdnskeyInvalidRRSIG {
-					cdnskeyInvalidRRSIG[keytag] = append(cdnskeyInvalidRRSIG[keytag], outcome.nsIP)
+				for kr := range outcome.cdnskeyInvalidRRSIG {
+					cdnskeyInvalidRRSIG[kr] = append(cdnskeyInvalidRRSIG[kr], outcome.nsIP)
 				}
 			}
 		}
@@ -6290,21 +6273,14 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		if len(cdnskeyInvalidRRSIG) > 0 {
-			keytags := make([]int, 0, len(cdnskeyInvalidRRSIG))
-			for keytag := range cdnskeyInvalidRRSIG {
-				keytags = append(keytags, int(keytag))
+		for _, kr := range sortedKeytagReasons(cdnskeyInvalidRRSIG) {
+			args := map[string]any{
+				"keytag": kr.keytag,
+				"reason": kr.reason,
 			}
-			sort.Ints(keytags)
-			for _, keytag := range keytags {
-				kt := uint16(keytag)
-				args := map[string]any{
-					"keytag": kt,
-				}
-				setTypedAddressesFromValues(args, cdnskeyInvalidRRSIG[kt])
-				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_INVALID_RRSIG", args); err != nil {
-					return results, err
-				}
+			setTypedAddressesFromValues(args, cdnskeyInvalidRRSIG[kr])
+			if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_INVALID_RRSIG", args); err != nil {
+				return results, err
 			}
 		}
 
@@ -8111,6 +8087,40 @@ const (
 	boundRRSIGsPerRRset  = "rrsigs_per_rrset"
 )
 
+// Values of the reason arg on a signature that does not verify.
+const (
+	reasonLabels    = "labels"
+	reasonSignature = "signature"
+)
+
+// sigFailReason returns the reason arg for the errors of a signature that does not verify.
+func sigFailReason(errs ...error) string {
+	if slices.ContainsFunc(errs, func(err error) bool { return errors.Is(err, dnssecutil.ErrLabels) }) {
+		return reasonLabels
+	}
+	return reasonSignature
+}
+
+// keytagReason keys a signature that does not verify.
+type keytagReason struct {
+	keytag uint16
+	reason string
+}
+
+// hasKeytag reports whether m holds keytag under any reason.
+func hasKeytag(m map[keytagReason]bool, keytag uint16) bool {
+	return m[keytagReason{keytag, reasonLabels}] || m[keytagReason{keytag, reasonSignature}]
+}
+
+// sortedKeytagReasons returns the keys of m by key tag, then reason.
+func sortedKeytagReasons[V any](m map[keytagReason]V) []keytagReason {
+	keys := slices.Collect(maps.Keys(m))
+	slices.SortFunc(keys, func(a, b keytagReason) int {
+		return cmp.Or(cmp.Compare(a.keytag, b.keytag), cmp.Compare(a.reason, b.reason))
+	})
+	return keys
+}
+
 // runScope is the per-run state of one testcase: the NSEC3 memo and the limits logged.
 type runScope struct {
 	testcase string
@@ -8511,7 +8521,7 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		parentDNSKEYMissing    bool
 		hadRRSIG               bool
 		verifiedKeytags        []uint16
-		rrsigNotValidByDNSKEY  map[uint16]bool
+		rrsigNotValidByDNSKEY  map[keytagReason]bool
 		rrsigExpired           map[uint16]bool
 		rrsigNotYetValid       map[uint16]bool
 		noDNSKEYForRRSIG       map[uint16]bool
@@ -8533,7 +8543,7 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			ns := group[0]
 			outcome := ds21Outcome{
 				ip:                    ns.Address.String(),
-				rrsigNotValidByDNSKEY: map[uint16]bool{},
+				rrsigNotValidByDNSKEY: map[keytagReason]bool{},
 				rrsigExpired:          map[uint16]bool{},
 				rrsigNotYetValid:      map[uint16]bool{},
 				noDNSKEYForRRSIG:      map[uint16]bool{},
@@ -8658,7 +8668,7 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcome.rsaExponentUnsupported = true
 					continue
 				}
-				outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+				outcome.rrsigNotValidByDNSKEY[keytagReason{sig.KeyTag, sigFailReason(errs...)}] = true
 			}
 
 			outcomes[i] = outcome
@@ -8677,7 +8687,7 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	notVerifiableIPs := []string{}
 	noDSRRSIGIPs := []string{}
 	parentDNSKEYMissingIPs := []string{}
-	perKeytagInvalid := map[uint16][]string{}
+	perKeytagInvalid := map[keytagReason][]string{}
 	perKeytagExpired := map[uint16][]string{}
 	perKeytagNotYet := map[uint16][]string{}
 	perKeytagNoKey := map[uint16][]string{}
@@ -8713,8 +8723,8 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				notVerifiableIPs = append(notVerifiableIPs, oc.ip)
 			}
 		}
-		for kt := range oc.rrsigNotValidByDNSKEY {
-			perKeytagInvalid[kt] = append(perKeytagInvalid[kt], oc.ip)
+		for kr := range oc.rrsigNotValidByDNSKEY {
+			perKeytagInvalid[kr] = append(perKeytagInvalid[kr], oc.ip)
 		}
 		for kt := range oc.rrsigExpired {
 			perKeytagExpired[kt] = append(perKeytagExpired[kt], oc.ip)
@@ -8751,8 +8761,12 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return nil
 	}
 
-	if err := emitKeytagFinding("DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY", perKeytagInvalid); err != nil {
-		return results, err
+	for _, kr := range sortedKeytagReasons(perKeytagInvalid) {
+		args := map[string]any{"keytag": kr.keytag, "reason": kr.reason}
+		setTypedAddressesFromValues(args, perKeytagInvalid[kr])
+		if err := appendLog(ctx, &results, testcase, "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY", args); err != nil {
+			return results, err
+		}
 	}
 	if err := emitKeytagFinding("DS21_DS_RRSIG_EXPIRED", perKeytagExpired); err != nil {
 		return results, err
@@ -9001,12 +9015,13 @@ type dnssec22Cut struct {
 
 // dnssec22SigCheck is the outcome of verifying the RRSIGs covering one RRset.
 type dnssec22SigCheck struct {
-	verified    bool
-	expired     bool
-	failed      bool
-	unsupported bool
-	expiredTag  uint16
-	failedTag   uint16
+	verified     bool
+	expired      bool
+	failed       bool
+	unsupported  bool
+	expiredTag   uint16
+	failedTag    uint16
+	failedReason string
 }
 
 // markExpired records the first expired signature.
@@ -9018,9 +9033,9 @@ func (c *dnssec22SigCheck) markExpired(keytag uint16) {
 }
 
 // markFailed records the first signature that definitely does not verify.
-func (c *dnssec22SigCheck) markFailed(keytag uint16) {
+func (c *dnssec22SigCheck) markFailed(keytag uint16, reason string) {
 	if !c.failed {
-		c.failedTag = keytag
+		c.failedTag, c.failedReason = keytag, reason
 	}
 	c.failed = true
 }
@@ -9032,6 +9047,7 @@ type dnssec22Finding struct {
 	signer string
 	zone   string
 	keytag uint16
+	reason string
 }
 
 // dnssec22Outcome is what one nameserver said about the whole name set.
@@ -9616,6 +9632,7 @@ func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) dnssec
 					ns:     name.String(),
 					signer: signerName,
 					keytag: check.failedTag,
+					reason: check.failedReason,
 				},
 				signer: signerName,
 			}
@@ -9643,6 +9660,7 @@ func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) dnssec
 			ns:     name.String(),
 			signer: signerName,
 			keytag: sigs[0].KeyTag,
+			reason: reasonSignature,
 		},
 		signer: signerName,
 	}
@@ -9665,7 +9683,7 @@ func dnssec22VerifySigs(ctx context.Context, sigs []*dns.RRSIG, keys []*dns.DNSK
 			continue
 		}
 		if int64(sig.Inception) > at.Unix() {
-			check.markFailed(sig.KeyTag)
+			check.markFailed(sig.KeyTag, reasonSignature)
 			continue
 		}
 		if !dnssecAlgorithmSupported(sig.Algorithm) {
@@ -9674,7 +9692,7 @@ func dnssec22VerifySigs(ctx context.Context, sigs []*dns.RRSIG, keys []*dns.DNSK
 		}
 		rrset := rrsetFor(sig)
 		if len(rrset) == 0 {
-			check.markFailed(sig.KeyTag)
+			check.markFailed(sig.KeyTag, reasonSignature)
 			continue
 		}
 		candidates, _ := candidateKeys(ctx, sig, keys)
@@ -9687,7 +9705,7 @@ func dnssec22VerifySigs(ctx context.Context, sigs []*dns.RRSIG, keys []*dns.DNSK
 			return errors.Is(err, dns.ErrAlg) || errors.Is(err, dnssecutil.ErrRSAExponentUnsupported)
 		})
 		if len(candidates) == 0 || !unsupported {
-			check.markFailed(sig.KeyTag)
+			check.markFailed(sig.KeyTag, sigFailReason(errs...))
 			continue
 		}
 		check.unsupported = true
@@ -10076,7 +10094,10 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if left.zone != right.zone {
 			return left.zone < right.zone
 		}
-		return left.keytag < right.keytag
+		if left.keytag != right.keytag {
+			return left.keytag < right.keytag
+		}
+		return left.reason < right.reason
 	})
 
 	sawError := false
@@ -10092,8 +10113,11 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			args["zone"] = finding.zone
 		}
 		switch finding.tag {
-		case "DS22_NS_ADDRESS_RRSIG_EXPIRED", "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY":
+		case "DS22_NS_ADDRESS_RRSIG_EXPIRED":
 			args["keytag"] = finding.keytag
+		case "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY":
+			args["keytag"] = finding.keytag
+			args["reason"] = finding.reason
 		}
 		setTypedServersFromEndpoints(args, byFinding[finding])
 		if err := appendLog(ctx, &results, testcase, finding.tag, args); err != nil {

@@ -716,16 +716,16 @@ msgid "There is no valid DNSKEY matched by any of the DS records. Fetched from t
 msgstr "Neexistuje žádný platný klíč DNSKEY odpovídající kterémukoli z DS záznamů. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "DNSKEY RRset je podepsán záznamem RRSIG s tagem {keytag}, který nelze ověřit odpovídajícím klíčem DNSKEY. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
+msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DNSKEY RRset je podepsán záznamem RRSIG s tagem {keytag}, který nelze ověřit odpovídajícím klíčem DNSKEY (důvod: {reason}). Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
 msgid "The DS record with tag {keytag} matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
 msgstr "DS záznam s tagem {keytag} odpovídá klíči DNSKEY a RRSIG záznamu DNSKEY je platný. Nalezeno na jmenných serverech s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "DNSKEY RRset je podepsán záznamem RRSIG s tagem {keytag}, který nelze ověřit odpovídajícím klíčem DNSKEY. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
+msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DNSKEY RRset je podepsán záznamem RRSIG s tagem {keytag}, který nelze ověřit odpovídajícím klíčem DNSKEY (důvod: {reason}). Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS03_ERROR_RESPONSE_NSEC_QUERY"
 msgid "The following servers give erroneous response to NSEC query. Fetched from name servers \"{servers}\"."
@@ -856,8 +856,8 @@ msgid "The SOA RRset is signed with an RRSIG with tag {keytag} which does not ma
 msgstr "SOA RRset je podepsán záznamem RRSIG s tagem {keytag}, který neodpovídá žádnému DNSKEY záznamu. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS09_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "The SOA RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "SOA RRset je podepsán záznamem RRSIG s tagem {keytag}, který nelze ověřit odpovídajícím klíčem DNSKEY. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
+msgid "The SOA RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "SOA RRset je podepsán záznamem RRSIG s tagem {keytag}, který nelze ověřit odpovídajícím klíčem DNSKEY (důvod: {reason}). Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS09_SOA_RRSIG_EXPIRED"
 msgid "RRSIG with keytag {keytag} and covering type SOA has already expired. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -960,8 +960,8 @@ msgid "There is no DNSKEY record matching the RRSIG (signature) with tag {keytag
 msgstr "Neexistuje žádný DNSKEY záznam odpovídající RRSIG (podpisu) s tagem {keytag} pro NSEC3 záznam. Získáno z jmenných serverů \"{servers}\"."
 
 msgctxt "DNSSEC:DS10_NSEC3_RRSIG_VERIFY_ERROR"
-msgid "The RRSIG (signature) with tag {keytag} for the NSEC3 record cannot be verified. Fetched from name servers \"{servers}\"."
-msgstr "RRSIG (podpis) s tagem {keytag} pro NSEC3 záznam nelze ověřit. Získáno z jmenných serverů \"{servers}\"."
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC3 record cannot be verified (reason: {reason}). Fetched from name servers \"{servers}\"."
+msgstr "RRSIG (podpis) s tagem {keytag} pro NSEC3 záznam nelze ověřit (důvod: {reason}). Získáno z jmenných serverů \"{servers}\"."
 
 msgctxt "DNSSEC:DS10_NSEC_ERR_TYPE_LIST"
 msgid "NSEC record for the zone apex with incorrect type list. Fetched from name servers \"{servers}\"."
@@ -1008,8 +1008,8 @@ msgid "There is no DNSKEY record matching the RRSIG (signature) with tag {keytag
 msgstr "Neexistuje žádný DNSKEY záznam odpovídající RRSIG (podpisu) s tagem {keytag} pro NSEC záznam. Získáno z jmenných serverů \"{servers}\"."
 
 msgctxt "DNSSEC:DS10_NSEC_RRSIG_VERIFY_ERROR"
-msgid "The RRSIG (signature) with tag {keytag} for the NSEC record cannot be verified. Fetched from name servers \"{servers}\"."
-msgstr "RRSIG (podpis) s tagem {keytag} pro NSEC záznam nelze ověřit. Získáno z jmenných serverů \"{servers}\"."
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC record cannot be verified (reason: {reason}). Fetched from name servers \"{servers}\"."
+msgstr "RRSIG (podpis) s tagem {keytag} pro NSEC záznam nelze ověřit (důvod: {reason}). Získáno z jmenných serverů \"{servers}\"."
 
 msgctxt "DNSSEC:DS10_SERVER_NO_DNSSEC"
 msgid "The following name servers do not support DNSSEC or have not been properly configured. Testing for NSEC and NSEC3 has been skipped on these servers. Fetched from name servers \"{servers}\"."
@@ -1112,8 +1112,8 @@ msgid "No CDS or CDNSKEY RRsets are found on any name server."
 msgstr "Na žádném jmenném serveru nebyly nalezeny žádné CDS ani CDNSKEY RRset."
 
 msgctxt "DNSSEC:DS16_CDS_INVALID_RRSIG"
-msgid "The CDS RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "CDS RRset je podepsán pomocí RRSIG s tagem {keytag}, ale RRSIG se neshoduje s DNSKEY se stejným key tagem. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
+msgid "The CDS RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "CDS RRset je podepsán pomocí RRSIG s tagem {keytag}, ale RRSIG se neshoduje s DNSKEY se stejným key tagem (důvod: {reason}). Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS16_CDS_MATCHES_NON_SEP_DNSKEY"
 msgid "The CDS record with tag {keytag} matches a DNSKEY record with SEP bit (bit 15) unset. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -1156,8 +1156,8 @@ msgid "The CDS RRset is a mixture between \"delete\" record and other records. F
 msgstr "CDS RRset je směsicí \"delete\" záznamu a dalších záznamů. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS17_CDNSKEY_INVALID_RRSIG"
-msgid "The CDNSKEY RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "CDNSKEY RRset je podepsán pomocí RRSIG s tagem {keytag}, ale RRSIG se neshoduje s DNSKEY se stejným key tagem. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
+msgid "The CDNSKEY RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "CDNSKEY RRset je podepsán pomocí RRSIG s tagem {keytag}, ale RRSIG se neshoduje s DNSKEY se stejným key tagem (důvod: {reason}). Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS17_CDNSKEY_IS_NON_SEP"
 msgid "The CDNSKEY record with tag {keytag} has the SEP bit (bit 15) unset. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -1324,8 +1324,8 @@ msgid "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s)
 msgstr "DS RRSIG nadřazené strany s keytagem {keytag} vypršela na jmenném serveru / serverech nadřazené strany {addresses}."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
-msgstr "DS RRSIG nadřazené strany s keytagem {keytag} nelze ověřit žádným odpovídajícím DNSKEY nadřazené strany na jmenném serveru / serverech nadřazené strany {addresses}."
+msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY (reason: {reason}) on parent name server(s) {addresses}."
+msgstr "DS RRSIG nadřazené strany s keytagem {keytag} nelze ověřit žádným odpovídajícím DNSKEY nadřazené strany (důvod: {reason}) na jmenném serveru / serverech nadřazené strany {addresses}."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VERIFIABLE"
 msgid "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
@@ -1380,8 +1380,8 @@ msgid "The RRSIG with keytag {keytag} covering the address records of name serve
 msgstr "Záznam RRSIG s keytagem {keytag}, který kryje adresní záznamy jmenného serveru {ns}, vypršel na jmenném serveru / serverech {servers}."
 
 msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
-msgstr "Záznam RRSIG s keytagem {keytag} a podepisující zónou {signer}, který kryje adresní záznamy jmenného serveru {ns}, nelze ověřit sadou DNSKEY zóny autoritativní pro toto jméno na jmenném serveru / serverech {servers}."
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name (reason: {reason}) on name server(s) {servers}."
+msgstr "Záznam RRSIG s keytagem {keytag} a podepisující zónou {signer}, který kryje adresní záznamy jmenného serveru {ns}, nelze ověřit sadou DNSKEY zóny autoritativní pro toto jméno (důvod: {reason}) na jmenném serveru / serverech {servers}."
 
 msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
 msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."

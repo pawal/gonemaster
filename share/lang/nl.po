@@ -717,16 +717,16 @@ msgid "There is no valid DNSKEY matched by any of the DS records. Fetched from t
 msgstr "Er is geen geldige DNSKEY die overeenkomt met een van de DS-records. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "De DNSKEY-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY (reden: {reason}). Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
 msgid "The DS record with tag {keytag} matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
 msgstr "Het DS-record met tag {keytag} komt overeen met de DNSKEY en de DNSKEY-RRSIG is geldig. Gevonden op de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "De DNSKEY-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY (reden: {reason}). Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS03_ERROR_RESPONSE_NSEC_QUERY"
 msgid "The following servers give erroneous response to NSEC query. Fetched from name servers \"{servers}\"."
@@ -857,8 +857,8 @@ msgid "The SOA RRset is signed with an RRSIG with tag {keytag} which does not ma
 msgstr "De SOA-RRset is ondertekend met een RRSIG met tag {keytag} die met geen enkel DNSKEY-record overeenkomt. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS09_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "The SOA RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "De SOA-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+msgid "The SOA RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De SOA-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY (reden: {reason}). Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS09_SOA_RRSIG_EXPIRED"
 msgid "RRSIG with keytag {keytag} and covering type SOA has already expired. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -961,8 +961,8 @@ msgid "There is no DNSKEY record matching the RRSIG (signature) with tag {keytag
 msgstr "Er is geen DNSKEY-record dat overeenkomt met de RRSIG (handtekening) met tag {keytag} voor het NSEC3-record. Opgehaald van naamservers \"{servers}\"."
 
 msgctxt "DNSSEC:DS10_NSEC3_RRSIG_VERIFY_ERROR"
-msgid "The RRSIG (signature) with tag {keytag} for the NSEC3 record cannot be verified. Fetched from name servers \"{servers}\"."
-msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC3-record kan niet worden geverifieerd. Opgehaald van naamservers \"{servers}\"."
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC3 record cannot be verified (reason: {reason}). Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC3-record kan niet worden geverifieerd (reden: {reason}). Opgehaald van naamservers \"{servers}\"."
 
 msgctxt "DNSSEC:DS10_NSEC_ERR_TYPE_LIST"
 msgid "NSEC record for the zone apex with incorrect type list. Fetched from name servers \"{servers}\"."
@@ -1009,8 +1009,8 @@ msgid "There is no DNSKEY record matching the RRSIG (signature) with tag {keytag
 msgstr "Er is geen DNSKEY-record dat overeenkomt met de RRSIG (handtekening) met tag {keytag} voor het NSEC-record. Opgehaald van naamservers \"{servers}\"."
 
 msgctxt "DNSSEC:DS10_NSEC_RRSIG_VERIFY_ERROR"
-msgid "The RRSIG (signature) with tag {keytag} for the NSEC record cannot be verified. Fetched from name servers \"{servers}\"."
-msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC-record kan niet worden geverifieerd. Opgehaald van naamservers \"{servers}\"."
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC record cannot be verified (reason: {reason}). Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC-record kan niet worden geverifieerd (reden: {reason}). Opgehaald van naamservers \"{servers}\"."
 
 msgctxt "DNSSEC:DS10_SERVER_NO_DNSSEC"
 msgid "The following name servers do not support DNSSEC or have not been properly configured. Testing for NSEC and NSEC3 has been skipped on these servers. Fetched from name servers \"{servers}\"."
@@ -1113,8 +1113,8 @@ msgid "No CDS or CDNSKEY RRsets are found on any name server."
 msgstr "Geen CDS- of CDNSKEY-RRsets gevonden op enige naamserver."
 
 msgctxt "DNSSEC:DS16_CDS_INVALID_RRSIG"
-msgid "The CDS RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "De CDS-RRset is ondertekend met een RRSIG met tag {keytag}, maar de RRSIG komt niet overeen met de DNSKEY met dezelfde key tag. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+msgid "The CDS RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDS-RRset is ondertekend met een RRSIG met tag {keytag}, maar de RRSIG komt niet overeen met de DNSKEY met dezelfde key tag (reden: {reason}). Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS16_CDS_MATCHES_NON_SEP_DNSKEY"
 msgid "The CDS record with tag {keytag} matches a DNSKEY record with SEP bit (bit 15) unset. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -1157,8 +1157,8 @@ msgid "The CDS RRset is a mixture between \"delete\" record and other records. F
 msgstr "De CDS-RRset is een mengeling van een \"delete\"-record en andere records. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS17_CDNSKEY_INVALID_RRSIG"
-msgid "The CDNSKEY RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "De CDNSKEY-RRset is ondertekend met een RRSIG met tag {keytag}, maar de RRSIG komt niet overeen met de DNSKEY met dezelfde key tag. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+msgid "The CDNSKEY RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag (reason: {reason}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDNSKEY-RRset is ondertekend met een RRSIG met tag {keytag}, maar de RRSIG komt niet overeen met de DNSKEY met dezelfde key tag (reden: {reason}). Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS17_CDNSKEY_IS_NON_SEP"
 msgid "The CDNSKEY record with tag {keytag} has the SEP bit (bit 15) unset. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -1325,8 +1325,8 @@ msgid "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s)
 msgstr "De DS-RRSIG van de bovenliggende zone met key tag {keytag} is verlopen op bovenliggende naamserver(s) {addresses}."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
-msgstr "De DS-RRSIG van de bovenliggende zone met key tag {keytag} kan niet worden geverifieerd met een overeenkomende DNSKEY van de bovenliggende zone op bovenliggende naamserver(s) {addresses}."
+msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY (reason: {reason}) on parent name server(s) {addresses}."
+msgstr "De DS-RRSIG van de bovenliggende zone met key tag {keytag} kan niet worden geverifieerd met een overeenkomende DNSKEY van de bovenliggende zone (reden: {reason}) op bovenliggende naamserver(s) {addresses}."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VERIFIABLE"
 msgid "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
@@ -1381,8 +1381,8 @@ msgid "The RRSIG with keytag {keytag} covering the address records of name serve
 msgstr "De RRSIG met key tag {keytag} die de adresrecords van naamserver {ns} dekt, is verlopen op naamserver(s) {servers}."
 
 msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
-msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
-msgstr "De RRSIG met key tag {keytag} en ondertekenaar {signer} die de adresrecords van naamserver {ns} dekt, kan niet worden geverifieerd met de DNSKEY-RRset van de zone die autoritatief is voor die naam op naamserver(s) {servers}."
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name (reason: {reason}) on name server(s) {servers}."
+msgstr "De RRSIG met key tag {keytag} en ondertekenaar {signer} die de adresrecords van naamserver {ns} dekt, kan niet worden geverifieerd met de DNSKEY-RRset van de zone die autoritatief is voor die naam (reden: {reason}) op naamserver(s) {servers}."
 
 msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
 msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."

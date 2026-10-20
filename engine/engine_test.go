@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 
@@ -167,6 +168,24 @@ func TestRunEmitsStartupTags(t *testing.T) {
 		if !dnstest.HasTag(log.Entries(), tag) {
 			t.Errorf("expected %s tag in run output", tag)
 		}
+	}
+}
+
+func TestRunCallbackSeesSystemEntriesFirst(t *testing.T) {
+	runner := newTestRunner(t, withRunLimits(1), withTestcases("syntax01"))
+	var tags []string
+	runner.Logger.Callback = func(entry *logger.Entry) error {
+		tags = append(tags, entry.Tag)
+		return nil
+	}
+	if _, err := RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(tags) == 0 || tags[0] != "GLOBAL_VERSION" {
+		t.Fatalf("callback tags = %v, want GLOBAL_VERSION first", tags)
+	}
+	if !slices.Contains(tags, "MODULE_END") {
+		t.Fatalf("callback tags = %v, want the test entries after the System entries", tags)
 	}
 }
 

@@ -13,6 +13,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - server, tools: the spec endpoints and the spec tooling read the tag inventory from `engine.Modules()`
+- engine: the log callback receives the `System` entries
 
 ## [v1.7.25] - 2026-10-20
 

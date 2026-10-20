@@ -77,8 +77,8 @@ Each `gm_run_next` call returns one JSON object whose `type` is one of:
 
 - `entry`: `entry` carries `timestamp` (seconds since the run started),
   `module`, `testcase`, `tag`, `level` and `args`. Entries below `min_level`
-  are not delivered. Entries the engine records outside its callback, the
-  `System` entries such as `GLOBAL_VERSION`, arrive after the test entries.
+  are not delivered. The `System` entries come first, `GLOBAL_VERSION` among
+  them, in the order the engine records them.
 - `timings`: `timings` is an array with `nameserver`, `address`, `avg_ms`,
   `min_ms`, `max_ms`, `median_ms`, `stddev_ms`, `count`, `status`,
   `timeout_count` and `refused_count` per address. Sent once, after the last

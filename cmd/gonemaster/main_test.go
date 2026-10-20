@@ -611,24 +611,25 @@ func TestRunRawStreamsOutput(t *testing.T) {
 func TestRunJSONStreamOutputs(t *testing.T) {
 	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json-stream")
 	res.RequireCode(t, 0)
-	lines := strings.Split(res.Out, "\n")
-	var first string
-	for _, line := range lines {
+	var tags []string
+	for _, line := range strings.Split(res.Out, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		first = line
-		break
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(line), &payload); err != nil {
+			t.Fatalf("expected JSON line, got %q (err=%v)", line, err)
+		}
+		tag, ok := payload["Tag"].(string)
+		if !ok {
+			t.Fatalf("expected Tag in JSON output, got %v", payload["Tag"])
+		}
+		tags = append(tags, tag)
 	}
-	if first == "" {
-		t.Fatalf("expected json-stream output, got %q", res.Out)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal([]byte(first), &payload); err != nil {
-		t.Fatalf("expected JSON line, got %q (err=%v)", first, err)
-	}
-	if tag, ok := payload["Tag"].(string); !ok || !strings.Contains(tag, "B01_") {
-		t.Fatalf("expected Tag in JSON output, got %v", payload["Tag"])
+	version := slices.Index(tags, "GLOBAL_VERSION")
+	testcase := slices.IndexFunc(tags, func(tag string) bool { return strings.HasPrefix(tag, "B01_") })
+	if version < 0 || testcase < 0 || version > testcase {
+		t.Fatalf("expected GLOBAL_VERSION before a B01_ tag, got %v", tags)
 	}
 	if len(res.Err) != 0 {
 		t.Fatalf("expected no stderr output, got %q", res.Err)

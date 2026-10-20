@@ -8,10 +8,10 @@
     "logSystem(tag, args), logSystemWithLogger(..., tag, args)"
   ],
   "summary": {
-    "file_count": 156,
-    "log_call_count": 768,
-    "unique_tag_count": 553,
-    "unique_key_count": 93,
+    "file_count": 158,
+    "log_call_count": 780,
+    "unique_tag_count": 565,
+    "unique_key_count": 97,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
     "unresolved_log_call_count": 129
@@ -1004,6 +1004,7 @@
         "RNAME_MAIL_DOMAIN_LOCALHOST",
         "RNAME_MAIL_ILLEGAL_CNAME",
         "TERMINAL_HYPHEN",
+        "TEST_TARGET",
         "Z11_DIFFERENT_SPF_POLICIES_FOUND",
         "Z11_NON_NULL_SPF_NON_MAIL_DOMAIN",
         "Z11_NO_SPF_FOUND",
@@ -1030,6 +1031,7 @@
         "unknown"
       ],
       "producer_files": [
+        "engine/engine.go",
         "engine/nameserver/limits.go",
         "engine/nameserver/query_helpers.go",
         "engine/test/address/address.go",
@@ -1039,18 +1041,12 @@
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 50,
+      "occurrences": 51,
       "samples": [
         {
           "tag": "B01_CHILD_FOUND",
           "file": "engine/test/basic/basic.go",
           "line": 173,
-          "shape": "string"
-        },
-        {
-          "tag": "B01_CHILD_FOUND",
-          "file": "engine/test/basic/basic.go",
-          "line": 188,
           "shape": "string"
         },
         {
@@ -1087,6 +1083,12 @@
           "tag": "NO_RESPONSE_PTR_QUERY",
           "file": "engine/test/address/address.go",
           "line": 445,
+          "shape": "unknown"
+        },
+        {
+          "tag": "TEST_TARGET",
+          "file": "engine/engine.go",
+          "line": 686,
           "shape": "unknown"
         }
       ]
@@ -2194,7 +2196,8 @@
     "module": {
       "tags": [
         "MODULE_END",
-        "MODULE_ERROR"
+        "MODULE_ERROR",
+        "UNKNOWN_MODULE"
       ],
       "shapes": [
         "unknown"
@@ -2202,7 +2205,7 @@
       "producer_files": [
         "engine/engine.go"
       ],
-      "occurrences": 2,
+      "occurrences": 3,
       "samples": [
         {
           "tag": "MODULE_END",
@@ -2214,6 +2217,12 @@
           "tag": "MODULE_ERROR",
           "file": "engine/engine.go",
           "line": 807,
+          "shape": "unknown"
+        },
+        {
+          "tag": "UNKNOWN_MODULE",
+          "file": "engine/engine.go",
+          "line": 632,
           "shape": "unknown"
         }
       ]
@@ -2297,6 +2306,26 @@
           "file": "engine/test/zone/zone.go",
           "line": 1191,
           "shape": "unknown"
+        }
+      ]
+    },
+    "name": {
+      "tags": [
+        "DEPENDENCY_VERSION"
+      ],
+      "shapes": [
+        "string"
+      ],
+      "producer_files": [
+        "engine/engine.go"
+      ],
+      "occurrences": 1,
+      "samples": [
+        {
+          "tag": "DEPENDENCY_VERSION",
+          "file": "engine/engine.go",
+          "line": 688,
+          "shape": "string"
         }
       ]
     },
@@ -2936,6 +2965,26 @@
         }
       ]
     },
+    "reason": {
+      "tags": [
+        "IPV6_AUTO_DISABLED"
+      ],
+      "shapes": [
+        "string"
+      ],
+      "producer_files": [
+        "engine/engine.go"
+      ],
+      "occurrences": 1,
+      "samples": [
+        {
+          "tag": "IPV6_AUTO_DISABLED",
+          "file": "engine/engine.go",
+          "line": 681,
+          "shape": "string"
+        }
+      ]
+    },
     "refresh": {
       "tags": [
         "EXPIRE_LOWER_THAN_REFRESH",
@@ -3396,6 +3445,26 @@
         }
       ]
     },
+    "start_time": {
+      "tags": [
+        "START_TIME"
+      ],
+      "shapes": [
+        "unknown"
+      ],
+      "producer_files": [
+        "engine/engine.go"
+      ],
+      "occurrences": 1,
+      "samples": [
+        {
+          "tag": "START_TIME",
+          "file": "engine/engine.go",
+          "line": 685,
+          "shape": "unknown"
+        }
+      ]
+    },
     "target": {
       "tags": [
         "Z13_SPF_MACRO_TARGET",
@@ -3453,13 +3522,15 @@
     "testcase": {
       "tags": [
         "TEST_CASE_END",
-        "TEST_CASE_START"
+        "TEST_CASE_START",
+        "UNKNOWN_METHOD"
       ],
       "shapes": [
         "string",
         "unknown"
       ],
       "producer_files": [
+        "engine/engine.go",
         "engine/test/address/address.go",
         "engine/test/basic/basic.go",
         "engine/test/connectivity/connectivity.go",
@@ -3470,18 +3541,12 @@
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 125,
+      "occurrences": 126,
       "samples": [
         {
           "tag": "TEST_CASE_END",
           "file": "engine/test/address/address.go",
           "line": 474,
-          "shape": "unknown"
-        },
-        {
-          "tag": "TEST_CASE_END",
-          "file": "engine/test/basic/basic.go",
-          "line": 1027,
           "shape": "unknown"
         },
         {
@@ -3518,6 +3583,12 @@
           "tag": "TEST_CASE_START",
           "file": "engine/test/basic/basic.go",
           "line": 928,
+          "shape": "string"
+        },
+        {
+          "tag": "UNKNOWN_METHOD",
+          "file": "engine/engine.go",
+          "line": 634,
           "shape": "string"
         }
       ]
@@ -3653,6 +3724,33 @@
           "tag": "RRSIG_EXPIRED",
           "file": "engine/test/dnssec/dnssec.go",
           "line": 2108,
+          "shape": "unknown"
+        }
+      ]
+    },
+    "version": {
+      "tags": [
+        "DEPENDENCY_VERSION",
+        "GLOBAL_VERSION"
+      ],
+      "shapes": [
+        "unknown"
+      ],
+      "producer_files": [
+        "engine/engine.go"
+      ],
+      "occurrences": 2,
+      "samples": [
+        {
+          "tag": "DEPENDENCY_VERSION",
+          "file": "engine/engine.go",
+          "line": 688,
+          "shape": "unknown"
+        },
+        {
+          "tag": "GLOBAL_VERSION",
+          "file": "engine/engine.go",
+          "line": 677,
           "shape": "unknown"
         }
       ]

@@ -212,9 +212,8 @@ shapes and the error codes; they are the same in Go.
 - `Run.Cancel()` ends the run; the stream finishes with an `error` event with
   code `canceled`. A run that is not driven to its final event MUST be
   canceled, or its goroutine blocks on the next event.
-- Entries the engine records outside its callback, the `System` entries,
-  arrive after the test entries. `include_timings` adds a `timings` event
-  before `done`.
+- Entries arrive in the order the engine records them, the `System` entries
+  first. `include_timings` adds a `timings` event before `done`.
 - `ListTests()` returns the inventory, `CheckProfile(json)` the problems in a
   profile, `ReportProfile(json)` those problems with the effective profile a
   run would use, and `Version()` the build with the contract `Schema` and its

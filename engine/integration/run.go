@@ -111,7 +111,7 @@ func (r *Run) execute(req engine.RunRequest, timings bool) {
 	case err != nil:
 		final = Event{Type: EventError, Error: errorFor(err)}
 	default:
-		// System entries the engine records outside its callback arrive here.
+		// Entries the callback did not see, if any, arrive here.
 		for i := range entries {
 			if key := keyOf(&entries[i]); streamed[key] > 0 {
 				streamed[key]--

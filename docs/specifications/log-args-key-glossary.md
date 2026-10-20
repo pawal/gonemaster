@@ -32,6 +32,8 @@ name; the query trace applies that full set to nameserver and query names.
 | `signer` | `string` | Signer's Name of an RRSIG record. | Zone apex name. Never the owner name of the signed RRset. |
 | `zone` | `string` | Zone apex name a finding is about. | Never the zone under test. Use `signer` where the name comes from an RRSIG. |
 | `asn` | `int` | Autonomous system number. | Integer in 1 to 4294967295. Used where a finding names exactly one AS; `asns` carries a list. |
+| `name` | `string` | Name of a dependency on `DEPENDENCY_VERSION`. | `dns` for the DNS library. |
+| `version` | `string` | Version string on `GLOBAL_VERSION` and `DEPENDENCY_VERSION`. | As the build reports it, for example `v1.7.25`. |
 
 ## Query Identity Keys
 
@@ -95,6 +97,7 @@ name; the query trace applies that full set to nameserver and query names.
 | Key | Type | Meaning | Notes |
 | --- | --- | --- | --- |
 | `date` | `string` | Human-visible timestamp argument in tag-specific contexts. | Use UTC RFC3339 (ISO 8601 profile). |
+| `start_time` | `string` | Start of the run on `START_TIME`. | UTC RFC3339. |
 
 ## Role-Specific Collection Variants
 

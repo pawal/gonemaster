@@ -629,9 +629,9 @@ func RunWithRunner(req RunRequest, runner *Runner) (_ []LogEntry, err error) {
 	module, testcases, err := normalizeRequest(req)
 	if err != nil {
 		if req.Module != "" {
-			runner.Logger.AddWithoutCallback("UNKNOWN_MODULE", map[string]any{"module": req.Module}, "", "")
+			runner.Logger.Add("UNKNOWN_MODULE", map[string]any{"module": req.Module}, "", "")
 		} else if len(req.Testcases) > 0 {
-			runner.Logger.AddWithoutCallback("UNKNOWN_METHOD", map[string]any{"testcase": strings.Join(req.Testcases, ",")}, "", "")
+			runner.Logger.Add("UNKNOWN_METHOD", map[string]any{"testcase": strings.Join(req.Testcases, ",")}, "", "")
 		}
 		return nil, err
 	}
@@ -674,18 +674,18 @@ func RunWithRunner(req RunRequest, runner *Runner) (_ []LogEntry, err error) {
 		ctx = dnssecchain.WithNSNames(ctx)
 	}
 
+	if _, err := runner.Logger.Add("GLOBAL_VERSION", map[string]any{"version": VersionString()}, "", ""); err != nil {
+		return nil, err
+	}
 	if runner.AutoIPv6Disabled {
-		if _, err := runner.Logger.AddWithoutCallback("IPV6_AUTO_DISABLED", map[string]any{"reason": "no route to a global IPv6 address"}, "", ""); err != nil {
+		if _, err := runner.Logger.Add("IPV6_AUTO_DISABLED", map[string]any{"reason": "no route to a global IPv6 address"}, "", ""); err != nil {
 			return nil, err
 		}
 	}
-	if _, err := runner.Logger.AddWithoutCallback("GLOBAL_VERSION", map[string]any{"version": VersionString()}, "", ""); err != nil {
-		return nil, err
-	}
-	runner.Logger.AddWithoutCallback("START_TIME", map[string]any{"start_time": runner.StartedAt.UTC().Format(time.RFC3339)}, "", "")
-	runner.Logger.AddWithoutCallback("TEST_TARGET", map[string]any{"domain": req.Domain}, "", "")
+	runner.Logger.Add("START_TIME", map[string]any{"start_time": runner.StartedAt.UTC().Format(time.RFC3339)}, "", "")
+	runner.Logger.Add("TEST_TARGET", map[string]any{"domain": req.Domain}, "", "")
 	if v := DNSLibVersion(); v != "" {
-		runner.Logger.AddWithoutCallback("DEPENDENCY_VERSION", map[string]any{"name": "dns", "version": v}, "", "")
+		runner.Logger.Add("DEPENDENCY_VERSION", map[string]any{"name": "dns", "version": v}, "", "")
 	}
 
 	// Snapshot the logger entry count here so we can prepend these system
@@ -693,19 +693,19 @@ func RunWithRunner(req RunRequest, runner *Runner) (_ []LogEntry, err error) {
 	prefixCount := len(runner.Logger.Entries())
 
 	if !runner.Profile.Net.IPv4 && !runner.Profile.Net.IPv6 {
-		runner.Logger.AddWithoutCallback("NO_NETWORK", map[string]any{}, "", "")
+		runner.Logger.Add("NO_NETWORK", map[string]any{}, "", "")
 		prefix := runner.Logger.Entries()
 		return convertEntries(prefix, req.MinLevel)
 	}
 	if !runner.Profile.Net.IPv4 {
-		runner.Logger.AddWithoutCallback("SKIP_IPV4_DISABLED", map[string]any{}, "", "")
+		runner.Logger.Add("SKIP_IPV4_DISABLED", map[string]any{}, "", "")
 	}
 	if !runner.Profile.Net.IPv6 {
-		runner.Logger.AddWithoutCallback("SKIP_IPV6_DISABLED", map[string]any{}, "", "")
+		runner.Logger.Add("SKIP_IPV6_DISABLED", map[string]any{}, "", "")
 	}
 
 	if req.NameserverCache != nil && runner.NameserverCache == req.NameserverCache {
-		runner.Logger.AddWithoutCallback("RESTORED_NS_CACHE", map[string]any{}, "", "")
+		runner.Logger.Add("RESTORED_NS_CACHE", map[string]any{}, "", "")
 	}
 
 	entries, err := runWithContext(ctx, req, module, testcases)
@@ -714,7 +714,7 @@ func RunWithRunner(req RunRequest, runner *Runner) (_ []LogEntry, err error) {
 	}
 
 	if req.NameserverCache != nil {
-		runner.Logger.AddWithoutCallback("SAVED_NS_CACHE", map[string]any{}, "", "")
+		runner.Logger.Add("SAVED_NS_CACHE", map[string]any{}, "", "")
 	}
 
 	// Prepend the system prefix entries (logged before tests ran) so that the

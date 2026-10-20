@@ -10,7 +10,10 @@ Go package reference: [pkg.go.dev/codeberg.org/pawal/gonemaster/engine](https://
 - Optional: `req.LogCallback` streams `*logger.Entry` as tests run.
 - Profiles can be inspected with `engine.EffectiveProfile(req)`.
 - Planned testcases can be listed with `engine.PlannedTestcases(req)`.
+- `engine.Modules()` lists modules, testcases and their tags in run order.
 - For IDN domains, normalize to A-labels with `engine/normalization`.
+- `engine/integration` wraps the above in a JSON request and event contract
+  with a pull-based stream; see below.
 
 ## Example: run a full test and print JSON
 ```go
@@ -186,6 +189,54 @@ func main() {
 	}
 
 	wg.Wait()
+}
+```
+
+## Embedding through `engine/integration`
+
+`engine/integration` is the contract for a host outside Go, and for a Go
+caller that wants a serialisable request and a pull-based event stream
+instead of a callback. The C shared library in [library.md](library.md) is a
+thin layer over it, and that page documents the request fields, the event
+shapes and the error codes; they are the same in Go.
+
+- `Request` maps onto `engine.RunRequest`. `Profile` is a JSON document
+  applied over the defaults; `MinLevel` sets both the output level and the
+  capture level, so the stream carries only entries at or above it.
+- `Start(ctx, req)` returns a `*Run` and does not fail: a request that fails
+  validation yields one `error` event. `StartJSON(ctx, data)` decodes the
+  request first and rejects unknown fields.
+- `Run.Next(ctx)` blocks for the next `Event`. After the final event, `done`
+  or `error`, it returns that event again. The only error it returns is the
+  caller's context ending.
+- `Run.Cancel()` ends the run; the stream finishes with an `error` event with
+  code `canceled`. A run that is not driven to its final event MUST be
+  canceled, or its goroutine blocks on the next event.
+- Entries the engine records outside its callback, the `System` entries,
+  arrive after the test entries. `include_timings` adds a `timings` event
+  before `done`.
+- `ListTests()` returns the inventory, `CheckProfile(json)` the problems in a
+  profile, and `Version()` the build with the contract `Schema` and its
+  capabilities.
+
+```go
+run := integration.Start(ctx, integration.Request{Domain: domain, MinLevel: "NOTICE", IncludeTimings: true})
+for {
+	ev, err := run.Next(ctx)
+	if err != nil {
+		run.Cancel()
+		return err
+	}
+	switch ev.Type {
+	case integration.EventEntry:
+		fmt.Println(ev.Entry.Level, ev.Entry.Tag)
+	case integration.EventTimings:
+		fmt.Println(len(ev.Timings), "nameserver addresses")
+	case integration.EventDone:
+		return nil
+	case integration.EventError:
+		return ev.Error
+	}
 }
 ```
 

@@ -2,7 +2,7 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.25] - 2026-10-20
 
 ### Added
 
@@ -16,6 +16,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - engine: DNSSEC tests check the RRSIG labels field against owner and signer
+- admin-ui, ui-public: consistent terminology and form of address in five locales
 
 ## [v1.7.24] - 2026-10-17
 

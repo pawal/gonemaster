@@ -56,6 +56,7 @@ steps:
     commands:
       - *go_cache
       - go test ./...
+      - make lib-smoke
 
   # -race requires cgo, so this step must stay on the Debian-based golang
   # image and must never inherit CGO_ENABLED=0. It also waits for ui_checks

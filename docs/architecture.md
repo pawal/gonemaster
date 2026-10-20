@@ -1,6 +1,6 @@
 # gonemaster architecture
 
-Last reviewed: 2026-10-04.
+Last reviewed: 2026-10-20.
 
 ## 1. System overview
 
@@ -32,9 +32,9 @@ shared state across binaries.
 
 ## 2. Component map
 
-gonemaster ships five binaries and three web UIs. The UIs are built
-to static assets and embedded into `gonemaster-server` with
-`go:embed`.
+gonemaster ships five binaries, one shared library, and three web UIs.
+The UIs are built to static assets and embedded into `gonemaster-server`
+with `go:embed`.
 
 ### Binaries
 
@@ -45,6 +45,7 @@ to static assets and embedded into `gonemaster-server` with
 | `gonemaster-client` | [cmd/gonemaster-client/](../cmd/gonemaster-client/) | CLI client for the admin API. | `gonemaster-server`. |
 | `gonemaster-nagios` | [cmd/gonemaster-nagios/](../cmd/gonemaster-nagios/) | Nagios-compatible probe. Runs the engine in-process and exits with a Nagios status code. | DNS. |
 | `gonemaster-mcp` | [cmd/gonemaster-mcp/](../cmd/gonemaster-mcp/) | Model Context Protocol (stdio) bridge. Forwards MCP tool calls to the admin API; runs no engine. The same tools are served by `gonemaster-server` at `/api/v1/mcp`. | `gonemaster-server`. |
+| `libgonemaster_engine` | [cmd/gonemaster-lib/](../cmd/gonemaster-lib/) | C shared library over `engine/integration`. A host process starts runs and pulls JSON events through eight exported functions. Built with cgo. | DNS. |
 
 `gonemaster`, `gonemaster-nagios`, and `gonemaster-server` are
 self-contained: each can run without the others. `gonemaster-client`
@@ -355,6 +356,8 @@ Build is driven by the [Makefile](../Makefile). CI runs on
 | `make build-gonemaster-server-noui` | `bin/gonemaster-server` without UIs. | Uses build tag `nogui`. |
 | `make build-gonemaster[-server]-badkeys-embed` | Variant with the badkeys blocklist baked in. | Uses build tag `badkeys_embed`. Downloads the blocklist via `badkeys-update-embed`. |
 | `make ui-build` | `dist/` assets in each of `server/{ui,public,analysisui}/` for `go:embed`. | Three independent Vite builds. |
+| `make build-gonemaster-lib` | `bin/libgonemaster_engine.so` (`.dylib` on macOS) and its header. | `go build -buildmode=c-shared`; needs cgo and a C compiler. |
+| `make lib-smoke` | `bin/lib-smoke`, a C program run against the library. | Builds the library first. CI runs it in the `go_test` step. |
 
 ### Build tags
 
@@ -364,6 +367,11 @@ Build is driven by the [Makefile](../Makefile). CI runs on
 - `badkeys_embed` embeds the gzipped badkeys blocklist into the
   binary. Without the tag, the blocklist is read from
   `share/badkeys/` at runtime.
+
+- `cgo` is set by the toolchain, not by `-tags`. The exported C
+  functions of `cmd/gonemaster-lib` are compiled only when cgo is
+  on; without it the package builds to an empty program, so
+  `go test ./...` and `go vet ./...` pass under `CGO_ENABLED=0`.
 
 The tags compose: `-tags "nogui badkeys_embed"` is a valid build.
 
@@ -964,7 +972,7 @@ Top-level directories tracked in the repository.
 
 | Path | Contents |
 |---|---|
-| [cmd/](../cmd/) | Binary entry points: `gonemaster`, `gonemaster-server`, `gonemaster-client`, `gonemaster-nagios`, `gonemaster-mcp`. |
+| [cmd/](../cmd/) | Binary entry points: `gonemaster`, `gonemaster-server`, `gonemaster-client`, `gonemaster-nagios`, `gonemaster-mcp`; `gonemaster-lib` is the C shared library. |
 | [engine/](../engine/) | DNS test engine. Parallel-safe; each `engine.Run` builds isolated per-run state. |
 | [server/](../server/) | HTTP handlers, job queue, batches, snapshots, persistence drivers, the MCP endpoint. |
 | [mcpbridge/](../mcpbridge/) | The MCP tools and their admin API client, shared by `gonemaster-mcp` and the server endpoint. |

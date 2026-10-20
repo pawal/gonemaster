@@ -23,7 +23,7 @@ CMD ?= all
 	ui-analysis-build ui-analysis-install ui-analysis-dev ui-analysis-test clean \
 	build-gonemaster build-gonemaster-badkeys-embed build-gonemaster-server build-gonemaster-server-noui \
 	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
-	build-gonemaster-nagios build-gonemaster-mcp install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
+	build-gonemaster-nagios build-gonemaster-mcp build-gonemaster-lib lib-smoke install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios install-gonemaster-mcp ui-check test-go test-integration vet fmt-check race race-ci \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-export-testcase-descriptions spec-check-testcase-descriptions spec-check-possible-tags \
@@ -62,6 +62,8 @@ help:
 	@echo "  build-gonemaster-client       Build the HTTP API client"
 	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
 	@echo "  build-gonemaster-mcp          Build the MCP (Model Context Protocol) bridge"
+	@echo "  build-gonemaster-lib          Build the engine as a C shared library (cgo)"
+	@echo "  lib-smoke                     Build and run the C smoke test against the shared library"
 	@echo "  spec-export        Refresh generated specification inventories (JSON)"
 	@echo "  spec-check-possible-tags  Check the possible-tags inventory (JSON + markdown) is up to date"
 	@echo "  spec-export-testcase-descriptions  Refresh the site testcase-description data file (TOML)"
@@ -214,6 +216,15 @@ build-gonemaster-nagios: $(BIN_DIR)
 
 build-gonemaster-mcp: $(BIN_DIR)
 	$(GO) build -ldflags "-X main.version=$(VERSION)" -o $(BIN_DIR)/gonemaster-mcp ./cmd/gonemaster-mcp
+
+LIB_EXT := $(if $(filter Darwin,$(shell uname -s)),dylib,so)
+
+build-gonemaster-lib: $(BIN_DIR)
+	CGO_ENABLED=1 $(GO) build -buildmode=c-shared -o $(BIN_DIR)/libgonemaster_engine.$(LIB_EXT) ./cmd/gonemaster-lib
+
+lib-smoke: build-gonemaster-lib
+	$(CC) -I$(BIN_DIR) -o $(BIN_DIR)/lib-smoke tools/lib-smoke/smoke.c -L$(BIN_DIR) -lgonemaster_engine
+	LD_LIBRARY_PATH=$(BIN_DIR) DYLD_LIBRARY_PATH=$(BIN_DIR) $(BIN_DIR)/lib-smoke
 
 test-go:
 	$(GO) test ./...

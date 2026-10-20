@@ -444,19 +444,19 @@ func (p *Profile) setWithSource(path string, value any, source valueSource) erro
 	}
 	def, ok := propertyDefs[path]
 	if !ok {
-		return fmt.Errorf("unknown property %q", path)
+		return unknownProperty(path)
 	}
 	if value == nil {
-		return fmt.Errorf("property %s can not be nil", path)
+		return &PropertyError{Path: path, Err: fmt.Errorf("property %s can not be nil", path)}
 	}
 	normalized, err := normalizeValue(path, def, value, source)
 	if err != nil {
-		return err
+		return &PropertyError{Path: path, Err: err}
 	}
 	if def.validate != nil {
 		normalized, err = def.validate(normalized)
 		if err != nil {
-			return err
+			return &PropertyError{Path: path, Err: err}
 		}
 	}
 	def.setter(p, normalized)

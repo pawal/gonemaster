@@ -241,11 +241,27 @@ func AllProperties() []string {
 	return propertyNames()
 }
 
+// PropertyError reports a property that cannot be applied.
+type PropertyError struct {
+	Path string
+	// Unknown is true when the property does not exist.
+	Unknown bool
+	Err     error
+}
+
+func (e *PropertyError) Error() string { return e.Err.Error() }
+
+func (e *PropertyError) Unwrap() error { return e.Err }
+
+func unknownProperty(path string) error {
+	return &PropertyError{Path: path, Unknown: true, Err: fmt.Errorf("unknown property %q", path)}
+}
+
 // Get returns the value of a property when set, or nil otherwise.
 func (p *Profile) Get(path string) (any, error) {
 	def, ok := propertyDefs[path]
 	if !ok {
-		return nil, fmt.Errorf("unknown property %q", path)
+		return nil, unknownProperty(path)
 	}
 	if p == nil || !p.isSet(path) {
 		return nil, nil
@@ -334,7 +350,7 @@ func fromDataMap(data map[string]any) (*Profile, error) {
 			if deprecatedProperties[path] {
 				continue
 			}
-			return nil, fmt.Errorf("unknown property %q", path)
+			return nil, unknownProperty(path)
 		}
 		value, ok := getNestedValue(data, path)
 		if !ok {

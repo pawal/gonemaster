@@ -18,13 +18,11 @@ import (
 // without a short description in testcaseDescriptions (which would surface as an
 // empty description in the spec endpoint and the MCP spec_list_testcases tool).
 func TestEveryImplementedTestcaseHasDescription(t *testing.T) {
-	for _, item := range engine.AvailableTestcases() {
-		_, tc, ok := splitTestcaseItem(item)
-		if !ok {
-			continue
-		}
-		if testcaseDescriptions[strings.ToUpper(tc)] == "" {
-			t.Errorf("testcase %q has no entry in testcaseDescriptions", tc)
+	for _, module := range engine.Modules() {
+		for _, tc := range module.Testcases {
+			if testcaseDescriptions[strings.ToUpper(tc.ID)] == "" {
+				t.Errorf("testcase %q has no entry in testcaseDescriptions", tc.ID)
+			}
 		}
 	}
 }
@@ -32,13 +30,13 @@ func TestEveryImplementedTestcaseHasDescription(t *testing.T) {
 // TestEveryImplementedTestcaseHasUITitle pins a title per testcase in every UI catalog.
 func TestEveryImplementedTestcaseHasUITitle(t *testing.T) {
 	var ids []string
-	for _, item := range engine.AvailableTestcases() {
-		if _, tc, ok := splitTestcaseItem(item); ok {
-			ids = append(ids, tc)
+	for _, module := range engine.Modules() {
+		for _, tc := range module.Testcases {
+			ids = append(ids, tc.ID)
 		}
 	}
 	if len(ids) == 0 {
-		t.Fatal("engine.AvailableTestcases returned no testcases")
+		t.Fatal("engine.Modules returned no testcases")
 	}
 
 	catalogs := []struct{ dir, prefix string }{

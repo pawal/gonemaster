@@ -216,8 +216,12 @@ shapes and the error codes; they are the same in Go.
   arrive after the test entries. `include_timings` adds a `timings` event
   before `done`.
 - `ListTests()` returns the inventory, `CheckProfile(json)` the problems in a
-  profile, and `Version()` the build with the contract `Schema` and its
+  profile, `ReportProfile(json)` those problems with the effective profile a
+  run would use, and `Version()` the build with the contract `Schema` and its
   capabilities.
+- `Translate(req)` renders messages from the embedded catalogs in one
+  language and `NormalizeName(name)` applies the domain name normalisation,
+  for a host that translates stored entries or validates input itself.
 
 ```go
 run := integration.Start(ctx, integration.Request{Domain: domain, MinLevel: "NOTICE", IncludeTimings: true})

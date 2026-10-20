@@ -6,8 +6,8 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
-- engine: `engine/integration`, a JSON request and event contract with a pull-based run stream, structured metadata, profile validation and stable error codes
-- build: `libgonemaster_engine`, a C shared library over `engine/integration` (`make build-gonemaster-lib`)
+- engine: `engine/integration`, a JSON request and event contract for embedding the engine
+- build: `libgonemaster_engine`, a C shared library over `engine/integration`
 - engine: `engine.Modules()` lists modules, testcases and their tags in run order; `profile.PropertyError` names the property an error concerns
 
 ### Changed

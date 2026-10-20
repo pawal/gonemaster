@@ -26,9 +26,12 @@ func Version() VersionInfo {
 		Schema:        Schema,
 		Capabilities: map[string]bool{
 			"cancel":             true,
+			"effective_profile":  true,
 			"nameserver_timings": true,
+			"normalization":      true,
 			"profile_json":       true,
 			"streaming":          true,
+			"translation":        true,
 			"undelegated_ds":     true,
 			"undelegated_ns":     true,
 		},

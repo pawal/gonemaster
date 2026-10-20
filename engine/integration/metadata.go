@@ -6,6 +6,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 // Schema is the version of this contract.
@@ -16,8 +17,12 @@ type Metadata struct {
 	EngineVersion string `json:"engine_version"`
 	Schema        int    `json:"schema"`
 	// Levels lists the severity levels from lowest to highest.
-	Levels  []string `json:"levels"`
-	Modules []Module `json:"modules"`
+	Levels []string `json:"levels"`
+	// Languages lists the locales the message catalogs cover.
+	Languages []string `json:"languages"`
+	// ProfileProperties lists the dotted property paths a profile may set.
+	ProfileProperties []string `json:"profile_properties"`
+	Modules           []Module `json:"modules"`
 }
 
 // Module is one module in run order.
@@ -38,7 +43,7 @@ var inventory = sync.OnceValue(engine.Modules)
 
 // ListTests returns the modules, testcases and tags of this build.
 func ListTests() Metadata {
-	out := Metadata{EngineVersion: engine.VersionString(), Schema: Schema, Levels: levels()}
+	out := Metadata{EngineVersion: engine.VersionString(), Schema: Schema, Levels: levels(), Languages: Languages(), ProfileProperties: profile.AllProperties()}
 	for _, module := range inventory() {
 		m := Module{Name: module.Name, Display: module.Display, Testcases: []Testcase{}}
 		for _, tc := range module.Testcases {

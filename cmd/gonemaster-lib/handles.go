@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -49,15 +50,27 @@ func listTestsJSON() string {
 }
 
 func checkProfileJSON(profile string) string {
+	return guard(func() string { return encode(integration.ReportProfile([]byte(profile))) })
+}
+
+func translateJSON(request string) string {
 	return guard(func() string {
-		errs := integration.CheckProfile([]byte(profile))
-		if errs == nil {
-			errs = []integration.ProfileError{}
+		req, err := integration.ParseTranslateRequest([]byte(request))
+		if err != nil {
+			var e *integration.Error
+			if errors.As(err, &e) {
+				return encode(integration.Event{Type: integration.EventError, Error: e})
+			}
+			return errorJSON(integration.CodeInvalidRequest, err.Error())
 		}
 		return encode(struct {
-			Errors []integration.ProfileError `json:"errors"`
-		}{errs})
+			Messages []integration.Translation `json:"messages"`
+		}{integration.Translate(req)})
 	})
+}
+
+func normalizeNameJSON(name string) string {
+	return guard(func() string { return encode(integration.NormalizeName(name)) })
 }
 
 // runStart returns a handle; a bad request yields a run whose only event is the error.
@@ -101,7 +114,7 @@ func unknownHandle(handle uint64) integration.Event {
 func guard(fn func() string) (out string) {
 	defer func() {
 		if v := recover(); v != nil {
-			out = errorJSON(fmt.Sprintf("panic: %v", v))
+			out = errorJSON(integration.CodeRunFailed, fmt.Sprintf("panic: %v", v))
 		}
 	}()
 	return fn()
@@ -110,12 +123,12 @@ func guard(fn func() string) (out string) {
 func encode(v any) string {
 	data, err := json.Marshal(v)
 	if err != nil {
-		return errorJSON(err.Error())
+		return errorJSON(integration.CodeRunFailed, err.Error())
 	}
 	return string(data)
 }
 
-func errorJSON(message string) string {
-	data, _ := json.Marshal(integration.Event{Type: integration.EventError, Error: &integration.Error{Code: integration.CodeRunFailed, Message: message}})
+func errorJSON(code string, message string) string {
+	data, _ := json.Marshal(integration.Event{Type: integration.EventError, Error: &integration.Error{Code: code, Message: message}})
 	return string(data)
 }

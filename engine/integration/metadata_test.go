@@ -63,3 +63,19 @@ func TestKnownModuleAndTestcase(t *testing.T) {
 		})
 	}
 }
+
+func TestListTestsListsLanguages(t *testing.T) {
+	meta := ListTests()
+	if !slices.Equal(meta.Languages, Languages()) || !slices.Contains(meta.Languages, "en") {
+		t.Fatalf("languages = %v", meta.Languages)
+	}
+}
+
+func TestListTestsListsProfileProperties(t *testing.T) {
+	meta := ListTests()
+	for _, want := range []string{"net.ipv4", "test_levels", "test_cases", "resolver.source4"} {
+		if !slices.Contains(meta.ProfileProperties, want) {
+			t.Errorf("profile_properties lacks %s: %v", want, meta.ProfileProperties)
+		}
+	}
+}

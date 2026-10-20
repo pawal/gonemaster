@@ -1,8 +1,8 @@
 # The engine as a C shared library
 
-`libgonemaster_engine` exposes the engine to a host process through eight C
-functions. Requests, events, metadata and errors cross the boundary as JSON
-strings, so any foreign function interface that handles `char *` and
+`libgonemaster_engine` exposes the engine to a host process through ten C
+functions. Requests, events, metadata, messages and errors cross the boundary
+as JSON strings, so any foreign function interface that handles `char *` and
 `uint64_t` can load it. The library is a thin layer over the Go package
 `engine/integration`, described in [dev.md](dev.md).
 
@@ -14,7 +14,9 @@ make build-gonemaster-lib
 
 The target writes `bin/libgonemaster_engine.so` (`.dylib` on macOS) and the
 header `bin/libgonemaster_engine.h`. It requires cgo and a C compiler, so it
-is not part of the cross-compiled release matrix. `make lib-smoke` compiles
+is not part of the cross-compiled release matrix. The macOS library carries
+the install name `@rpath/libgonemaster_engine.dylib`, so a host links it with
+an rpath of its own or sets `DYLD_LIBRARY_PATH`. `make lib-smoke` compiles
 [tools/lib-smoke/smoke.c](../tools/lib-smoke/smoke.c) against the library and
 runs it; CI runs the same check.
 
@@ -24,6 +26,8 @@ runs it; CI runs the same check.
 char *gm_version_json(void);
 char *gm_list_tests_json(void);
 char *gm_check_profile_json(char *profile_json);
+char *gm_translate_json(char *request_json);
+char *gm_normalize_name_json(char *name);
 uint64_t gm_run_start(char *request_json);
 char *gm_run_next(uint64_t handle);
 void gm_run_cancel(uint64_t handle);
@@ -109,21 +113,60 @@ Each `gm_run_next` call returns one JSON object whose `type` is one of:
 
 ```json
 {"engine_version":"v1.7.25","schema":1,"levels":["DEBUG3","DEBUG2","DEBUG","INFO","NOTICE","WARNING","ERROR","CRITICAL"],
+ "languages":["cs","da","de","en","es","fi","fr","ja","nb","nl","sl","sv"],
+ "profile_properties":["asn_db.sources","asn_db.style","net.ipv4","..."],
  "modules":[{"name":"basic","display":"Basic","testcases":[{"id":"basic01","display":"Basic01","tags":["B01_CHILD_FOUND", "..."]}]}]}
 ```
 
 Modules are in run order. `display` values match the `module` and `testcase`
 fields of entries; `name` and `id` match the values accepted in a request.
-`levels` is ordered from lowest to highest.
+`levels` is ordered from lowest to highest. `languages` lists the locales
+`gm_translate_json` has a catalog for. `profile_properties` lists the dotted
+paths a profile may set; a path names one property, so a `test_levels`
+document replaces the whole map.
 
 ## Profile check
 
-`gm_check_profile_json` returns `{"errors":[]}` when the profile applies, or
-one object per problem with `code`, `path` and `message`. Codes are
-`invalid_json`, `unknown_property`, `invalid_value` and `unknown_testcase`.
-Parsing stops at the first property that fails. An `unknown_testcase` entry
-names a `test_cases` value this build does not implement; the engine ignores
-such values, so a run with that profile still starts.
+`gm_check_profile_json` returns `{"errors":[],"effective":{...}}` when the
+profile applies, or one object per problem in `errors` with `code`, `path`
+and `message`. Codes are `invalid_json`, `unknown_property`, `invalid_value`
+and `unknown_testcase`. Parsing stops at the first property that fails. An
+`unknown_testcase` entry names a `test_cases` value this build does not
+implement; the engine ignores such values, so a run with that profile still
+starts and `effective` is present.
+
+`effective` is the profile a run with this document would use: the defaults
+with the document applied, in the format of `share/profile.json`. The
+document `{}` yields the defaults.
+
+## Translation
+
+`gm_translate_json` renders messages from the embedded catalogs, the same
+ones the `gonemaster` command prints. The request names a language and the
+entries; the reply carries one message per entry, in order:
+
+```json
+{"language":"sv","entries":[{"module":"System","tag":"GLOBAL_VERSION","args":{"version":"v1.7.25"}}]}
+{"messages":[{"message":"Använder version v1.7.25 av Gonemasters testmotor.","found":true}]}
+```
+
+`language` is a locale such as `sv` or `sv_SE.UTF-8`; an empty string and a
+locale without a catalog render English. `found` is false when no catalog has
+the tag; `message` is then `MODULE:TAG` with the args appended. Unknown
+request fields are an `error` event with code `invalid_request`.
+
+## Name normalisation
+
+`gm_normalize_name_json` applies the engine's domain name normalisation,
+IDN conversion included, and returns the name or the problems:
+
+```json
+{"name":"xn--rksmrgs-5wao1o.se","errors":[]}
+{"errors":[{"tag":"INVALID_ASCII","params":{"label":"!%~&"},"message":"Domain name has an ASCII label (\"!%~&\") with a character not permitted."}]}
+```
+
+A run normalises its `domain` the same way; the call exists for a host that
+validates input before it starts a run.
 
 ## Version
 
@@ -131,7 +174,7 @@ such values, so a run with that profile still starts.
 
 ```json
 {"engine_version":"v1.7.25","commit":"...","dns_library":"v0.6.118","schema":1,
- "capabilities":{"cancel":true,"nameserver_timings":true,"profile_json":true,"streaming":true,"undelegated_ds":true,"undelegated_ns":true}}
+ "capabilities":{"cancel":true,"effective_profile":true,"nameserver_timings":true,"normalization":true,"profile_json":true,"streaming":true,"translation":true,"undelegated_ds":true,"undelegated_ns":true}}
 ```
 
 `schema` is the version of this contract. A host SHOULD refuse a library

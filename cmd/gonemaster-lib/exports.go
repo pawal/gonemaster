@@ -35,3 +35,13 @@ func gm_run_free(handle C.uint64_t) { runFree(uint64(handle)) }
 
 //export gm_free_string
 func gm_free_string(s *C.char) { C.free(unsafe.Pointer(s)) }
+
+//export gm_translate_json
+func gm_translate_json(request *C.char) *C.char {
+	return C.CString(translateJSON(C.GoString(request)))
+}
+
+//export gm_normalize_name_json
+func gm_normalize_name_json(name *C.char) *C.char {
+	return C.CString(normalizeNameJSON(C.GoString(name)))
+}

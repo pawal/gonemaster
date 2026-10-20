@@ -52,17 +52,58 @@ func TestListTestsJSON(t *testing.T) {
 
 func TestCheckProfileJSON(t *testing.T) {
 	cases := []struct {
-		name    string
-		profile string
-		want    string
+		name       string
+		profile    string
+		wantPrefix string
 	}{
-		{"valid", `{}`, `{"errors":[]}`},
+		{"valid", `{}`, `{"errors":[],"effective":{"asn_db":`},
 		{"unknown property", `{"net":1}`, `{"errors":[{"code":"unknown_property","path":"net","message":"unknown property \"net\""}]}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := checkProfileJSON(tc.profile); got != tc.want {
-				t.Fatalf("checkProfileJSON = %s, want %s", got, tc.want)
+			if got := checkProfileJSON(tc.profile); !strings.HasPrefix(got, tc.wantPrefix) {
+				t.Fatalf("checkProfileJSON = %s, want prefix %s", got, tc.wantPrefix)
+			}
+		})
+	}
+}
+
+func TestTranslateJSON(t *testing.T) {
+	cases := []struct {
+		name    string
+		request string
+		want    string
+	}{
+		{"english", `{"language":"en","entries":[{"module":"System","tag":"GLOBAL_VERSION","args":{"version":"v1"}}]}`, `{"messages":[{"message":"Using version v1 of the Gonemaster engine.","found":true}]}`},
+		{"swedish", `{"language":"sv","entries":[{"module":"System","tag":"GLOBAL_VERSION","args":{"version":"v1"}}]}`, `{"messages":[{"message":"Använder version v1 av Gonemasters testmotor.","found":true}]}`},
+		{"unknown tag", `{"language":"en","entries":[{"module":"Basic","tag":"NOPE"}]}`, `{"messages":[{"message":"BASIC:NOPE","found":false}]}`},
+		{"no entries", `{"language":"en"}`, `{"messages":[]}`},
+		{"bad json", `{"language":`, `{"type":"error","error":{"code":"invalid_request","message":"unexpected EOF"}}`},
+		{"unknown field", `{"locale":"en"}`, `{"type":"error","error":{"code":"invalid_request","message":"json: unknown field \"locale\""}}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := translateJSON(tc.request); got != tc.want {
+				t.Fatalf("translateJSON = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeNameJSON(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"valid", "Example.COM", `{"name":"example.com","errors":[]}`},
+		{"idn", "räksmörgås.se", `{"name":"xn--rksmrgs-5wao1o.se","errors":[]}`},
+		{"empty", "", `{"errors":[{"tag":"EMPTY_DOMAIN_NAME","message":"Domain name is empty."}]}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := normalizeNameJSON(tc.in); got != tc.want {
+				t.Fatalf("normalizeNameJSON = %s, want %s", got, tc.want)
 			}
 		})
 	}

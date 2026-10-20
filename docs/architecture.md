@@ -45,7 +45,7 @@ with `go:embed`.
 | `gonemaster-client` | [cmd/gonemaster-client/](../cmd/gonemaster-client/) | CLI client for the admin API. | `gonemaster-server`. |
 | `gonemaster-nagios` | [cmd/gonemaster-nagios/](../cmd/gonemaster-nagios/) | Nagios-compatible probe. Runs the engine in-process and exits with a Nagios status code. | DNS. |
 | `gonemaster-mcp` | [cmd/gonemaster-mcp/](../cmd/gonemaster-mcp/) | Model Context Protocol (stdio) bridge. Forwards MCP tool calls to the admin API; runs no engine. The same tools are served by `gonemaster-server` at `/api/v1/mcp`. | `gonemaster-server`. |
-| `libgonemaster_engine` | [cmd/gonemaster-lib/](../cmd/gonemaster-lib/) | C shared library over `engine/integration`. A host process starts runs and pulls JSON events through eight exported functions. Built with cgo. | DNS. |
+| `libgonemaster_engine` | [cmd/gonemaster-lib/](../cmd/gonemaster-lib/) | C shared library over `engine/integration`. A host process starts runs, pulls JSON events, translates messages and normalises names through ten exported functions. Built with cgo. | DNS. |
 
 `gonemaster`, `gonemaster-nagios`, and `gonemaster-server` are
 self-contained: each can run without the others. `gonemaster-client`

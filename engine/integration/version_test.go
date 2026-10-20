@@ -22,7 +22,7 @@ func TestVersionReportsBuildAndCapabilities(t *testing.T) {
 		names = append(names, name)
 	}
 	slices.Sort(names)
-	if !slices.Equal(names, []string{"cancel", "nameserver_timings", "profile_json", "streaming", "undelegated_ds", "undelegated_ns"}) {
+	if !slices.Equal(names, []string{"cancel", "effective_profile", "nameserver_timings", "normalization", "profile_json", "streaming", "translation", "undelegated_ds", "undelegated_ns"}) {
 		t.Fatalf("capabilities = %v", names)
 	}
 }

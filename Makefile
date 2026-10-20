@@ -217,10 +217,17 @@ build-gonemaster-nagios: $(BIN_DIR)
 build-gonemaster-mcp: $(BIN_DIR)
 	$(GO) build -ldflags "-X main.version=$(VERSION)" -o $(BIN_DIR)/gonemaster-mcp ./cmd/gonemaster-mcp
 
-LIB_EXT := $(if $(filter Darwin,$(shell uname -s)),dylib,so)
+# An @rpath install name lets a macOS host find the library through its own rpath.
+ifeq ($(shell uname -s),Darwin)
+LIB_EXT := dylib
+LIB_LDFLAGS := -ldflags '-extldflags "-Wl,-install_name,@rpath/libgonemaster_engine.dylib"'
+else
+LIB_EXT := so
+LIB_LDFLAGS :=
+endif
 
 build-gonemaster-lib: $(BIN_DIR)
-	CGO_ENABLED=1 $(GO) build -buildmode=c-shared -o $(BIN_DIR)/libgonemaster_engine.$(LIB_EXT) ./cmd/gonemaster-lib
+	CGO_ENABLED=1 $(GO) build -buildmode=c-shared $(LIB_LDFLAGS) -o $(BIN_DIR)/libgonemaster_engine.$(LIB_EXT) ./cmd/gonemaster-lib
 
 lib-smoke: build-gonemaster-lib
 	$(CC) -I$(BIN_DIR) -o $(BIN_DIR)/lib-smoke tools/lib-smoke/smoke.c -L$(BIN_DIR) -lgonemaster_engine

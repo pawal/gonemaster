@@ -121,6 +121,16 @@ func (f *ds22Fixture) secureCut(t *testing.T) {
 		tctest.Question("ns.example", dns.TypeDNSKEY), tctest.Secure(), tctest.Answers(f.cutKey, keySig))
 }
 
+// signedDenial returns records with an RRSIG of the zone key over each.
+func (f *ds22Fixture) signedDenial(t *testing.T, records ...dns.RR) []dns.RR {
+	t.Helper()
+	out := slices.Clone(records)
+	for _, rr := range records {
+		out = append(out, tctest.Sign(t, f.zoneKey, f.zoneSigner, dns.RRToType(rr), []dns.RR{rr}))
+	}
+	return out
+}
+
 // walker returns a walker for a nameserver answering the fixture's table.
 func (f *ds22Fixture) walker(t *testing.T, ctx context.Context) *dnssec22Walker {
 	t.Helper()
@@ -147,7 +157,7 @@ func TestDNSSEC22CutInsecure(t *testing.T) {
 	f := newDS22Fixture(t)
 	nsec := nsecRecord("ns.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC)
 	f.answers[ds22Key("ns.example", "DS")] = tctest.Response(
-		tctest.Question("ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(nsec))
+		tctest.Question("ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(f.signedDenial(t, nsec)...))
 
 	cut := f.walker(t, ctx).cut(ctx, dnsname.New("ns.example"))
 	if cut.status != dnssec22InsecureCut {
@@ -180,7 +190,7 @@ func TestDNSSEC22CutOptOut(t *testing.T) {
 			ctx := tctest.Context(t)
 			f := newDS22Fixture(t)
 			f.answers[ds22Key(tc.cut, "DS")] = tctest.Wire(t, tctest.Response(
-				tctest.Question(tc.cut, dns.TypeDS), tctest.Secure(), tctest.Authority(tc.denial...)))
+				tctest.Question(tc.cut, dns.TypeDS), tctest.Secure(), tctest.Authority(f.signedDenial(t, tc.denial...)...)))
 
 			cut := f.walker(t, ctx).cut(ctx, dnsname.New(tc.cut))
 			if cut.status != tc.want {
@@ -683,7 +693,7 @@ func TestDNSSEC22InsecureDelegation(t *testing.T) {
 			f.secureZone(t, ctx)
 			f.unsignedAddress(t, "ns1.sub.example")
 			f.denyDS("ns1.sub.example", tctest.SOARR("sub.example"))
-			f.denyDS("sub.example", tc.denial...)
+			f.denyDS("sub.example", f.signedDenial(t, tc.denial...)...)
 			ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
 
 			entries := f.run(t, ctx, "ns1.sub.example")
@@ -1196,7 +1206,7 @@ func TestDNSSEC22ReferredInsecureDelegation(t *testing.T) {
 	f := newDS22Fixture(t)
 	f.secureZone(t, ctx)
 	f.referTo("ns1.sub.example", "sub.example", "bow.sub.example", ds22ChildIP)
-	f.denyDS("sub.example", nsecRecord("sub.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC))
+	f.denyDS("sub.example", f.signedDenial(t, nsecRecord("sub.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC))...)
 	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
 	child := map[string]int{}
 	ds22Server(t, ctx, "bow.sub.example", ds22ChildIP, ds22Answers{}, child)
@@ -1503,7 +1513,7 @@ func TestDNSSEC22CutNSEC3Bound(t *testing.T) {
 			ctx, log := scopedContext(t, "DNSSEC22", "example")
 			f := newDS22Fixture(t)
 			f.answers[ds22Key("ns.example", "DS")] = tctest.Wire(t, tctest.Response(
-				tctest.Question("ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(tc.records...)))
+				tctest.Question("ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(f.signedDenial(t, tc.records...)...)))
 
 			cut := f.walker(t, ctx).cut(ctx, dnsname.New("ns.example"))
 			if cut.status != tc.want {

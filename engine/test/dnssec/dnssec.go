@@ -9305,7 +9305,7 @@ func (w *dnssec22Walker) probeCut(ctx context.Context, name dnsname.Name, referr
 	}
 	dsRRs := resp.GetRecordsForName("DS", name, "answer")
 	if len(dsRRs) == 0 {
-		return dnssec22Cut{status: dnssec22CutFromDenial(ctx, name, resp)}
+		return dnssec22Cut{status: w.cutFromDenial(ctx, name, resp)}
 	}
 	if referred {
 		return w.dsStatus(ctx, name, resp, dsRRs)
@@ -9313,14 +9313,14 @@ func (w *dnssec22Walker) probeCut(ctx context.Context, name dnsname.Name, referr
 	return w.cutFromDS(ctx, name, resp, dsRRs)
 }
 
-// dnssec22CutFromDenial reads the zone cut status off the NSEC or NSEC3 matching name.
-func dnssec22CutFromDenial(ctx context.Context, name dnsname.Name, resp packet.Packet) dnssec22CutStatus {
+// cutFromDenial reads the zone cut status off the NSEC or NSEC3 matching name.
+func (w *dnssec22Walker) cutFromDenial(ctx context.Context, name dnsname.Name, resp packet.Packet) dnssec22CutStatus {
 	for _, rr := range resp.GetRecords("NSEC", "authority") {
 		nsec, ok := rr.(*dns.NSEC)
 		if !ok || !rrOwnerMatchesZone(rr, name) {
 			continue
 		}
-		return dnssec22CutFromBitmap(nsec.TypeBitMap)
+		return w.provenCut(ctx, name, resp, dnssec22CutFromBitmap(nsec.TypeBitMap), nsec)
 	}
 	records, ok := dnssecutil.NSEC3Usable(nsec3Records(resp, "authority"))
 	if !ok {
@@ -9331,26 +9331,26 @@ func dnssec22CutFromDenial(ctx context.Context, name dnsname.Name, resp packet.P
 		return dnssec22Indeterminate
 	}
 	if match != nil {
-		return dnssec22CutFromBitmap(match.TypeBitMap)
+		return w.provenCut(ctx, name, resp, dnssec22CutFromBitmap(match.TypeBitMap), match)
 	}
-	covered, ok := dnssec22OptOutCovers(ctx, name, records)
+	proof, ok := dnssec22OptOutProof(ctx, name, records)
 	switch {
 	case !ok:
 		return dnssec22Indeterminate
-	case covered:
-		return dnssec22InsecureCut
+	case proof != nil:
+		return w.provenCut(ctx, name, resp, dnssec22InsecureCut, proof...)
 	}
 	// An unsigned enclosing zone proves nothing here; an ancestor decides.
 	return dnssec22NotACut
 }
 
-// dnssec22OptOutCovers reports whether an Opt-Out NSEC3 covers the next closer name of name (RFC 5155 section 8.6); false past the iteration bound.
-func dnssec22OptOutCovers(ctx context.Context, name dnsname.Name, records []*dns.NSEC3) (bool, bool) {
+// dnssec22OptOutProof returns the closest encloser NSEC3 and the Opt-Out NSEC3 covering the next closer name of name (RFC 5155 section 8.6), nil when none covers; false past the iteration bound.
+func dnssec22OptOutProof(ctx context.Context, name dnsname.Name, records []*dns.NSEC3) ([]dns.RR, bool) {
 	next := name
 	for encloser, more := name.NextHigher(); more; encloser, more = encloser.NextHigher() {
 		match, ok := nsec3Matching(ctx, records, encloser)
 		if !ok {
-			return false, false
+			return nil, false
 		}
 		if match == nil {
 			next = encloser
@@ -9360,13 +9360,61 @@ func dnssec22OptOutCovers(ctx context.Context, name dnsname.Name, records []*dns
 			if rr.Flags&nsec3FlagOptOut == 0 {
 				continue
 			}
-			if covers, ok := nsec3Covers(ctx, rr, next); !ok || covers {
-				return covers, ok
+			covers, ok := nsec3Covers(ctx, rr, next)
+			if !ok {
+				return nil, false
+			}
+			if covers {
+				return []dns.RR{match, rr}, true
 			}
 		}
-		return false, true
+		return nil, true
 	}
-	return false, true
+	return nil, true
+}
+
+// provenCut keeps an insecure status only when every denial record it rests on verifies (RFC 4035 section 5.4).
+func (w *dnssec22Walker) provenCut(ctx context.Context, name dnsname.Name, resp packet.Packet, status dnssec22CutStatus, records ...dns.RR) dnssec22CutStatus {
+	if status != dnssec22InsecureCut {
+		return status
+	}
+	var keys []*dns.DNSKEY
+	for _, rr := range records {
+		owner, rrtype := dnsname.New(rr.Header().Name), dns.RRToType(rr)
+		sigs := filterRRSIGByType(resp.GetRecordsForName("RRSIG", owner, "authority"), rrtype)
+		if len(sigs) == 0 {
+			return dnssec22BrokenCut
+		}
+		if keys == nil {
+			signerKeys, keyStatus := w.signerKeys(ctx, name, dnsname.New(sigs[0].SignerName))
+			if keyStatus != dnssec22SecureCut {
+				return keyStatus
+			}
+			keys = signerKeys
+		}
+		check := dnssec22VerifySigs(ctx, sigs, keys, packetTime(resp), func(*dns.RRSIG) []dns.RR {
+			return rrsetForName(resp.GetRecords(rrsigTypeString(rrtype), "authority"), owner.String())
+		})
+		if checked := dnssec22CutFromCheck(check); checked != dnssec22SecureCut {
+			return checked
+		}
+	}
+	return dnssec22InsecureCut
+}
+
+// signerKeys returns the DNSKEY RRset of signer, which must be a proper ancestor of name at or below the apex.
+func (w *dnssec22Walker) signerKeys(ctx context.Context, name dnsname.Name, signer dnsname.Name) ([]*dns.DNSKEY, dnssec22CutStatus) {
+	if signer.Compare(name) == 0 || !signer.IsInBailiwick(name) || !w.zone.IsInBailiwick(signer) {
+		return nil, dnssec22BrokenCut
+	}
+	cut := w.cut(ctx, signer)
+	switch cut.status {
+	case dnssec22SecureCut:
+		return cut.keys, dnssec22SecureCut
+	case dnssec22Indeterminate:
+		return nil, dnssec22Indeterminate
+	}
+	return nil, dnssec22BrokenCut
 }
 
 // dnssec22CutFromBitmap maps the NSEC or NSEC3 type bitmap onto a zone cut status.
@@ -9404,19 +9452,12 @@ func (w *dnssec22Walker) dsStatus(ctx context.Context, name dnsname.Name, resp p
 	if len(sigs) == 0 {
 		return dnssec22Cut{status: dnssec22BrokenCut}
 	}
-	parent := dnsname.New(sigs[0].SignerName)
-	if parent.Compare(name) == 0 || !parent.IsInBailiwick(name) || !w.zone.IsInBailiwick(parent) {
-		return dnssec22Cut{status: dnssec22BrokenCut}
-	}
-	parentCut := w.cut(ctx, parent)
-	if parentCut.status == dnssec22Indeterminate {
-		return dnssec22Cut{status: dnssec22Indeterminate}
-	}
-	if parentCut.status != dnssec22SecureCut {
-		return dnssec22Cut{status: dnssec22BrokenCut}
+	keys, keyStatus := w.signerKeys(ctx, name, dnsname.New(sigs[0].SignerName))
+	if keyStatus != dnssec22SecureCut {
+		return dnssec22Cut{status: keyStatus}
 	}
 
-	dsCheck := dnssec22VerifySigs(ctx, sigs, parentCut.keys, packetTime(resp), func(*dns.RRSIG) []dns.RR { return dsRRs })
+	dsCheck := dnssec22VerifySigs(ctx, sigs, keys, packetTime(resp), func(*dns.RRSIG) []dns.RR { return dsRRs })
 	if status := dnssec22CutFromCheck(dsCheck); status != dnssec22SecureCut {
 		return dnssec22Cut{status: status}
 	}

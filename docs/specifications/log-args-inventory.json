@@ -3696,31 +3696,31 @@
         {
           "tag": "DS24_SIGNAL_CHAIN_BROKEN",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 11246,
+          "line": 11287,
           "shape": "unknown"
         },
         {
           "tag": "DS24_SIGNAL_UNSIGNED",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 11255,
+          "line": 11296,
           "shape": "unknown"
         },
         {
           "tag": "DS24_SIGNAL_VALIDATED",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 11265,
+          "line": 11306,
           "shape": "unknown"
         },
         {
           "tag": "DS24_SIGNAL_ZONE_INSECURE",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 11244,
+          "line": 11285,
           "shape": "unknown"
         },
         {
           "tag": "DS24_SIGNAL_ZONE_UNREACHABLE",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 11250,
+          "line": 11291,
           "shape": "unknown"
         }
       ]

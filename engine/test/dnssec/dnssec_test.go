@@ -1694,6 +1694,40 @@ func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
 	}
 }
 
+// underRoot returns a copy of key owned by the root.
+func underRoot(key *dns.DNSKEY) *dns.DNSKEY {
+	planted := *key
+	planted.Hdr.Name = "."
+	return &planted
+}
+
+// A DNSKEY under another owner is not a key of the zone.
+func TestDNSSEC06IgnoresForeignOwnerKey(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	key := tctest.DNSKEYRR(".", 8, tctest.PublicKey("AwEAAc=="))
+	sig := rrsigRecord("example", dns.TypeDNSKEY, 12345, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+	resp := answerPacket("example", dns.TypeDNSKEY, key, sig)
+
+	tctest.Stub(t, &zoneQueryAll, func(_ context.Context, _ *zone.Zone, _ string, _ string, _ *nameserver.QueryOptions) ([]packet.Packet, error) {
+		return []packet.Packet{resp}, nil
+	})
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC06(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec06: %v", err)
+	}
+	entry := tctest.RequireTag(t, entries, "EXTRA_PROCESSING_BROKEN")
+	if entry.Args["keys"] != 0 {
+		t.Fatalf("keys = %#v, want 0", entry.Args["keys"])
+	}
+	tctest.RequireNoTag(t, entries, "EXTRA_PROCESSING_OK")
+}
+
 func TestDNSSEC07SignedZone(t *testing.T) {
 	ctx := tctest.Context(t)
 
@@ -2673,6 +2707,35 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 		t.Fatalf("dnssec08: %v", err)
 	}
 	tctest.RequireTags(t, entries, "DS08_RRSIG_NOT_VALID_BY_DNSKEY")
+}
+
+// The apex DNSKEY RRset is verified without a key under another owner in the answer.
+func TestDNSSEC08IgnoresForeignOwnerKey(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	other, _ := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	sig := tctest.Sign(t, key, signer, dns.TypeDNSKEY, []dns.RR{key})
+
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		if q.Type != "DNSKEY" {
+			return packet.Packet{}
+		}
+		return answerPacket(q.Name, dns.TypeDNSKEY, key, underRoot(other), sig)
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	entries, err := DNSSEC08(ctx, &zone.Zone{Name: dnsname.New("example")})
+	if err != nil {
+		t.Fatalf("dnssec08: %v", err)
+	}
+	tctest.RequireTags(t, entries, "DS08_DNSKEY_RRSIG_VALID")
+	tctest.RequireNoTag(t, entries, "DS08_RRSIG_NOT_VALID_BY_DNSKEY")
 }
 
 func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
@@ -4381,6 +4444,37 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 	tctest.RequireTags(t, entries, "DNSKEY_SMALLER_THAN_REC")
 }
 
+// A key under another owner is not sized as a key of the zone.
+func TestDNSSEC14IgnoresForeignOwnerKey(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	key, _ := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	small := tctest.DNSKEYRR(".", 8)
+	if _, err := small.Generate(1024); err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.92", func(q tctest.Query) packet.Packet {
+		if q.Type == "DNSKEY" {
+			return answerPacket(q.Name, dns.TypeDNSKEY, key, small)
+		}
+		return packet.Packet{}
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	entries, err := DNSSEC14(ctx, &zone.Zone{Name: dnsname.New("example")})
+	if err != nil {
+		t.Fatalf("dnssec14: %v", err)
+	}
+	tctest.RequireTags(t, entries, "KEY_SIZE_OK")
+	tctest.RequireNoTag(t, entries, "DNSKEY_SMALLER_THAN_REC")
+}
+
 // A public exponent above 2^31-1 is reported; the usual 65537 is not.
 func TestDNSSEC14RSAExponentLarge(t *testing.T) {
 	for _, tc := range []struct {
@@ -4917,6 +5011,41 @@ func TestDNSSEC16InvalidRRSIGReason(t *testing.T) {
 	}
 }
 
+// A CDS signed by a key under another owner is signed by an unknown key.
+func TestDNSSEC16ForeignOwnerKeySignsCDS(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	keySig := tctest.Sign(t, key, signer, dns.TypeDNSKEY, []dns.RR{key})
+	other, otherSigner := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	planted := underRoot(other)
+	rr := ds24CDS(t, "example", key)
+	sig := tctest.Sign(t, planted, otherSigner, dns.TypeCDS, []dns.RR{rr})
+
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.98", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "CDS":
+			return answerPacket(q.Name, dns.TypeCDS, rr, sig)
+		case "DNSKEY":
+			return answerPacket(q.Name, dns.TypeDNSKEY, key, planted, keySig)
+		default:
+			return packet.Packet{}
+		}
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	entries, err := DNSSEC16(ctx, &zone.Zone{Name: dnsname.New("example")})
+	if err != nil {
+		t.Fatalf("dnssec16: %v", err)
+	}
+	tctest.RequireTags(t, entries, "DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY")
+}
+
 func TestDNSSEC16ParallelQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)
@@ -5067,6 +5196,41 @@ func TestDNSSEC17InvalidRRSIGReason(t *testing.T) {
 	}
 }
 
+// A CDNSKEY signed by a key under another owner is signed by an unknown key.
+func TestDNSSEC17ForeignOwnerKeySignsCDNSKEY(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	key, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	keySig := tctest.Sign(t, key, signer, dns.TypeDNSKEY, []dns.RR{key})
+	other, otherSigner := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+	planted := underRoot(other)
+	rr := ds24CDNSKEY("example", key)
+	sig := tctest.Sign(t, planted, otherSigner, dns.TypeCDNSKEY, []dns.RR{rr})
+
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.99", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "CDNSKEY":
+			return answerPacket(q.Name, dns.TypeCDNSKEY, rr, sig)
+		case "DNSKEY":
+			return answerPacket(q.Name, dns.TypeDNSKEY, key, planted, keySig)
+		default:
+			return packet.Packet{}
+		}
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	entries, err := DNSSEC17(ctx, &zone.Zone{Name: dnsname.New("example")})
+	if err != nil {
+		t.Fatalf("dnssec17: %v", err)
+	}
+	tctest.RequireTags(t, entries, "DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY")
+}
+
 func TestDNSSEC17ParallelQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)
@@ -5207,6 +5371,56 @@ func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 		t.Fatalf("dnssec18: %v", err)
 	}
 	tctest.RequireTags(t, entries, "DS18_NO_MATCH_CDS_RRSIG_DS", "DS18_NO_MATCH_CDNSKEY_RRSIG_DS")
+}
+
+// A DS keytag carried only by a key under another owner names no key of the zone.
+func TestDNSSEC18IgnoresForeignOwnerKey(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+	other := tctest.DNSKEYRR(".", 8, tctest.PublicKey("AwEAAg=="))
+	otherTag := keyTag(other)
+	ds := tctest.DSRR("example", otherTag, 8, 1, "DEADBEEF")
+
+	cds := &dns.CDS{DS: *ds}
+	cdnskey := ds24CDNSKEY("example", other)
+	cdsSig := rrsigRecord("example", dns.TypeCDS, otherTag, 1, 2)
+	cdnskeySig := rrsigRecord("example", dns.TypeCDNSKEY, otherTag, 1, 2)
+
+	parentNS := tctest.NS(t, ctx, "pns1.example", "192.0.2.93", func(q tctest.Query) packet.Packet {
+		if q.Type == "DS" {
+			return dsPacketFromDS(q.Name, ds)
+		}
+		return packet.Packet{}
+	})
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.94", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "CDS":
+			return answerPacket(q.Name, dns.TypeCDS, cds, cdsSig)
+		case "CDNSKEY":
+			return answerPacket(q.Name, dns.TypeCDNSKEY, cdnskey, cdnskeySig)
+		case "DNSKEY":
+			return answerPacket(q.Name, dns.TypeDNSKEY, key, other)
+		default:
+			return packet.Packet{}
+		}
+	})
+	tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	entries, err := DNSSEC18(ctx, &zone.Zone{Name: dnsname.New("example")})
+	if err != nil {
+		t.Fatalf("dnssec18: %v", err)
+	}
+	tctest.RequireTags(t, entries, "DS18_NO_MATCH_CDS_RRSIG_DS", "DS18_NO_MATCH_CDNSKEY_RRSIG_DS")
+	tctest.RequireNoTag(t, entries, "DS18_MATCH_CDS_RRSIG_DS", "DS18_MATCH_CDNSKEY_RRSIG_DS")
 }
 
 func TestDNSSEC18ParallelQueries(t *testing.T) {

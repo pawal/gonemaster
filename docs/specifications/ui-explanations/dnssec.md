@@ -1335,7 +1335,7 @@ Header: Broken chain to nameserver address
 
 Description:
 
-The address records of one of your nameservers live in a signed zone below your own, and the link between the two zones is broken: the DS record does not match the key that signs the lower zone, or the signatures on those records do not verify. Validating resolvers cannot reach the key that signs the address, so they reject it and stop using that nameserver.
+The address records of one of your nameservers live in a zone below your own, and the link between the two zones is broken: the DS record does not match the key that signs the lower zone, the signatures on those records do not verify, or the record stating that the lower zone is unsigned carries no valid signature. Validating resolvers cannot authenticate the address, so they reject it and stop using that nameserver.
 
 ## Tag DS22_NS_ADDRESS_ORPHAN_ZONE
 

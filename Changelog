@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- engine: DNSSEC22 reads an insecure delegation only from a denial that verifies
+
 ## [v1.7.25] - 2026-10-20
 
 ### Added

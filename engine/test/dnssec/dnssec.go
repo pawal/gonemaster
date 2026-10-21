@@ -2373,7 +2373,7 @@ func DNSSEC06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if resp.Msg == nil {
 			continue
 		}
-		keys := resp.GetRecords("DNSKEY", "answer")
+		keys := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
 		sigs := resp.GetRecords("RRSIG", "answer")
 		if len(keys) > 0 && len(sigs) > 0 {
 			if err := appendLog(ctx, &results, testcase, "EXTRA_PROCESSING_OK", map[string]any{
@@ -2877,18 +2877,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
-				if len(dnskeyRRs) == 0 {
-					outcomes[i] = outcome
-					return nil
-				}
-
-				var dnskeyRecords []*dns.DNSKEY
-				for _, rr := range resp.GetRecords("DNSKEY", "answer") {
-					if dnskey, ok := rr.(*dns.DNSKEY); ok {
-						dnskeyRecords = append(dnskeyRecords, dnskey)
-					}
-				}
+				dnskeyRecords := apexDNSKEYs(resp, z.Name)
 				if len(dnskeyRecords) == 0 {
 					outcomes[i] = outcome
 					return nil
@@ -4964,19 +4953,13 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				keyRecords := resp.GetRecords("DNSKEY", "answer")
-				if len(keyRecords) == 0 {
+				outcome.dnskeyRRs = apexDNSKEYs(resp, z.Name)
+				if len(outcome.dnskeyRRs) == 0 {
 					if _, err := buf.Add("NO_RESPONSE_DNSKEY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
 					return nil
-				}
-
-				for _, rr := range keyRecords {
-					if dnskey, ok := rr.(*dns.DNSKEY); ok {
-						outcome.dnskeyRRs = append(outcome.dnskeyRRs, dnskey)
-					}
 				}
 
 				outcomes[i] = outcome
@@ -5439,11 +5422,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcomes[i] = outcome
 					return nil
 				}
-				for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
-					if dnskey, ok := rr.(*dns.DNSKEY); ok {
-						outcome.dnskeyRecords = append(outcome.dnskeyRecords, dnskey)
-					}
-				}
+				outcome.dnskeyRecords = apexDNSKEYs(dnskeyResp, z.Name)
 				if len(outcome.dnskeyRecords) == 0 {
 					outcomes[i] = outcome
 					return nil
@@ -5939,11 +5918,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcomes[i] = outcome
 					return nil
 				}
-				for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
-					if dnskey, ok := rr.(*dns.DNSKEY); ok {
-						outcome.dnskeyRecords = append(outcome.dnskeyRecords, dnskey)
-					}
-				}
+				outcome.dnskeyRecords = apexDNSKEYs(dnskeyResp, z.Name)
 				if len(outcome.dnskeyRecords) == 0 {
 					outcomes[i] = outcome
 					return nil
@@ -6530,11 +6505,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						outcomes[i] = outcome
 						return nil
 					}
-					for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
-						if dnskey, ok := rr.(*dns.DNSKEY); ok {
-							outcome.dnskeyRecords = append(outcome.dnskeyRecords, dnskey)
-						}
-					}
+					outcome.dnskeyRecords = apexDNSKEYs(dnskeyResp, z.Name)
 					for _, rr := range dnskeyResp.GetRecords("RRSIG", "answer") {
 						if sig, ok := rr.(*dns.RRSIG); ok && sig.TypeCovered == dns.TypeDNSKEY {
 							outcome.dnskeyRRSIG = append(outcome.dnskeyRRSIG, sig)
@@ -7996,6 +7967,17 @@ func filterCDSDigestMUST(rrs []dns.RR) []dns.RR {
 		}
 	}
 	return out
+}
+
+// apexDNSKEYs returns the answer-section DNSKEY records owned by apex.
+func apexDNSKEYs(resp packet.Packet, apex dnsname.Name) []*dns.DNSKEY {
+	var keys []*dns.DNSKEY
+	for _, rr := range resp.GetRecordsForName("DNSKEY", apex, "answer") {
+		if key, ok := rr.(*dns.DNSKEY); ok {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 func dnskeyRRset(keys []*dns.DNSKEY) []dns.RR {
@@ -9472,12 +9454,7 @@ func dnssec22ChildKeys(ctx context.Context, ns nameserver.Nameserver, name dnsna
 	if resp.Msg == nil || !resp.AA() || resp.Rcode() != "NOERROR" {
 		return dnssec22Cut{status: dnssec22Indeterminate}, false
 	}
-	var keys []*dns.DNSKEY
-	for _, rr := range resp.GetRecordsForName("DNSKEY", name, "answer") {
-		if key, ok := rr.(*dns.DNSKEY); ok {
-			keys = append(keys, key)
-		}
-	}
+	keys := apexDNSKEYs(resp, name)
 	matched := dnssec22KeysMatchingDS(dsRRs, keys)
 	if len(matched) == 0 {
 		return dnssec22Cut{status: dnssec22BrokenCut}, true

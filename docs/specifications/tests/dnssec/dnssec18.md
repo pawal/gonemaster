@@ -32,7 +32,7 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDNSKEY`, `CDS`, and `DNSKEY` and skip.
    - Query `CDS`, `CDNSKEY`, and `DNSKEY` with DNSSEC enabled; each requires authoritative `NOERROR` response for participation.
    - Track whether CDS and/or CDNSKEY RRset is present, plus their answer-section RRSIG records and actual record content.
-   - Track DNSKEY RRset records and answer-section RRSIG records (TypeCovered == DNSKEY) for that nameserver.
+   - Track the DNSKEY records owned by the zone apex and the answer-section RRSIG records (TypeCovered == DNSKEY) for that nameserver.
 7. If neither CDS nor CDNSKEY RRsets are present, or DNSKEY RRsets are absent, skip RRSIG-vs-DS validation (steps 8-12). Steps 13-16 are independently gated: content comparison (steps 13-14) runs when the relevant CDS/CDNSKEY RRset is present (regardless of DNSKEY presence); soft signals (step 15) and the on-demand absence check (step 16) run when DNSKEY records are available.
 8. For each nameserver with CDS RRset:
    - Search DS records for any DS whose keytag exists in nameserver DNSKEY RRset and also in CDS RRSIG keytags.

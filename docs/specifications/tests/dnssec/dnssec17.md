@@ -23,7 +23,7 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDNSKEY` and `DNSKEY` and skip.
    - Query `CDNSKEY` with DNSSEC enabled; require authoritative `NOERROR` and at least one CDNSKEY record to continue.
    - Collect CDNSKEY records and answer-section RRSIG records.
-   - Query `DNSKEY` with DNSSEC enabled; collect DNSKEY and answer-section RRSIG records when authoritative `NOERROR` with DNSKEY answers.
+   - Query `DNSKEY` with DNSSEC enabled; collect the DNSKEY records owned by the zone apex and the answer-section RRSIG records when authoritative `NOERROR` with such DNSKEY records.
 4. If no nameserver produced CDNSKEY records, emit no DS17 findings.
 5. For each nameserver with CDNSKEY records (parallelized validation):
    - Detect delete semantics:

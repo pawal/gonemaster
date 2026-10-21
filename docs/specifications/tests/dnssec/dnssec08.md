@@ -22,7 +22,7 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip.
    - Query child apex `DNSKEY` with DNSSEC enabled.
    - Require response message, `RCODE=NOERROR`, and `AA=true`; otherwise skip nameserver.
-   - Require at least one apex DNSKEY answer record; otherwise skip nameserver.
+   - Require at least one answer-section DNSKEY record owned by the zone apex; otherwise skip nameserver. These records alone form the key set; a DNSKEY under another owner is ignored.
    - If no `RRSIG` answer records, mark nameserver in `DNSKEY without RRSIG`.
    - Else evaluate each answer-section RRSIG record:
      - If inception is in future, mark `DNSKEY RRSIG not yet valid` by keytag.

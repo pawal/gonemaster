@@ -24,8 +24,8 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `DNSKEY` and skip.
    - Query `DNSKEY` with DNSSEC enabled.
    - If response message is absent, emit `NO_RESPONSE`.
-   - Else if answer has no DNSKEY records, emit `NO_RESPONSE_DNSKEY`.
-   - Else collect DNSKEY records for key-size validation.
+   - Else if the answer has no DNSKEY record owned by the zone apex, emit `NO_RESPONSE_DNSKEY`.
+   - Else collect those DNSKEY records for key-size validation.
 4. For each collected DNSKEY, only when its algorithm exists in the RSA key-size table:
    - Compute key size via `dnskeyKeySize`.
    - Deduplicate by `(keytag,keysize,algorithm)`.
@@ -48,7 +48,7 @@ Status: Final
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `KEY_SIZE_OK` | At least one DNSKEY was collected and step 4 emitted no tag. |
 | `NO_RESPONSE` | DNSKEY query returned no DNS message. |
-| `NO_RESPONSE_DNSKEY` | DNS response did not contain DNSKEY records in answer. |
+| `NO_RESPONSE_DNSKEY` | DNS response did not contain a DNSKEY record owned by the zone apex in answer. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

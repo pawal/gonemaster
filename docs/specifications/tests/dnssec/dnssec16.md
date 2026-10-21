@@ -23,7 +23,7 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDS` and `DNSKEY` and skip.
    - Query `CDS` with DNSSEC enabled; require authoritative `NOERROR` and at least one CDS record to continue.
    - Collect CDS records and answer-section RRSIG records.
-   - Query `DNSKEY` with DNSSEC enabled; collect DNSKEY and answer-section RRSIG records when authoritative `NOERROR` with DNSKEY answers.
+   - Query `DNSKEY` with DNSSEC enabled; collect the DNSKEY records owned by the zone apex and the answer-section RRSIG records when authoritative `NOERROR` with such DNSKEY records.
 4. If no nameserver produced CDS records, emit no DS16 findings.
 5. For each nameserver with CDS records (parallelized validation):
    - Detect delete semantics:

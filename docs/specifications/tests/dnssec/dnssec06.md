@@ -19,7 +19,7 @@ Status: Final
 2. Query all child nameservers for apex `DNSKEY` with DNSSEC enabled via `zoneQueryAll`.
 3. For each response packet:
    - If response message is absent, skip packet with no DS06 finding.
-   - Count DNSKEY records in answer and RRSIG records in answer.
+   - Count the DNSKEY records owned by the zone apex and the RRSIG records in the answer section.
    - If both counts are non-zero, emit `EXTRA_PROCESSING_OK` with `address`, `keys`, and `sigs`.
    - Else if `RCODE` is `NOERROR`, emit `EXTRA_PROCESSING_BROKEN` with `address`, `keys`, and `sigs`.
 4. Emit `TEST_CASE_END`.
@@ -27,8 +27,8 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `EXTRA_PROCESSING_BROKEN` | Response is `NOERROR` but DNSKEY answer does not include both DNSKEY and RRSIG records (RFC 4035 section 3.1.1). |
-| `EXTRA_PROCESSING_OK` | DNSKEY answer includes at least one DNSKEY and at least one RRSIG record. |
+| `EXTRA_PROCESSING_BROKEN` | Response is `NOERROR` but DNSKEY answer does not include both a DNSKEY owned by the zone apex and an RRSIG record (RFC 4035 section 3.1.1). |
+| `EXTRA_PROCESSING_OK` | DNSKEY answer includes at least one DNSKEY owned by the zone apex and at least one RRSIG record. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 

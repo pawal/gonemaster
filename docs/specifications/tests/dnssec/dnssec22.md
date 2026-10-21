@@ -217,6 +217,13 @@ cut, for a cut X itself serves. It queries `M DS` at X with DNSSEC enabled
     covers the hash of the next closer name yields `insecure`: RFC 5155
     sections 8.3 and 8.6 accept this proof for an unsigned delegation the
     parent omits from its NSEC3 chain.
+  - An `insecure` result MUST rest on authenticated records (RFC 4035
+    section 5.4): the matching record, or the closest encloser record and the
+    covering Opt-Out record. Each record MUST carry an RRSIG whose signer P is a
+    proper ancestor of M at or below the zone apex and which verifies against
+    the DNSKEY RRset of P, obtained as in the DS branch. Otherwise the result
+    is `broken`, or `indeterminate` for a signature whose algorithm the local
+    verifier cannot process.
   - Otherwise: `not a cut`. With no NSEC and no NSEC3 record the enclosing
     zone is unsigned, which is valid only below an insecure delegation, and
     the walk decides from an ancestor.
@@ -334,7 +341,7 @@ emit TEST_CASE_END
 | Tag | Emitted when |
 | --- | --- |
 | `DS22_NO_IN_DOMAIN_NS` | No nameserver name of the zone is in-domain, the root zone included. |
-| `DS22_NS_ADDRESS_CHAIN_BROKEN` | The expected signer is a zone cut below the zone apex on the same nameserver, and its DS matches no DNSKEY, or its DNSKEY or DS RRSIG does not verify (RFC 4035 section 5.2). |
+| `DS22_NS_ADDRESS_CHAIN_BROKEN` | The expected signer is a zone cut below the zone apex on the same nameserver, and its DS matches no DNSKEY, or its DNSKEY or DS RRSIG does not verify (RFC 4035 section 5.2), or the NSEC or NSEC3 record proving it insecure does not verify (RFC 4035 section 5.4). |
 | `DS22_NS_ADDRESS_INSECURE` | The name lies below an insecure delegation served by the same nameserver. |
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | The address records are signed by a name the nameserver serves as a zone apex, while the NSEC or NSEC3 record matching that name in the enclosing zone carries no NS bit, so no zone cut is proven. |
 | `DS22_NS_ADDRESS_RRSIG_EXPIRED` | The expiration of the RRSIG covering the address records is in the past (RFC 4035 section 5.3.1). |
@@ -472,6 +479,9 @@ Scoring takes the severity default in the `dnssec` dimension. No
 - Wildcard-synthesised address records need no special handling:
   `dnssecutil.VerifyRRSIG` derives the wildcard owner from the RRSIG label
   count.
+- An insecure delegation claimed by an NSEC or NSEC3 record whose RRSIG is
+  missing or does not verify yields `DS22_NS_ADDRESS_CHAIN_BROKEN` for the
+  names below it. Validators treat the unproven denial as bogus.
 - A `CNAME` at a nameserver name is skipped. RFC 2181 section 10.3 forbids an
   alias there and Delegation05 reports it; following the alias would validate a
   name in another zone.
@@ -499,10 +509,13 @@ Scoring takes the severity default in the `dnssec` dimension. No
 ## Implementation Notes
 Implementation-defined choices, none of them mandated by the protocol:
 
-- The NSEC and NSEC3 records read for zone cut status are not verified
-  cryptographically. They come from a nameserver that also serves the child
-  data, and the finding is a structural contradiction between two answers of
-  that same nameserver. DNSSEC10 owns NSEC and NSEC3 signature checks.
+- Only an `insecure` zone cut status verifies the NSEC or NSEC3 records it
+  rests on. The records behind `not a cut` and `indeterminate` are read
+  unverified: `not a cut` moves the walk toward the apex keys, and a
+  nameserver that withholds the answer reaches `indeterminate` as well.
+  DNSSEC10 owns the other NSEC and NSEC3 signature checks.
+- A denial signed by the zone costs no query to authenticate. One signed by a
+  cut between M and the apex costs the memoized probe of that cut.
 - Child nameservers are deduplicated by IP, and one task runs per unique IP.
 - `A` is queried first and settles the name; `AAAA` follows only an
   authoritative NODATA on `A`.

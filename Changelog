@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Changed
+
+- deps: miekg/dns v0.6.119; a reply past two compression pointer follows per octet fails to parse
+
 ### Fixed
 
 - engine: DNSSEC22 reads an insecure delegation only from a denial that verifies

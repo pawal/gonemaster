@@ -358,7 +358,10 @@ Scoring takes the severity default in the `dnssec` dimension. No
 - A `CNAME` at the signaling name is not followed; the name counts by the
   records owned by N.
 - The denial of existence that marks a cut insecure is not verified. A cut
-  without DS is insecure whether or not the denial would validate.
+  without DS is insecure whether or not the denial would validate. A forged
+  denial lowers the result to `DS24_SIGNAL_ZONE_INSECURE` and cannot yield
+  `DS24_SIGNAL_VALIDATED` or `DS24_BOOTSTRAP_READY`, which need a chain from
+  the root trust anchor.
 - A server whose address the non-global target guard refuses gives no
   answer, which can leave a cut unreachable.
 - The signaling zones are probed from one vantage point. A lame anycast

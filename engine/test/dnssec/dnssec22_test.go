@@ -200,6 +200,100 @@ func TestDNSSEC22CutOptOut(t *testing.T) {
 	}
 }
 
+// An insecure cut needs a denial that verifies under the enclosing zone.
+func TestDNSSEC22CutInsecureNeedsAuthenticDenial(t *testing.T) {
+	nsec := nsecRecord("ns.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC)
+	apex := nsec3Record("example", "example", dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG)
+	span := nsec3Span("example", "k0000000000000000000000000000000", "l0000000000000000000000000000000", 1)
+	cases := []struct {
+		name   string
+		denial func(t *testing.T, f *ds22Fixture) []dns.RR
+		want   dnssec22CutStatus
+	}{
+		{"unsigned", func(t *testing.T, f *ds22Fixture) []dns.RR {
+			return []dns.RR{nsec}
+		}, dnssec22BrokenCut},
+		{"signed outside the zone", func(t *testing.T, f *ds22Fixture) []dns.RR {
+			key, signer := tctest.SignedKey(t, "other", dns.ECDSAP256SHA256, tctest.SEP())
+			return []dns.RR{nsec, tctest.Sign(t, key, signer, dns.TypeNSEC, []dns.RR{nsec})}
+		}, dnssec22BrokenCut},
+		{"signed by the name itself", func(t *testing.T, f *ds22Fixture) []dns.RR {
+			return []dns.RR{nsec, tctest.Sign(t, f.cutKey, f.cutSigner, dns.TypeNSEC, []dns.RR{nsec})}
+		}, dnssec22BrokenCut},
+		{"signature does not verify", func(t *testing.T, f *ds22Fixture) []dns.RR {
+			other, otherSigner := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+			return []dns.RR{nsec, tctest.Sign(t, other, otherSigner, dns.TypeNSEC, []dns.RR{nsec}, tctest.KeyTag(keyTag(f.zoneKey)))}
+		}, dnssec22BrokenCut},
+		{"signature expired", func(t *testing.T, f *ds22Fixture) []dns.RR {
+			return []dns.RR{nsec, tctest.Sign(t, f.zoneKey, f.zoneSigner, dns.TypeNSEC, []dns.RR{nsec},
+				tctest.Inception(time.Now().Add(-48*time.Hour)), tctest.Expiration(time.Now().Add(-time.Hour)))}
+		}, dnssec22BrokenCut},
+		{"unsupported algorithm", func(t *testing.T, f *ds22Fixture) []dns.RR {
+			return []dns.RR{nsec, tctest.RRSIGRR("ns.example", dns.TypeNSEC, tctest.SigAlgo(dns.DSA),
+				tctest.Signer("example"), tctest.KeyTag(keyTag(f.zoneKey)))}
+		}, dnssec22Indeterminate},
+		{"Opt-Out with the closest encloser unsigned", func(t *testing.T, f *ds22Fixture) []dns.RR {
+			return []dns.RR{apex, span, tctest.Sign(t, f.zoneKey, f.zoneSigner, dns.TypeNSEC3, []dns.RR{span})}
+		}, dnssec22BrokenCut},
+		{"Opt-Out with the span unsigned", func(t *testing.T, f *ds22Fixture) []dns.RR {
+			return []dns.RR{apex, span, tctest.Sign(t, f.zoneKey, f.zoneSigner, dns.TypeNSEC3, []dns.RR{apex})}
+		}, dnssec22BrokenCut},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			f := newDS22Fixture(t)
+			f.answers[ds22Key("ns.example", "DS")] = tctest.Wire(t, tctest.Response(
+				tctest.Question("ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(tc.denial(t, f)...)))
+
+			cut := f.walker(t, ctx).cut(ctx, dnsname.New("ns.example"))
+			if cut.status != tc.want {
+				t.Fatalf("status = %d, want %d", cut.status, tc.want)
+			}
+		})
+	}
+}
+
+// The keys of a denial come from the apex at no cost, or from the memoized cut that signed it.
+func TestDNSSEC22CutDenialSignerQueries(t *testing.T) {
+	cases := []struct {
+		name    string
+		cut     string
+		signCut bool
+		want    map[string]int
+	}{
+		{"signed by the zone", "ns.example", false,
+			map[string]int{"ns.example/DS": 1, "example/DS": 0, "example/DNSKEY": 0}},
+		{"signed by a cut", "a.ns.example", true,
+			map[string]int{"a.ns.example/DS": 1, "ns.example/DS": 1, "ns.example/DNSKEY": 1, "example/DS": 0}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			f := newDS22Fixture(t)
+			f.secureCut(t)
+			nsec := nsecRecord(tc.cut, dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC)
+			key, signer := f.zoneKey, f.zoneSigner
+			if tc.signCut {
+				key, signer = f.cutKey, f.cutSigner
+			}
+			f.denyDS(tc.cut, nsec, tctest.Sign(t, key, signer, dns.TypeNSEC, []dns.RR{nsec}))
+			walker := f.walker(t, ctx)
+
+			for range 2 {
+				if got := walker.cut(ctx, dnsname.New(tc.cut)).status; got != dnssec22InsecureCut {
+					t.Fatalf("status = %d, want insecure", got)
+				}
+			}
+			for question, want := range tc.want {
+				if got := f.counts[question]; got != want {
+					t.Errorf("%s questions = %d, want %d", question, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestDNSSEC22CutNotACut(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -708,6 +802,23 @@ func TestDNSSEC22InsecureDelegation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// An insecure delegation whose denial does not verify breaks the chain to the names below it.
+func TestDNSSEC22UnprovenInsecureDelegation(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.secureZone(t, ctx)
+	f.unsignedAddress(t, "ns1.sub.example")
+	f.denyDS("ns1.sub.example", tctest.SOARR("sub.example"))
+	f.denyDS("sub.example", nsecRecord("sub.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC))
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_CHAIN_BROKEN")
+	tctest.RequireArg(t, entry, "ns", "ns1.sub.example")
+	tctest.RequireArg(t, entry, "signer", "sub.example")
+	tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_INSECURE", "DS22_NS_ADDRESS_VALIDATES")
 }
 
 // Unsigned address records in the signed zone itself are bogus.

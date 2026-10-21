@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Zone :: Gonemaster</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/zone/index.html</link><description>ZONE01Fully qualified master nameserver in SOA
+ZONE02SOA 'refresh' minimum value
+ZONE03SOA 'retry' lower than 'refresh'
+ZONE04SOA 'retry' at least 1 hour
+ZONE05SOA 'expire' minimum value
+ZONE06SOA 'minimum' maximum value
+ZONE07SOA master is not an alias
+ZONE08MX is not an alias
+ZONE09MX record present
+ZONE10No multiple SOA records
+ZONE11SPF policy at zone apex
+ZONE12CSYNC RR at zone apex</description><generator>Hugo</generator><language>en-us</language><atom:link href="https://pawal.codeberg.page/gonemaster/specifications/tests/zone/index.xml" rel="self" type="application/rss+xml"/></channel></rss>

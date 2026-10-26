@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Delegation :: Gonemaster</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/delegation/index.html</link><description>DELEGATION01Minimum number of name servers
+DELEGATION02Name servers must have distinct IP addresses
+DELEGATION03No truncation of referrals
+DELEGATION04Name server is authoritative
+DELEGATION05Name server must not point at CNAME alias
+DELEGATION06Existence of SOA
+DELEGATION07Parent glue name records present in child</description><generator>Hugo</generator><language>en-us</language><atom:link href="https://pawal.codeberg.page/gonemaster/specifications/tests/delegation/index.xml" rel="self" type="application/rss+xml"/></channel></rss>

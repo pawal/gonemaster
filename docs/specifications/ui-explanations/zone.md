@@ -284,11 +284,11 @@ Your zone publishes more than one CSYNC record. Only one is allowed at the apex;
 
 ## Tag Z12_SERIAL_MISMATCH
 
-Header: CSYNC serial does not match SOA
+Header: CSYNC serial is newer than SOA
 
 Description:
 
-The serial in your CSYNC record does not match the zone's current SOA serial. CSYNC is only meant to be actioned when the two serials agree; a registry that notices the mismatch will refuse to apply the CSYNC, so any NS or glue changes it was meant to publish will be skipped.
+Your CSYNC record has the `soaminimum` flag set, and its serial is newer than the SOA serial this nameserver serves. A registry does not act on the CSYNC until the zone's SOA serial has reached that value, so the NS or glue changes it announces are not applied yet.
 
 ## Tag Z13_SPF_LOOKUP_COUNT_EXCEEDED
 

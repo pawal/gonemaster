@@ -29,16 +29,15 @@ Status: Final
      - If the CSYNC RRset has more than one record, emit `Z12_MULTIPLE_CSYNC` (`ns`, `count`).
      - Else if exactly one CSYNC record is present:
        - Group nameserver for consolidated `Z12_CSYNC_FOUND` by CSYNC content (`serial`, `flags`, `type_bitmap`).
-       - If the SOA serial was retrieved, evaluate CSYNC serial against SOA serial:
-         - When `soaminimum` flag is set (bit 1), emit `Z12_SERIAL_MISMATCH` only if `csync soaserial` is greater than current SOA serial (RFC 7477 sections 2.1.1.1 and 3.1).
-         - When `soaminimum` flag is not set, emit `Z12_SERIAL_MISMATCH` if `csync soaserial` differs from current SOA serial.
+       - If the `soaminimum` flag (bit 1) is set and the SOA serial was retrieved, emit `Z12_SERIAL_MISMATCH` if `csync soaserial` is greater than the current SOA serial in RFC 1982 serial arithmetic (RFC 7477 section 2.1.1.1).
+       - If the `soaminimum` flag is not set, `csync soaserial` MUST NOT be evaluated (RFC 7477 section 2.1.1.1).
      - Else (zero CSYNC records) collect nameserver for consolidated `Z12_NO_CSYNC`.
    - Emit consolidated `Z12_CSYNC_FOUND` for each distinct CSYNC content group, with `servers` list, `serial`, `flags`, and `type_bitmap`.
    - If at least one nameserver has CSYNC and at least one has no CSYNC, emit `Z12_MIXED_PRESENCE`.
-   - If more than one nameserver has CSYNC and the CSYNC content differs across them, emit `Z12_INCONSISTENT_CSYNC`.
+   - If more than one nameserver has CSYNC and the `immediate` flag or the type bitmap differs across them, emit `Z12_INCONSISTENT_CSYNC` (RFC 9975 section 3.2).
 5. Emit `TEST_CASE_END`.
 
-CSYNC content identity is determined by comparing the concatenation of `soaserial`, `flags`, and `TypeBitMap` fields.
+`Z12_CSYNC_FOUND` groups by `soaserial`, `flags`, and `TypeBitMap`. `Z12_INCONSISTENT_CSYNC` compares only the `immediate` flag and `TypeBitMap`; `soaserial` and `soaminimum` MAY differ across nameservers (RFC 9975 section 3.2).
 
 ### Per-NS CSYNC Probe and Aggregation (steps 2-5)
 
@@ -61,11 +60,10 @@ After all queries, per ns with auth NOERROR CSYNC response:
                                      also evaluate against SOA serial (below)
      == 0                         -> add ns to noCsyncGroup
 
-   single-CSYNC serial check (only when SOA serial was captured):
-     flag 0x2 "soaminimum" set:
+   single-CSYNC serial check:
+     flag 0x2 "soaminimum" unset  -> serial ignored
+     "soaminimum" set, SOA serial captured:
        csync.serial > soa.serial  -> Z12_SERIAL_MISMATCH (ns, csync_serial, soa_serial)
-     "soaminimum" unset:
-       csync.serial != soa.serial -> Z12_SERIAL_MISMATCH (ns, csync_serial, soa_serial)
 
 Aggregate emissions:
    per (serial, flags, type_bitmap) group
@@ -73,7 +71,7 @@ Aggregate emissions:
    noCsyncGroup non-empty         -> Z12_NO_CSYNC (servers)
    any NS has CSYNC AND any NS has none
                                   -> Z12_MIXED_PRESENCE
-   more than one single-CSYNC group (content differs across NS)
+   immediate flag or type_bitmap differs across single-CSYNC NS
                                   -> Z12_INCONSISTENT_CSYNC
 
 emit TEST_CASE_END
@@ -86,11 +84,11 @@ emit TEST_CASE_END
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `Z12_CSYNC_FOUND` | CSYNC record found at zone apex (consolidated per distinct CSYNC content). |
-| `Z12_INCONSISTENT_CSYNC` | CSYNC content differs across authoritative nameservers (RFC 9975 section 3.2 for the `immediate` flag and type bitmap). |
+| `Z12_INCONSISTENT_CSYNC` | The `immediate` flag or the type bitmap differs across authoritative nameservers (RFC 9975 section 3.2). |
 | `Z12_MIXED_PRESENCE` | CSYNC present on some nameservers but absent on others (RFC 9975 sections 3 and 3.2). |
 | `Z12_MULTIPLE_CSYNC` | More than one CSYNC RR found at zone apex on this nameserver (RFC 7477 section 2). |
 | `Z12_NO_CSYNC` | No CSYNC record found at zone apex (consolidated across all nameservers without CSYNC). |
-| `Z12_SERIAL_MISMATCH` | CSYNC soaserial fails the serial precondition against current SOA serial from the same nameserver (RFC 9975 section 3.2). |
+| `Z12_SERIAL_MISMATCH` | CSYNC `soaminimum` is set and `soaserial` is greater than the current SOA serial from the same nameserver (RFC 7477 section 2.1.1.1, RFC 9975 section 3.2). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -140,5 +138,7 @@ emit TEST_CASE_END
 - CSYNC is an optional zone apex record per RFC 7477 section 2; `Z12_NO_CSYNC` is informational only and does not indicate a problem.
 - Only authoritative NOERROR responses are evaluated. Nameservers returning non-NOERROR or non-AA responses are skipped silently.
 - SOA serial comparison (`Z12_SERIAL_MISMATCH`) is only performed when the SOA query to the same nameserver succeeds and returns a SOA record. If the SOA query fails, no mismatch is reported for that nameserver.
-- With CSYNC `soaminimum` flag set, an older CSYNC serial than current SOA serial is accepted and does not emit `Z12_SERIAL_MISMATCH`.
+- With CSYNC `soaminimum` flag set, a CSYNC serial equal to or older than the current SOA serial is accepted and does not emit `Z12_SERIAL_MISMATCH`.
+- With CSYNC `soaminimum` flag unset, any `soaserial`, including 0, is accepted and does not emit `Z12_SERIAL_MISMATCH`.
+- RFC 9975 section 3.2 also makes the CSYNC state inconsistent when the per-nameserver serial assessments disagree; that case is reported through `Z12_SERIAL_MISMATCH` on the nameservers that fail it, not through `Z12_INCONSISTENT_CSYNC`.
 - For nameservers returning multiple CSYNC records (`Z12_MULTIPLE_CSYNC`), the records are not included in the cross-nameserver consistency comparison.

@@ -1167,78 +1167,52 @@ func TestZone12NoCSYNC(t *testing.T) {
 }
 
 func TestZone12SerialMismatch(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "CSYNC":
-			// CSYNC carries serial 100, but SOA has serial 200.
-			return csyncPacket("example", 100, 0, []uint16{dns.TypeNS})
-		case "SOA":
-			return soaPacket("example", 200, 3600, 900, 604800, 300)
-		}
-		return packet.Packet{}
-	})
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1}, nil
-	})
-
-	z := zonepkg.Zone{Name: dnsname.New("example")}
-	entries, err := Zone12(ctx, &z)
-	if err != nil {
-		t.Fatalf("zone12: %v", err)
+	cases := []struct {
+		name        string
+		csyncSerial uint32
+		flags       uint16
+		soaSerial   uint32
+		want        bool
+	}{
+		{name: "soaminimum unset, serial zero", csyncSerial: 0, flags: csyncFlagImmediate, soaSerial: 2026092238},
+		{name: "soaminimum unset, serial older", csyncSerial: 100, flags: 0, soaSerial: 200},
+		{name: "soaminimum set, serial newer", csyncSerial: 300, flags: csyncFlagSoaMinimum, soaSerial: 200, want: true},
+		{name: "soaminimum set, serial equal", csyncSerial: 200, flags: csyncFlagSoaMinimum, soaSerial: 200},
+		{name: "soaminimum set, serial older", csyncSerial: 100, flags: csyncFlagSoaMinimum, soaSerial: 200},
 	}
-	tctest.RequireTags(t, entries, "Z12_SERIAL_MISMATCH")
-}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
 
-func TestZone12SerialMismatchSoaMinimumNewerCSYNC(t *testing.T) {
-	ctx := tctest.Context(t)
+			ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "CSYNC":
+					return csyncPacket("example", tc.csyncSerial, tc.flags, []uint16{dns.TypeNS})
+				case "SOA":
+					return soaPacket("example", tc.soaSerial, 3600, 900, 604800, 300)
+				}
+				return packet.Packet{}
+			})
+			tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+				return []ens.Nameserver{ns1}, nil
+			})
 
-	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "CSYNC":
-			// soaminimum set, but CSYNC serial is newer than current SOA serial.
-			return csyncPacket("example", 300, csyncFlagSoaMinimum, []uint16{dns.TypeNS})
-		case "SOA":
-			return soaPacket("example", 200, 3600, 900, 604800, 300)
-		}
-		return packet.Packet{}
-	})
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1}, nil
-	})
-
-	z := zonepkg.Zone{Name: dnsname.New("example")}
-	entries, err := Zone12(ctx, &z)
-	if err != nil {
-		t.Fatalf("zone12: %v", err)
+			z := zonepkg.Zone{Name: dnsname.New("example")}
+			entries, err := Zone12(ctx, &z)
+			if err != nil {
+				t.Fatalf("zone12: %v", err)
+			}
+			tctest.RequireCount(t, entries, "Z12_CSYNC_FOUND", 1)
+			if !tc.want {
+				tctest.RequireNoTag(t, entries, "Z12_SERIAL_MISMATCH")
+				return
+			}
+			e := tctest.RequireTag(t, entries, "Z12_SERIAL_MISMATCH")
+			if e.Args["csync_serial"] != uint32(300) || e.Args["soa_serial"] != uint32(200) {
+				t.Fatalf("args = %v, want csync_serial=300 soa_serial=200", e.Args)
+			}
+		})
 	}
-	tctest.RequireTags(t, entries, "Z12_SERIAL_MISMATCH")
-}
-
-func TestZone12SerialMismatchSoaMinimumOlderCSYNCNotMismatch(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "CSYNC":
-			// soaminimum set and SOA serial has advanced, which is valid.
-			return csyncPacket("example", 100, csyncFlagSoaMinimum, []uint16{dns.TypeNS})
-		case "SOA":
-			return soaPacket("example", 200, 3600, 900, 604800, 300)
-		}
-		return packet.Packet{}
-	})
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1}, nil
-	})
-
-	z := zonepkg.Zone{Name: dnsname.New("example")}
-	entries, err := Zone12(ctx, &z)
-	if err != nil {
-		t.Fatalf("zone12: %v", err)
-	}
-	tctest.RequireNoTag(t, entries, "Z12_SERIAL_MISMATCH")
 }
 
 func TestZone12MultipleCSYNC(t *testing.T) {
@@ -1273,31 +1247,52 @@ func TestZone12MultipleCSYNC(t *testing.T) {
 }
 
 func TestZone12InconsistentCSYNC(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	// ns1 and ns2 return CSYNC records with different serials.
-	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		if q.Type == "CSYNC" {
-			return csyncPacket("example", 2024010101, 0, []uint16{dns.TypeNS})
-		}
-		return packet.Packet{}
-	})
-	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
-		if q.Type == "CSYNC" {
-			return csyncPacket("example", 2024010199, 0, []uint16{dns.TypeNS})
-		}
-		return packet.Packet{}
-	})
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1, ns2}, nil
-	})
-
-	z := zonepkg.Zone{Name: dnsname.New("example")}
-	entries, err := Zone12(ctx, &z)
-	if err != nil {
-		t.Fatalf("zone12: %v", err)
+	cases := []struct {
+		name   string
+		serial uint32
+		flags  uint16
+		types  []uint16
+		want   bool
+	}{
+		{name: "serial differs", serial: 2024010199, flags: 0, types: []uint16{dns.TypeNS}},
+		{name: "soaminimum differs", serial: 2024010101, flags: csyncFlagSoaMinimum, types: []uint16{dns.TypeNS}},
+		{name: "immediate differs", serial: 2024010101, flags: csyncFlagImmediate, types: []uint16{dns.TypeNS}, want: true},
+		{name: "type bitmap differs", serial: 2024010101, flags: 0, types: []uint16{dns.TypeA, dns.TypeNS}, want: true},
 	}
-	tctest.RequireTags(t, entries, "Z12_INCONSISTENT_CSYNC")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+
+			// ns1 is fixed; ns2 differs in one field.
+			ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+				if q.Type == "CSYNC" {
+					return csyncPacket("example", 2024010101, 0, []uint16{dns.TypeNS})
+				}
+				return packet.Packet{}
+			})
+			ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+				if q.Type == "CSYNC" {
+					return csyncPacket("example", tc.serial, tc.flags, tc.types)
+				}
+				return packet.Packet{}
+			})
+			tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+				return []ens.Nameserver{ns1, ns2}, nil
+			})
+
+			z := zonepkg.Zone{Name: dnsname.New("example")}
+			entries, err := Zone12(ctx, &z)
+			if err != nil {
+				t.Fatalf("zone12: %v", err)
+			}
+			tctest.RequireCount(t, entries, "Z12_CSYNC_FOUND", 2)
+			if tc.want {
+				tctest.RequireTags(t, entries, "Z12_INCONSISTENT_CSYNC")
+			} else {
+				tctest.RequireNoTag(t, entries, "Z12_INCONSISTENT_CSYNC")
+			}
+		})
+	}
 }
 
 func TestZone12MixedPresence(t *testing.T) {

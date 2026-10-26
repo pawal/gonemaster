@@ -1787,7 +1787,7 @@ func csyncSerialMismatch(csyncSerial uint32, flags uint16, soaSerial uint32) boo
 	if flags&csyncFlagSoaMinimum != 0 {
 		return util.SerialGT(csyncSerial, soaSerial)
 	}
-	return csyncSerial != soaSerial
+	return false
 }
 
 // csyncTypeBitmap formats a CSYNC TypeBitMap as a semicolon-separated list of DNS type names.

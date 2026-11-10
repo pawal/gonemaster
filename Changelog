@@ -4,6 +4,14 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- delegation04: `IS_NOT_AUTHORITATIVE_REFERRAL` for a nameserver that answers with a referral for the zone; such a response no longer emits `IS_NOT_AUTHORITATIVE`
+
+### Changed
+
+- i18n: the `SOA_NOT_EXISTS` message names a response without an SOA record, not an empty response
+
 ### Fixed
 
 - engine: Syntax05, Syntax07, Syntax08 and DNSSEC04 read the first authoritative answer instead of a referral from a lame nameserver

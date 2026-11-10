@@ -2,6 +2,9 @@ package zone
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -376,6 +379,92 @@ func TestZoneQueryPersistentAcceptsAuthority(t *testing.T) {
 	}
 	if len(resp.GetRecordsForName("NS", dnsname.New("child.example"), "authority")) == 0 {
 		t.Fatalf("expected NS record in authority section")
+	}
+}
+
+// reply is one scripted nameserver answer for the QueryAuthOrFirst tests.
+type reply struct {
+	resp packet.Packet
+	err  error
+}
+
+func TestZoneQueryAuthOrFirst(t *testing.T) {
+	referral := reply{resp: dnstest.Referral("example", "ns1.example", "ns2.example")}
+	answer := reply{resp: dnstest.Response(dnstest.Answers(dnstest.SOARR("example")))}
+	noData := reply{resp: dnstest.Response(dnstest.Authority(dnstest.SOARR("example")))}
+	refused := reply{resp: dnstest.Response(dnstest.NotAuthoritative(), dnstest.Rcode(dns.RcodeRefused))}
+	timeout := reply{err: errors.New("i/o timeout")}
+	silent := reply{}
+
+	tests := []struct {
+		name      string
+		replies   []reply
+		want      string
+		wantCalls []int
+	}{
+		{"lame first server", []reply{referral, answer}, "ns2", []int{1, 1}},
+		{"authoritative NODATA ends the walk", []reply{noData, answer}, "ns1", []int{1, 0}},
+		{"error and no response skipped", []reply{timeout, silent, answer}, "ns3", []int{1, 1, 1}},
+		{"no AA falls back to the first response", []reply{referral, refused}, "ns1", []int{1, 1}},
+		{"no response at all", []reply{silent, timeout}, "", []int{1, 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, _, _ := testhelpers.Context(t)
+			calls := make([]int, len(tt.replies))
+			var servers []nameserver.Nameserver
+			for i, r := range tt.replies {
+				id := fmt.Sprintf("ns%d", i+1)
+				servers = append(servers, nstest.HookedNS(t, ctx, nil, id+".example", fmt.Sprintf("192.0.2.%d", i+1),
+					func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+						calls[i]++
+						if r.resp.Msg == nil {
+							return packet.Packet{}, r.err
+						}
+						return dnstest.From(r.resp, dnstest.AnswerFrom(id)), nil
+					}))
+			}
+			z := Zone{Name: dnsname.New("example"), ns: servers, nsSet: true}
+
+			resp, err := z.QueryAuthOrFirst(ctx, "example", "SOA", nil)
+			if err != nil {
+				t.Fatalf("query: %v", err)
+			}
+			if resp.AnswerFrom != tt.want {
+				t.Fatalf("answer from %q, want %q", resp.AnswerFrom, tt.want)
+			}
+			if !slices.Equal(calls, tt.wantCalls) {
+				t.Fatalf("calls %v, want %v", calls, tt.wantCalls)
+			}
+		})
+	}
+}
+
+func TestZoneQueryAuthOrFirstReusesCache(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+	var lameCalls, goodCalls int
+	hook := func(calls *int, p packet.Packet) nstest.Hook {
+		return func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+			*calls++
+			return p, nil
+		}
+	}
+	lame := nstest.HookedNS(t, ctx, nil, "lame.example", "192.0.2.1", hook(&lameCalls, dnstest.Referral("example", "lame.example", "good.example")))
+	good := nstest.HookedNS(t, ctx, nil, "good.example", "192.0.2.2", hook(&goodCalls, dnstest.Response(dnstest.Answers(dnstest.SOARR("example")))))
+	z := Zone{Name: dnsname.New("example"), ns: []nameserver.Nameserver{lame, good}, nsSet: true}
+
+	if _, err := z.QueryAll(ctx, "example", "SOA", nil); err != nil {
+		t.Fatalf("query all: %v", err)
+	}
+	resp, err := z.QueryAuthOrFirst(ctx, "example", "SOA", nil)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if !resp.AA() {
+		t.Fatalf("expected the authoritative answer")
+	}
+	if lameCalls != 1 || goodCalls != 1 {
+		t.Fatalf("calls lame=%d good=%d, want one per server", lameCalls, goodCalls)
 	}
 }
 

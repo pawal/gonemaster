@@ -1444,6 +1444,36 @@ func TestDNSSEC04ParallelQueries(t *testing.T) {
 	})
 }
 
+func TestDNSSEC04LameFirstServer(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	now := time.Unix(1700000000, 0).UTC()
+	sig := rrsigRecord(".", dns.TypeDNSKEY, 54321, now.Unix()-86400, now.Unix()+172800)
+	dnskeyResp := answerPacket(".", dns.TypeDNSKEY, tctest.DNSKEYRR(".", 8, tctest.PublicKey("AwEAAc==")), sig)
+	dnskeyResp.Timestamp = now
+
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {"a.root": {"192.0.2.1"}, "b.root": {"192.0.2.2"}},
+	})
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(tctest.Query) packet.Packet {
+		return tctest.Response(tctest.NotAuthoritative(), tctest.Authority(tctest.NSRR(".", "a.root.")))
+	})
+	tctest.NSOn(t, ctx, r, "b.root", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "DNSKEY") {
+			return dnskeyResp
+		}
+		return answerPacket(".", dns.TypeSOA, soaRecord("."))
+	})
+
+	entries, err := DNSSEC04(ctx, tctest.Zone(t, ".", r))
+	if err != nil {
+		t.Fatalf("dnssec04: %v", err)
+	}
+	if got := tctest.RequireTag(t, entries, "RRSIG_EXPIRATION").Args["keytag"]; got != uint16(54321) {
+		t.Fatalf("keytag %#v, want 54321", got)
+	}
+}
+
 func TestDNSSEC05AlgorithmMatrix(t *testing.T) {
 	cases := []struct {
 		name     string

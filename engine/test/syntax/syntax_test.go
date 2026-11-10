@@ -13,6 +13,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -366,6 +367,59 @@ func TestSyntax08NoResponseMXQuery(t *testing.T) {
 	tctest.RequireTags(t, entries, "NO_RESPONSE_MX_QUERY")
 }
 
+func TestSyntaxLameFirstServer(t *testing.T) {
+	tests := []struct {
+		name   string
+		run    func(context.Context, *zone.Zone) ([]*logger.Entry, error)
+		answer packet.Packet
+		tag    string
+	}{
+		{"syntax05", Syntax05, soaPacket(".", "b.root.", "hostmaster.example."), "RNAME_NO_AT_SIGN"},
+		{"syntax07", Syntax07, soaPacket(".", "b.root.", "hostmaster.example."), "MNAME_SYNTAX_OK"},
+		{"syntax08", Syntax08, mxPacketMulti(".", "mail.example."), "MX_SYNTAX_OK"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testContext(t)
+			z, _ := lameFirstRoot(t, ctx, func(tctest.Query) packet.Packet { return tt.answer })
+
+			entries, err := tt.run(ctx, z)
+			if err != nil {
+				t.Fatalf("%s: %v", tt.name, err)
+			}
+			tctest.RequireTags(t, entries, tt.tag)
+		})
+	}
+}
+
+func TestAllRunsSyntax06PastLameFirstServer(t *testing.T) {
+	ctx := testContext(t)
+	z, r := lameFirstRoot(t, ctx, func(q tctest.Query) packet.Packet {
+		if q.Name == "." && strings.EqualFold(q.Type, "SOA") {
+			return soaPacket(".", "b.root.", "hostmaster.example.com.")
+		}
+		return comReferral()
+	})
+	tctest.NSOn(t, ctx, r, "ns.com", "192.0.2.3", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
+		switch {
+		case name == "example.com" && kind == "MX":
+			return mxPacketMulti("example.com", "mail.example.com.")
+		case name == "mail.example.com" && kind == "A":
+			return aPacket("mail.example.com", net.IPv4(192, 0, 2, 10))
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	entries, err := All(ctx, z)
+	if err != nil {
+		t.Fatalf("all: %v", err)
+	}
+	tctest.RequireTags(t, entries, "RNAME_NO_AT_SIGN", "RNAME_RFC822_VALID", "MNAME_SYNTAX_OK")
+}
+
 func TestCheckNameSyntaxNumericTLD(t *testing.T) {
 	entries, err := checkNameSyntax(testContext(t), "NAMESERVER", dnsname.New("ns1.123"), "Syntax04")
 	if err != nil {
@@ -433,6 +487,29 @@ func mxPacketMulti(zoneName string, exchanges ...string) packet.Packet {
 		rrs = append(rrs, tctest.MXRR(zoneName, uint16(10+i), exchange))
 	}
 	return tctest.Response(tctest.Answers(rrs...))
+}
+
+// lameFirstRoot serves the root zone from a lame a.root and from b.root through handler.
+func lameFirstRoot(t *testing.T, ctx context.Context, handler tctest.Handler) (*zone.Zone, *recursor.Recursor) {
+	t.Helper()
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {"a.root": {"192.0.2.1"}, "b.root": {"192.0.2.2"}},
+	})
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if q.Name != "." {
+			return comReferral()
+		}
+		return tctest.Response(tctest.NotAuthoritative(),
+			tctest.Authority(tctest.NSRR(".", "a.root."), tctest.NSRR(".", "b.root.")))
+	})
+	tctest.NSOn(t, ctx, r, "b.root", "192.0.2.2", handler)
+	return tctest.Zone(t, ".", r), r
+}
+
+func comReferral() packet.Packet {
+	return tctest.Response(tctest.NotAuthoritative(),
+		tctest.Authority(tctest.NSRR("com", "ns.com.")),
+		tctest.Additional(tctest.ARR("ns.com", "192.0.2.3")))
 }
 
 func aPacket(owner string, addr net.IP) packet.Packet {

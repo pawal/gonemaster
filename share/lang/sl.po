@@ -2471,6 +2471,10 @@ msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "{ns}/{address} je na vratih 53/{proto} podal neavtoritativen odgovor."
 
+msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE_REFERRAL"
+msgid "Nameserver {ns}/{address} responds with a referral to the zone's own nameservers on {proto} port 53."
+msgstr "{ns}/{address} je na vratih 53/{proto} odgovoril z usmeritvijo na lastne domenske strežnike cone."
+
 msgctxt "DELEGATION:NAMES_MATCH"
 msgid "All of the nameserver names are listed both at parent and child."
 msgstr "Domenski strežniki v starševski in podrejeni coni so enaki."
@@ -2603,9 +2607,9 @@ msgid "All the nameservers have SOA record."
 msgstr "SOA zapis je prisoten na vseh domenskih strežnikih."
 
 msgctxt "DELEGATION:SOA_NOT_EXISTS"
-msgid "Empty NOERROR response to SOA query was received from {ns}/{address}."
+msgid "NOERROR response to SOA query without an SOA record was received from {ns}/{address}."
 msgstr ""
-"Domenski strežnik {ns}/{address} je poslal prazen NOERROR odgovor na SOA poizvedbo."
+"Domenski strežnik {ns}/{address} je poslal NOERROR odgovor na SOA poizvedbo brez SOA zapisa."
 
 msgctxt "DELEGATION:TOTAL_NAME_MISMATCH"
 msgid "None of the nameservers listed at the parent are listed at the child."

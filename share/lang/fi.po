@@ -2570,6 +2570,12 @@ msgstr ""
 "Nimipalvelimen {ns}/{address} vastaus ei ole autoritäärinen koskien kohdetta {proto} "
 "portissa 53."
 
+msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE_REFERRAL"
+msgid "Nameserver {ns}/{address} responds with a referral to the zone's own nameservers on {proto} port 53."
+msgstr ""
+"Nimipalvelimen {ns}/{address} vastaus portissa 53 ({proto}) on viittaus "
+"vyöhykkeen omiin nimipalvelimiin."
+
 msgctxt "DELEGATION:NAMES_MATCH"
 msgid "All of the nameserver names are listed both at parent and child."
 msgstr ""
@@ -2708,8 +2714,8 @@ msgid "All the nameservers have SOA record."
 msgstr "Kaikilla nimipalvelimilla on SOA-tietue."
 
 msgctxt "DELEGATION:SOA_NOT_EXISTS"
-msgid "Empty NOERROR response to SOA query was received from {ns}/{address}."
-msgstr "Tyhjä NOERROR-vastaus SOA-kyselyyn vastaanotettiin kohteesta {ns}/{address}."
+msgid "NOERROR response to SOA query without an SOA record was received from {ns}/{address}."
+msgstr "NOERROR-vastaus SOA-kyselyyn ilman SOA-tietuetta vastaanotettiin kohteesta {ns}/{address}."
 
 msgctxt "DELEGATION:TOTAL_NAME_MISMATCH"
 msgid "None of the nameservers listed at the parent are listed at the child."

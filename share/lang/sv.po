@@ -2517,6 +2517,10 @@ msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "Namnservern '{ns}/{address}' svarade inte auktoritativt på {proto} port 53."
 
+msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE_REFERRAL"
+msgid "Nameserver {ns}/{address} responds with a referral to the zone's own nameservers on {proto} port 53."
+msgstr "Namnservern {ns}/{address} svarade med en hänvisning till zonens egna namnservrar på {proto} port 53."
+
 msgctxt "DELEGATION:NAMES_MATCH"
 msgid "All of the nameserver names are listed both at parent and child."
 msgstr ""
@@ -2657,10 +2661,10 @@ msgid "All the nameservers have SOA record."
 msgstr "Alla namnservrar har en SOA-post."
 
 msgctxt "DELEGATION:SOA_NOT_EXISTS"
-msgid "Empty NOERROR response to SOA query was received from {ns}/{address}."
+msgid "NOERROR response to SOA query without an SOA record was received from {ns}/{address}."
 msgstr ""
 "En SOA-fråga fick ett svar med svarskoden (RCODE) \"NOERROR\" från {ns}/{address}, men "
-"svaret var tomt."
+"svaret innehöll ingen SOA-post."
 
 msgctxt "DELEGATION:TOTAL_NAME_MISMATCH"
 msgid "None of the nameservers listed at the parent are listed at the child."

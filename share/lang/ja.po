@@ -861,6 +861,10 @@ msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "ネームサーバー {ns}/{address} の {proto}/53 での応答は権威応答ではありません。"
 
+msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE_REFERRAL"
+msgid "Nameserver {ns}/{address} responds with a referral to the zone's own nameservers on {proto} port 53."
+msgstr "ネームサーバー {ns}/{address} の {proto}/53 での応答は、ゾーン自身のネームサーバーへのリファラルです。"
+
 msgctxt "DELEGATION:NAMES_MATCH"
 msgid "All of the nameserver names are listed both at parent and child."
 msgstr "すべてのネームサーバー名が親ゾーンと子ゾーンの両方に記載されています。"
@@ -988,8 +992,8 @@ msgid "All the nameservers have SOA record."
 msgstr "すべてのネームサーバーが SOA レコードを返します。"
 
 msgctxt "DELEGATION:SOA_NOT_EXISTS"
-msgid "Empty NOERROR response to SOA query was received from {ns}/{address}."
-msgstr "{ns}/{address} から SOA クエリに対して空の NOERROR 応答を受信しました。"
+msgid "NOERROR response to SOA query without an SOA record was received from {ns}/{address}."
+msgstr "{ns}/{address} から SOA クエリに対して SOA レコードを含まない NOERROR 応答を受信しました。"
 
 msgctxt "DELEGATION:TOTAL_NAME_MISMATCH"
 msgid "None of the nameservers listed at the parent are listed at the child."

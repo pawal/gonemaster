@@ -51,7 +51,7 @@ make spec-export-implemented
 - delegation01 - Validate that delegation-side and child-side nameserver sets meet minimum-count requirements overall and per IP family.
 - delegation02 - Detect nameserver IP-address reuse within delegation data, within child data, and across the combined delegation+child addressed NS set.
 - delegation03 - Check how large a synthesized maximal referral response is relative to the 512-byte non-EDNS UDP payload limit and the 1232-byte EDNS payload size, and grade it accordingly.
-- delegation04 - Verify whether nameservers from delegation and child sources answer authoritatively for SOA queries.
+- delegation04 - Verify whether nameservers from delegation and child sources answer authoritatively for SOA queries, and identify a nameserver that answers with a referral for the zone.
 - delegation05 - Verify that NS names used for the tested zone are not aliases (CNAME targets).
 - delegation06 - Verify SOA RRset existence on nameservers collected from delegation and child sources.
 - delegation07 - Compare parent-side and child-side NS name sets and report mismatches.

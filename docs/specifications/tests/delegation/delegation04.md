@@ -3,7 +3,7 @@
 Status: Final
 
 ## Purpose
-- Verify whether nameservers from delegation and child sources answer authoritatively for SOA queries.
+- Verify whether nameservers from delegation and child sources answer authoritatively for SOA queries, and identify a nameserver that answers with a referral for the zone.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -26,11 +26,13 @@ Status: Final
 4. Execute tasks in parallel (deterministic merged log order):
    - For disabled tasks, emit `IPV4_DISABLED` or `IPV6_DISABLED` (`query_type=SOA`).
    - For query tasks, send SOA query twice (`UseVC=false` for UDP, then `UseVC=true` for TCP).
-   - For each non-nil response where `AA=false`, emit `IS_NOT_AUTHORITATIVE` with `proto`.
+   - For each non-nil response where `AA=false`:
+     - If the response is a referral (`RCODE=NOERROR`, empty answer section, no SOA and at least one NS in the authority section) and the authority section holds an NS RRset owned by the zone name, emit `IS_NOT_AUTHORITATIVE_REFERRAL` with `proto`.
+     - Otherwise emit `IS_NOT_AUTHORITATIVE` with `proto`.
    - Track whether the nameserver produced at least one authoritative response (`AA=true`) across UDP/TCP.
 5. After all tasks, emit `ARE_AUTHORITATIVE` with sorted unique NS names only when all conditions are true:
    - At least one nameserver was present ([`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) or [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) non-empty).
-   - No `IS_NOT_AUTHORITATIVE` tag has been emitted (transport-disabled debug tags do not suppress this).
+   - No `IS_NOT_AUTHORITATIVE` or `IS_NOT_AUTHORITATIVE_REFERRAL` tag has been emitted (transport-disabled debug tags do not suppress this).
    - At least one nameserver was observed authoritative.
 6. Emit `TEST_CASE_END`.
 
@@ -52,12 +54,14 @@ For each task (parallel; fan-out = resolver.defaults.parallel):
    actionQuery     -> for useVC in {false, true}:
                         query SOA at z.Name with UseVC
                          +- err or resp.Msg == nil           -> skip
-                         +- !AA  -> IS_NOT_AUTHORITATIVE (proto=UDP|TCP)
+                         +- !AA, referral with NS owned by z.Name
+                         |       -> IS_NOT_AUTHORITATIVE_REFERRAL (proto=UDP|TCP)
+                         +- !AA, otherwise -> IS_NOT_AUTHORITATIVE (proto=UDP|TCP)
                          +- AA   -> mark authoritative for this task
 
 After all tasks:
   (len(GlueNameservers) > 0 OR len(ApexNameservers) > 0)
-  AND no IS_NOT_AUTHORITATIVE tag emitted
+  AND no IS_NOT_AUTHORITATIVE or IS_NOT_AUTHORITATIVE_REFERRAL tag emitted
   AND any task ended authoritative
      -> ARE_AUTHORITATIVE (servers = sorted unique authoritative nameKeys)
 
@@ -68,10 +72,11 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `ARE_AUTHORITATIVE` | At least one evaluated nameserver was authoritative and no `IS_NOT_AUTHORITATIVE` tag was emitted. |
+| `ARE_AUTHORITATIVE` | At least one evaluated nameserver was authoritative and no `IS_NOT_AUTHORITATIVE` or `IS_NOT_AUTHORITATIVE_REFERRAL` tag was emitted. |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `IS_NOT_AUTHORITATIVE` | A SOA response was received with `AA=false` (RFC 1035 section 4.1.1) on UDP or TCP; NS-listed servers are authoritative for the zone (RFC 2181 section 6.1). |
+| `IS_NOT_AUTHORITATIVE_REFERRAL` | A SOA response with `AA=false` on UDP or TCP is a referral for the zone itself: the server holds the delegation of the zone, not the zone (RFC 1034 section 4.3.2, lame delegation in RFC 9499 section 7). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -88,6 +93,9 @@ emit TEST_CASE_END
 | `IS_NOT_AUTHORITATIVE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-authoritative SOA response. |
 | `IS_NOT_AUTHORITATIVE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IS_NOT_AUTHORITATIVE` | `proto` | `string` | Query transport label (`UDP` or `TCP`). |
+| `IS_NOT_AUTHORITATIVE_REFERRAL` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) answering with a referral for the zone. |
+| `IS_NOT_AUTHORITATIVE_REFERRAL` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IS_NOT_AUTHORITATIVE_REFERRAL` | `proto` | `string` | Query transport label (`UDP` or `TCP`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Delegation04`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation04`). |
 
@@ -98,6 +106,7 @@ emit TEST_CASE_END
 | `IPV4_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `IPV6_DISABLED` | `DEBUG2` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `IS_NOT_AUTHORITATIVE` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `IS_NOT_AUTHORITATIVE_REFERRAL` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
@@ -106,6 +115,7 @@ emit TEST_CASE_END
   - Upstream: says uniquely obtained address records are evaluated. Gonemaster: deduplicates by NS name, so distinct IPs under one NS name are not independently evaluated.
   - Upstream: describes pass/fail outcome semantics without explicit per-response message protocol. Gonemaster: emits per-response `IS_NOT_AUTHORITATIVE` findings and emits `ARE_AUTHORITATIVE` only when no other testcase findings were emitted.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
+  - Upstream: reports every non-authoritative response alike. Gonemaster: reports a referral for the zone itself as `IS_NOT_AUTHORITATIVE_REFERRAL`.
 - Potential upstream report:
   - `yes`
 - If yes, include:
@@ -116,5 +126,9 @@ emit TEST_CASE_END
 
 ## Edge Cases And Limitations
 - Missing/no-response cases emit no dedicated tag in this testcase.
-- `ARE_AUTHORITATIVE` is suppressed only by `IS_NOT_AUTHORITATIVE`; transport-disabled debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) do not suppress it.
+- `ARE_AUTHORITATIVE` is suppressed only by `IS_NOT_AUTHORITATIVE` and `IS_NOT_AUTHORITATIVE_REFERRAL`; transport-disabled debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) do not suppress it.
+- `IS_NOT_AUTHORITATIVE` and `IS_NOT_AUTHORITATIVE_REFERRAL` are mutually exclusive for one response.
+- A referral whose NS RRset is owned by another name, such as an upward referral to an ancestor, a non-authoritative NODATA with SOA in the authority section, and a non-authoritative error response emit `IS_NOT_AUTHORITATIVE`.
+- The NS RRset of the referral is not compared with the delegation or with the apex NS RRset.
+- The classification reads the response delegation04 already holds; it sends no query.
 - If all SOA queries fail to return usable responses, the testcase emits only `TEST_CASE_START`, `TEST_CASE_END`, and, if any transport is disabled, `IPV4_DISABLED` and/or `IPV6_DISABLED`.

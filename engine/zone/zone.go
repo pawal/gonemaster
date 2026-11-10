@@ -512,6 +512,32 @@ func (z *Zone) QueryAuth(ctx context.Context, name string, qtype string, opts *n
 	return packet.Packet{}, nil
 }
 
+// QueryAuthOrFirst returns the first response with AA set, else the first response.
+func (z *Zone) QueryAuthOrFirst(ctx context.Context, name string, qtype string, opts *nameserver.QueryOptions) (packet.Packet, error) {
+	servers, err := z.NS(ctx)
+	if err != nil {
+		return packet.Packet{}, err
+	}
+	prof := profile.FromContext(ctx)
+	var first packet.Packet
+	for _, ns := range servers {
+		if ipDisabled(prof, ns.Address) {
+			continue
+		}
+		resp, err := ns.QueryWithOptions(ctx, name, qtype, opts)
+		if err != nil || resp.Msg == nil {
+			continue
+		}
+		if resp.AA() {
+			return resp, nil
+		}
+		if first.Msg == nil {
+			first = resp
+		}
+	}
+	return first, nil
+}
+
 // QueryPersistent returns the first response containing the requested RR type.
 func (z *Zone) QueryPersistent(ctx context.Context, name string, qtype string, opts *nameserver.QueryOptions) (packet.Packet, error) {
 	servers, err := z.NS(ctx)

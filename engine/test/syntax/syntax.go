@@ -369,7 +369,7 @@ func Syntax05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	resp, err := z.QueryOne(ctx, z.Name.String(), "SOA", nil)
+	resp, err := z.QueryAuthOrFirst(ctx, z.Name.String(), "SOA", nil)
 	if err != nil {
 		return results, err
 	}
@@ -679,7 +679,7 @@ func Syntax07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	resp, err := z.QueryOne(ctx, z.Name.String(), "SOA", nil)
+	resp, err := z.QueryAuthOrFirst(ctx, z.Name.String(), "SOA", nil)
 	if err != nil {
 		return results, err
 	}
@@ -711,7 +711,7 @@ func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	resp, err := z.QueryOne(ctx, z.Name.String(), "MX", nil)
+	resp, err := z.QueryAuthOrFirst(ctx, z.Name.String(), "MX", nil)
 	if err != nil {
 		return results, err
 	}

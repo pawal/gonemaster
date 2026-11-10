@@ -7723,7 +7723,7 @@ func defaultZoneQueryOne(ctx context.Context, z *zone.Zone, name string, rrtype 
 	if z == nil {
 		return packet.Packet{}, errors.New("zone is nil")
 	}
-	return z.QueryOne(ctx, name, rrtype, opts)
+	return z.QueryAuthOrFirst(ctx, name, rrtype, opts)
 }
 
 func defaultZoneQueryAll(ctx context.Context, z *zone.Zone, name string, rrtype string, opts *nameserver.QueryOptions) ([]packet.Packet, error) {

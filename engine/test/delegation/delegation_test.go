@@ -459,6 +459,51 @@ func TestDelegation04NotAuthoritative(t *testing.T) {
 	tctest.RequireTags(t, entries, "IS_NOT_AUTHORITATIVE")
 }
 
+func TestDelegation04ClassifiesReferral(t *testing.T) {
+	tests := []struct {
+		name    string
+		lame    packet.Packet
+		tag     string
+		notTags []string
+	}{
+		{"referral for the zone", tctest.Response(tctest.NotAuthoritative(),
+			tctest.Authority(tctest.NSRR("example", "ns1.example."), tctest.NSRR("example", "ns2.example."))),
+			"IS_NOT_AUTHORITATIVE_REFERRAL", []string{"IS_NOT_AUTHORITATIVE"}},
+		{"upward referral", tctest.Response(tctest.NotAuthoritative(),
+			tctest.Authority(tctest.NSRR(".", "a.root-servers.net."))),
+			"IS_NOT_AUTHORITATIVE", []string{"IS_NOT_AUTHORITATIVE_REFERRAL"}},
+		{"non-authoritative NODATA", tctest.Response(tctest.NotAuthoritative(),
+			tctest.Authority(tctest.SOARR("example"), tctest.NSRR("example", "ns1.example."))),
+			"IS_NOT_AUTHORITATIVE", []string{"IS_NOT_AUTHORITATIVE_REFERRAL"}},
+		{"non-authoritative REFUSED", tctest.Response(tctest.NotAuthoritative(), tctest.Rcode(dns.RcodeRefused),
+			tctest.Authority(tctest.NSRR("example", "ns1.example."))),
+			"IS_NOT_AUTHORITATIVE", []string{"IS_NOT_AUTHORITATIVE_REFERRAL"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			lame := tctest.Wire(t, tt.lame)
+			ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(tctest.Query) packet.Packet { return lame })
+			ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(tctest.Query) packet.Packet { return soaPacket("example", true) })
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns1, ns2}, nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{}, nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := Delegation04(ctx, &z)
+			if err != nil {
+				t.Fatalf("delegation04: %v", err)
+			}
+			tctest.RequireCount(t, entries, tt.tag, 2)
+			tctest.RequireArg(t, tctest.RequireTag(t, entries, tt.tag), "ns", "ns1.example")
+			tctest.RequireNoTag(t, entries, append(tt.notTags, "ARE_AUTHORITATIVE")...)
+		})
+	}
+}
+
 func TestDelegation04ParallelQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)

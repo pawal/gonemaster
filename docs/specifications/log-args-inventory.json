@@ -9,12 +9,12 @@
   ],
   "summary": {
     "file_count": 148,
-    "log_call_count": 768,
-    "unique_tag_count": 553,
+    "log_call_count": 769,
+    "unique_tag_count": 554,
     "unique_key_count": 93,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
-    "unresolved_log_call_count": 129
+    "unresolved_log_call_count": 130
   },
   "keys": {
     "aa": {
@@ -767,7 +767,7 @@
         {
           "tag": "TOTAL_NAME_MISMATCH",
           "file": "engine/test/delegation/delegation.go",
-          "line": 865,
+          "line": 872,
           "shape": "string"
         }
       ]
@@ -1493,13 +1493,13 @@
         {
           "tag": "EXTRA_NAME_CHILD",
           "file": "engine/test/delegation/delegation.go",
-          "line": 853,
+          "line": 860,
           "shape": "string"
         },
         {
           "tag": "EXTRA_NAME_PARENT",
           "file": "engine/test/delegation/delegation.go",
-          "line": 848,
+          "line": 855,
           "shape": "string"
         }
       ]
@@ -1588,7 +1588,7 @@
         {
           "tag": "TOTAL_NAME_MISMATCH",
           "file": "engine/test/delegation/delegation.go",
-          "line": 865,
+          "line": 872,
           "shape": "string"
         }
       ]
@@ -2095,37 +2095,37 @@
         {
           "tag": "ENOUGH_IPV4_NS_CHILD",
           "file": "engine/test/delegation/delegation.go",
-          "line": 263,
+          "line": 264,
           "shape": "unknown"
         },
         {
           "tag": "ENOUGH_NS_CHILD",
           "file": "engine/test/delegation/delegation.go",
-          "line": 240,
+          "line": 241,
           "shape": "unknown"
         },
         {
           "tag": "ENOUGH_NS_DEL",
           "file": "engine/test/delegation/delegation.go",
-          "line": 219,
+          "line": 220,
           "shape": "unknown"
         },
         {
           "tag": "NOT_ENOUGH_IPV4_NS_CHILD",
           "file": "engine/test/delegation/delegation.go",
-          "line": 267,
+          "line": 268,
           "shape": "unknown"
         },
         {
           "tag": "NOT_ENOUGH_NS_CHILD",
           "file": "engine/test/delegation/delegation.go",
-          "line": 244,
+          "line": 245,
           "shape": "unknown"
         },
         {
           "tag": "NOT_ENOUGH_NS_DEL",
           "file": "engine/test/delegation/delegation.go",
-          "line": 223,
+          "line": 224,
           "shape": "unknown"
         },
         {
@@ -2345,7 +2345,7 @@
         {
           "tag": "IN_DOMAIN_GLUE_MISSING",
           "file": "engine/test/delegation/delegation.go",
-          "line": 348,
+          "line": 349,
           "shape": "unknown"
         },
         {
@@ -2381,7 +2381,7 @@
         {
           "tag": "NS_IS_CNAME",
           "file": "engine/test/delegation/delegation.go",
-          "line": 701,
+          "line": 708,
           "shape": "unknown"
         }
       ]
@@ -3333,19 +3333,19 @@
         {
           "tag": "REFERRAL_SIZE_LARGE",
           "file": "engine/test/delegation/delegation.go",
-          "line": 493,
+          "line": 494,
           "shape": "unknown"
         },
         {
           "tag": "REFERRAL_SIZE_OK",
           "file": "engine/test/delegation/delegation.go",
-          "line": 497,
+          "line": 498,
           "shape": "unknown"
         },
         {
           "tag": "REFERRAL_SIZE_TOO_LARGE",
           "file": "engine/test/delegation/delegation.go",
-          "line": 489,
+          "line": 490,
           "shape": "unknown"
         },
         {
@@ -3948,7 +3948,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/delegation/delegation.go",
-      "line": 1086,
+      "line": 1093,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -4038,7 +4038,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/delegation/delegation.go",
-      "line": 1076,
+      "line": 1083,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -4098,7 +4098,13 @@
     {
       "tag": "IS_NOT_AUTHORITATIVE",
       "file": "engine/test/delegation/delegation.go",
-      "line": 573,
+      "line": 580,
+      "args_expr": "withNameserverArgs(task.ns, map[string]any{\n\t\"proto\": protoLabel(useVC),\n})"
+    },
+    {
+      "tag": "IS_NOT_AUTHORITATIVE_REFERRAL",
+      "file": "engine/test/delegation/delegation.go",
+      "line": 574,
       "args_expr": "withNameserverArgs(task.ns, map[string]any{\n\t\"proto\": protoLabel(useVC),\n})"
     },
     {
@@ -4188,7 +4194,7 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/delegation/delegation.go",
-      "line": 667,
+      "line": 674,
       "args_expr": "args"
     },
     {
@@ -4356,13 +4362,13 @@
     {
       "tag": "SOA_NOT_EXISTS",
       "file": "engine/test/delegation/delegation.go",
-      "line": 779,
+      "line": 786,
       "args_expr": "withNameserverArgs(task.ns, nil)"
     },
     {
       "tag": "UNEXPECTED_RCODE",
       "file": "engine/test/delegation/delegation.go",
-      "line": 672,
+      "line": 679,
       "args_expr": "args"
     },
     {

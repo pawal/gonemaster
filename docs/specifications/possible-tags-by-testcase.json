@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 87,
-    "unique_tag_count": 623
+    "unique_tag_count": 624
   },
   "modules": {
     "address": {
@@ -310,6 +310,7 @@
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "IS_NOT_AUTHORITATIVE",
+        "IS_NOT_AUTHORITATIVE_REFERRAL",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ],

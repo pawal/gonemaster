@@ -211,6 +211,7 @@
             "IPV4_DISABLED": "DEBUG2",
             "IPV6_DISABLED": "DEBUG2",
             "IS_NOT_AUTHORITATIVE": "WARNING",
+            "IS_NOT_AUTHORITATIVE_REFERRAL": "WARNING",
             "NAMES_MATCH": "INFO",
             "NO_IPV4_NS_CHILD": "WARNING",
             "NO_IPV4_NS_DEL": "WARNING",

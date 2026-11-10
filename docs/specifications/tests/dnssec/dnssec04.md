@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - DNSKEY and SOA query responses from `zoneQueryOne` for child apex.
+  - DNSKEY and SOA query responses from `zoneQueryOne` for child apex, which calls `z.QueryAuthOrFirst`.
   - RRSIG records covering DNSKEY and SOA RRsets.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: controls sequential vs parallel DNSKEY/SOA query execution.
@@ -19,7 +19,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Query child apex `DNSKEY` and `SOA` with DNSSEC enabled:
+2. Query child apex `DNSKEY` and `SOA` with DNSSEC enabled through `z.QueryAuthOrFirst`: [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) in order, skipping disabled transports and failed queries; the first response with `AA=1` is used, or the first response when none sets `AA`.
    - If `resolver.defaults.parallel <= 1`, run sequentially (`DNSKEY` then `SOA`).
    - Else run both queries concurrently via ordered parallel execution.
 3. If either query fails with an error, return error.
@@ -41,6 +41,7 @@ Status: Final
 {{% expand "Show diagram" %}}
 ```
 zoneQueryOne for DNSKEY and SOA at z.Name, DNSSEC=on
+  each: first AA=1 response, else first response
   resolver.defaults.parallel <= 1 -> sequential (DNSKEY then SOA)
   resolver.defaults.parallel >  1 -> concurrent (ordered)
 
@@ -137,3 +138,4 @@ The following behaviors are implementation choices, not mandated by RFC 4034 or 
 - If either DNSKEY or SOA query returns no DNS message, testcase ends with only boundary tags and no RRSIG findings.
 - `DURATION_OK` is emitted only when no remaining-time tag and no `DURATION_LONG` tag were emitted for the same RRSIG.
 - All remaining-time checks use the DNSKEY response packet time as the reference "now".
+- A referral from a lame nameserver is read only when no nameserver answers with `AA=1`; it carries no RRSIG, so no RRSIG findings follow.

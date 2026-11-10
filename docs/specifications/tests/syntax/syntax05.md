@@ -9,13 +9,13 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - A SOA response for the child zone apex, acquired via `z.QueryOne(..., "SOA", ...)`.
+  - A SOA response for the child zone apex, acquired via `z.QueryAuthOrFirst(..., "SOA", ...)`.
 - Profile/config knobs that affect behavior:
-  - `net.ipv4` and `net.ipv6` can affect which nameserver transport `QueryOne` can use.
+  - `net.ipv4` and `net.ipv6` can affect which nameservers `z.QueryAuthOrFirst` queries.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Perform `z.QueryOne` for SOA at the zone apex.
+2. Query SOA at the zone apex through `z.QueryAuthOrFirst`: [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) in order, skipping disabled transports and failed queries; the first response with `AA=1` is used, or the first response when none sets `AA`.
 3. If response contains SOA records in answer section:
    - Use the first SOA record encountered.
    - Read `Mbox` (`RNAME`) and de-escape `\.` only for `@`-presence check.
@@ -54,7 +54,7 @@ Status: Final
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream text describes iterating over [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers)/[`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) nameserver sets directly; Gonemaster uses `z.QueryOne` abstraction.
+  - Upstream text describes iterating over [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers)/[`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) nameserver sets directly; Gonemaster uses the first authoritative response (`z.QueryAuthOrFirst`).
   - Upstream text says de-escaped output from this testcase is used by `SYNTAX08`; Gonemaster does not pass state from `Syntax05` to `Syntax08`.
 - Potential upstream report:
   - `yes`
@@ -67,4 +67,5 @@ Status: Final
 ## Edge Cases And Limitations
 - If multiple SOA records exist, only the first SOA record found is evaluated.
 - A DNS response without SOA in answer is treated the same as no response (`NO_RESPONSE_SOA_QUERY`).
+- A referral from a lame nameserver is read only when no nameserver answers with `AA=1`.
 - When running through `syntax.All`, this testcase is skipped if `syntax01` did not emit `ONLY_ALLOWED_CHARS`.

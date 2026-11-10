@@ -2043,6 +2043,8 @@ func DNSSEC04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, nil
 		}
 	} else {
+		// Memoizes the nameservers for the two concurrent queries.
+		_, _ = z.NS(ctx)
 		tasks := []parallel.Task[packet.Packet]{
 			func(ctx context.Context) (packet.Packet, error) {
 				return zoneQueryOne(ctx, z, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})

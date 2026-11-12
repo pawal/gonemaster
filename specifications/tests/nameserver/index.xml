@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Nameserver :: Gonemaster</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/nameserver/index.html</link><description>NAMESERVER01A name server should not be a recursor
+NAMESERVER02Test of EDNS0 support
+NAMESERVER03Test availability of zone transfer (AXFR)
+NAMESERVER04Same source address
+NAMESERVER05Behaviour against AAAA query
+NAMESERVER06NS can be resolved
+NAMESERVER07To check whether authoritative name servers return an upward referral
+NAMESERVER08Testing QNAME case insensitivity
+NAMESERVER09Testing QNAME case sensitivity
+NAMESERVER10Behaviour against unsupported EDNS version
+NAMESERVER11Behaviour against unknown EDNS option codes</description><generator>Hugo</generator><language>en-us</language><atom:link href="https://pawal.codeberg.page/gonemaster/specifications/tests/nameserver/index.xml" rel="self" type="application/rss+xml"/></channel></rss>

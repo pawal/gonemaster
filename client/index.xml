@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Client :: Gonemaster</title><link>https://pawal.codeberg.page/gonemaster/client/index.html</link><description>gonemaster-client is the command-line client for gonemaster-server. Use it when you want to submit jobs, run batches, inspect stored results, or query tagged analysis data through the admin API.
+For direct local tests that do not use the server, use ../cli/ .
+Connection The default server is:
+gonemaster-client --server http://localhost:8080/api/v1 jobs list Set --server to the admin API base URL. The report command reads the public analysis API, which the client derives from that same base.</description><generator>Hugo</generator><language>en-us</language><atom:link href="https://pawal.codeberg.page/gonemaster/client/index.xml" rel="self" type="application/rss+xml"/></channel></rss>

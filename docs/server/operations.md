@@ -203,7 +203,9 @@ Page views are visitor activity and each line carries the client IP in `remote`
 and its User-Agent in `user_agent`, so the retention policy of whatever collects stderr also governs this data.
 
 The line's level follows the response status: 2xx/3xx -> `info`, 4xx -> `warn`,
-5xx -> `error`. Fields:
+5xx -> `error`. A 503 from the public analysis API with error code
+`no_selectable_cohorts` or `no_default_cohort` reports server configuration
+and is logged at `warn`. Fields:
 
 | Field | Meaning |
 |---|---|

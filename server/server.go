@@ -413,6 +413,8 @@ func (s *Server) routes() {
 	s.mux.Handle("/api/v1", s.apiChain("/api/v1", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
 	})))
+	// Other /api/ paths are unknown API versions, not admin UI pages.
+	s.mux.Handle("/api/", s.apiChain("/api/unknown", http.NotFoundHandler()))
 
 	pubMux := http.NewServeMux()
 	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
@@ -482,6 +484,7 @@ func (s *Server) routes() {
 	// Outside the rate limiter, so a 429 is counted rather than invisible.
 	pubHandler = s.apiChain("/pub/api/v1/unknown", pubHandler)
 	s.mux.Handle("/pub/api/v1/", pubHandler)
+	s.mux.Handle("/pub/api/", s.apiChain("/pub/api/unknown", http.NotFoundHandler()))
 
 	s.mux.Handle("GET /robots.txt", s.pageChain("/robots.txt", http.HandlerFunc(s.handleRobotsTxt)))
 	s.mux.Handle("GET /sitemap.xml", s.pageChain("/sitemap.xml", http.HandlerFunc(s.handleSitemap)))

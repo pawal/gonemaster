@@ -172,8 +172,10 @@ func loadSnapshotOverviewV2(store AnalysisReadStore, snapshotID int64) (Snapshot
 func (s *Server) writePublicAnalysisResolutionError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, ErrNoSelectableAnalysisCohorts):
+		markNotConfigured(r)
 		writeError(w, http.StatusServiceUnavailable, "no_selectable_cohorts", "no public analysis cohorts are configured", nil)
 	case errors.Is(err, ErrNoDefaultAnalysisCohort):
+		markNotConfigured(r)
 		writeError(w, http.StatusServiceUnavailable, "no_default_cohort", "no default public analysis cohort configured", nil)
 	case errors.Is(err, ErrMultipleDefaultAnalysisCohorts):
 		writeError(w, http.StatusInternalServerError, "multiple_default_cohorts", "multiple default public cohorts configured", nil)

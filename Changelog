@@ -11,11 +11,13 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - i18n: the `SOA_NOT_EXISTS` message names a response without an SOA record, not an empty response
+- server: a public analysis 503 for a missing cohort (`no_selectable_cohorts`, `no_default_cohort`) logs at warn instead of error
 
 ### Fixed
 
 - engine: Syntax05, Syntax07, Syntax08 and DNSSEC04 read the first authoritative answer instead of a referral from a lame nameserver
 - engine: DNSSEC04 resolves the zone's nameservers once before its two parallel queries
+- server: unknown paths under `/api/` and `/pub/api/` return 404 instead of the admin UI page
 
 ## [v1.7.27] - 2026-10-26
 

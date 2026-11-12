@@ -59,6 +59,8 @@ func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
 		{"admin unmatched route", "/api/v1/no-such-endpoint", "/api/v1/unknown"},
 		// No captureRoute on the redirect mount, so its fallback label applies.
 		{"admin redirect mount", "/api/v1", "/api/v1"},
+		{"unknown admin api version", "/api/v2/jobs", "/api/unknown"},
+		{"unknown public api version", "/pub/api/v2/info", "/pub/api/unknown"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,6 +75,27 @@ func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
 			}
 			if got := line["path"]; got != tc.path {
 				t.Fatalf("path = %v, want %q", got, tc.path)
+			}
+		})
+	}
+}
+
+func TestUnknownAPIPathsReturnNotFound(t *testing.T) {
+	for _, path := range []string{
+		"/api/",
+		"/api/v2/jobs",
+		"/api/a'b/analysis/status",
+		"/pub/api/",
+		"/pub/api/v2/info",
+	} {
+		t.Run(path, func(t *testing.T) {
+			srv := newTestServer(t)
+
+			resp := doJSON(t, srv, http.MethodGet, path, nil)
+
+			wantStatus(t, resp, http.StatusNotFound)
+			if got := resp.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+				t.Fatalf("Content-Type = %q, want the plain 404 of an unknown /api/v1 path", got)
 			}
 		})
 	}
@@ -356,12 +379,16 @@ func TestRequestIDMiddlewareIgnoresUntrustedInbound(t *testing.T) {
 
 func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 	cases := []struct {
-		status    int
-		wantLevel string
+		status        int
+		notConfigured bool
+		wantLevel     string
 	}{
-		{http.StatusOK, "INFO"},
-		{http.StatusNotFound, "WARN"},
-		{http.StatusInternalServerError, "ERROR"},
+		{http.StatusOK, false, "INFO"},
+		{http.StatusNotFound, false, "WARN"},
+		{http.StatusInternalServerError, false, "ERROR"},
+		{http.StatusServiceUnavailable, false, "ERROR"},
+		{http.StatusServiceUnavailable, true, "WARN"},
+		{http.StatusOK, true, "INFO"},
 	}
 	for _, tc := range cases {
 		var buf bytes.Buffer
@@ -369,7 +396,10 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 
 		// requestID wraps accessLog so the line carries a request_id.
 		handler := srv.requestIDMiddleware(srv.accessLogMiddleware("/api/v1/unknown",
-			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.notConfigured {
+					markNotConfigured(r)
+				}
 				w.WriteHeader(tc.status)
 			})))
 
@@ -401,6 +431,19 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 		if id, ok := line["request_id"].(string); !ok || id == "" {
 			t.Fatalf("status %d: missing request_id, got %v", tc.status, line["request_id"])
 		}
+	}
+}
+
+func TestAccessLogPublicAnalysisWithoutCohortsLogsWarn(t *testing.T) {
+	var buf bytes.Buffer
+	srv := newTestServer(t, withLogTo(&buf, "info"))
+
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/analysis/cohorts/x/trends", nil)
+
+	wantErrorCode(t, resp, http.StatusServiceUnavailable, "no_selectable_cohorts")
+	line := findLogLine(t, &buf, "http_request")
+	if line["level"] != "WARN" {
+		t.Fatalf("level = %v, want WARN", line["level"])
 	}
 }
 

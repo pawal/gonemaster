@@ -8,6 +8,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 - server: a public analysis 503 for a missing cohort (`no_selectable_cohorts`, `no_default_cohort`) logs at warn instead of error
 
+### Fixed
+
+- server: unknown paths under `/api/` and `/pub/api/` return 404 instead of the admin UI page
+
 ## [v1.7.27] - 2026-10-26
 
 ### Fixed

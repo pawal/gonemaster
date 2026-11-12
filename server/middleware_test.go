@@ -59,6 +59,8 @@ func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
 		{"admin unmatched route", "/api/v1/no-such-endpoint", "/api/v1/unknown"},
 		// No captureRoute on the redirect mount, so its fallback label applies.
 		{"admin redirect mount", "/api/v1", "/api/v1"},
+		{"unknown admin api version", "/api/v2/jobs", "/api/unknown"},
+		{"unknown public api version", "/pub/api/v2/info", "/pub/api/unknown"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,6 +75,27 @@ func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
 			}
 			if got := line["path"]; got != tc.path {
 				t.Fatalf("path = %v, want %q", got, tc.path)
+			}
+		})
+	}
+}
+
+func TestUnknownAPIPathsReturnNotFound(t *testing.T) {
+	for _, path := range []string{
+		"/api/",
+		"/api/v2/jobs",
+		"/api/a'b/analysis/status",
+		"/pub/api/",
+		"/pub/api/v2/info",
+	} {
+		t.Run(path, func(t *testing.T) {
+			srv := newTestServer(t)
+
+			resp := doJSON(t, srv, http.MethodGet, path, nil)
+
+			wantStatus(t, resp, http.StatusNotFound)
+			if got := resp.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+				t.Fatalf("Content-Type = %q, want the plain 404 of an unknown /api/v1 path", got)
 			}
 		})
 	}

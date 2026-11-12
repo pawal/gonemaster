@@ -196,7 +196,11 @@ func (s *Server) accessLogMiddleware(fallbackRoute string, next http.Handler) ht
 			}
 			attrs = append(attrs, slog.String("body", body))
 		}
-		s.logger.LogAttrs(r.Context(), statusLevel(status), "http_request", attrs...)
+		level := statusLevel(status)
+		if holder.notConfigured.Load() && level > slog.LevelWarn {
+			level = slog.LevelWarn
+		}
+		s.logger.LogAttrs(r.Context(), level, "http_request", attrs...)
 	})
 }
 
@@ -358,6 +362,15 @@ func analysisTimeoutMiddleware(d time.Duration, next http.Handler) http.Handler 
 // routeHolder carries the router's matched pattern to the access log.
 type routeHolder struct {
 	route atomic.Pointer[string]
+	// notConfigured marks a 5xx that reports server configuration, not a fault.
+	notConfigured atomic.Bool
+}
+
+// markNotConfigured logs the request's 5xx at warn instead of error.
+func markNotConfigured(r *http.Request) {
+	if holder, ok := r.Context().Value(routeHolderContextKey).(*routeHolder); ok {
+		holder.notConfigured.Store(true)
+	}
 }
 
 // captureRoute records the mux's matched pattern as a mount-qualified route.

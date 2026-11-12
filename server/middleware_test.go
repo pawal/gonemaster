@@ -356,12 +356,16 @@ func TestRequestIDMiddlewareIgnoresUntrustedInbound(t *testing.T) {
 
 func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 	cases := []struct {
-		status    int
-		wantLevel string
+		status        int
+		notConfigured bool
+		wantLevel     string
 	}{
-		{http.StatusOK, "INFO"},
-		{http.StatusNotFound, "WARN"},
-		{http.StatusInternalServerError, "ERROR"},
+		{http.StatusOK, false, "INFO"},
+		{http.StatusNotFound, false, "WARN"},
+		{http.StatusInternalServerError, false, "ERROR"},
+		{http.StatusServiceUnavailable, false, "ERROR"},
+		{http.StatusServiceUnavailable, true, "WARN"},
+		{http.StatusOK, true, "INFO"},
 	}
 	for _, tc := range cases {
 		var buf bytes.Buffer
@@ -369,7 +373,10 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 
 		// requestID wraps accessLog so the line carries a request_id.
 		handler := srv.requestIDMiddleware(srv.accessLogMiddleware("/api/v1/unknown",
-			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.notConfigured {
+					markNotConfigured(r)
+				}
 				w.WriteHeader(tc.status)
 			})))
 
@@ -401,6 +408,19 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 		if id, ok := line["request_id"].(string); !ok || id == "" {
 			t.Fatalf("status %d: missing request_id, got %v", tc.status, line["request_id"])
 		}
+	}
+}
+
+func TestAccessLogPublicAnalysisWithoutCohortsLogsWarn(t *testing.T) {
+	var buf bytes.Buffer
+	srv := newTestServer(t, withLogTo(&buf, "info"))
+
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/analysis/cohorts/x/trends", nil)
+
+	wantErrorCode(t, resp, http.StatusServiceUnavailable, "no_selectable_cohorts")
+	line := findLogLine(t, &buf, "http_request")
+	if line["level"] != "WARN" {
+		t.Fatalf("level = %v, want WARN", line["level"])
 	}
 }
 

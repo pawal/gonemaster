@@ -11,6 +11,8 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - server: unknown paths under `/api/` and `/pub/api/` return 404 instead of the admin UI page
+- analysis-ui: entity links keep only `dataset_tag` and `snapshot` from the current query
+- server: an analysis dashboard page's HTML names the page itself as canonical instead of the dashboard root
 
 ## [v1.7.27] - 2026-10-26
 

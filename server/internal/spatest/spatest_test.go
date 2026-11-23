@@ -94,6 +94,30 @@ func TestIndexForRootAndUnknownPathsFailsOn404(t *testing.T) {
 	})
 }
 
+// pageIndex serves an index naming the request path in canonical and og:url, plus extra off the root.
+func pageIndex(extra string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := "https://example.com/analysis" + r.URL.Path
+		body := `<link rel="canonical" href="` + u + `" /><meta property="og:url" content="` + u + `" />`
+		if r.URL.Path != "/" {
+			body += extra
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(body))
+	})
+}
+
+func TestIndexForRootAndUnknownPathsIgnoresThePageURL(t *testing.T) {
+	IndexForRootAndUnknownPaths(t, pageIndex(""), "/deep/spa/route")
+	PathTraversalCannotEscape(t, pageIndex(""), "/../spatest.go")
+}
+
+func TestIndexForRootAndUnknownPathsFailsOnOtherContent(t *testing.T) {
+	tbtest.MustFail(t, "did not serve the SPA index content", func(tb *tbtest.TB) {
+		IndexForRootAndUnknownPaths(tb, pageIndex("<p>other</p>"), "/deep/spa/route")
+	})
+}
+
 func TestPathTraversalCannotEscapeReportsAnEscape(t *testing.T) {
 	fsys := testFS()
 	fsys["secret.txt"] = &fstest.MapFile{Data: []byte("secret")}

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -65,11 +66,8 @@ func TestInjectMetaReplacesPlaceholders(t *testing.T) {
 	}
 }
 
-func TestServeIndexDoesNotReflectRequestPath(t *testing.T) {
-	// The request path is attacker-controlled; it must never be echoed into the
-	// injected canonical/Open Graph tags or it becomes reflected XSS (the
-	// /analysis CSP permits inline scripts). Only exercised when the SPA is
-	// embedded; the placeholder build serves a static unavailable page instead.
+// The request path reaches the embedded page only percent-encoded.
+func TestServeIndexEscapesRequestPath(t *testing.T) {
 	if !IsBuilt() {
 		t.Skip("analysis UI dist not built; injection path not exercised")
 	}
@@ -82,6 +80,59 @@ func TestServeIndexDoesNotReflectRequestPath(t *testing.T) {
 	}
 	if strings.Contains(body, "__ANALYSIS_OG_URL__") {
 		t.Fatalf("og:url placeholder left unreplaced")
+	}
+}
+
+func TestCanonicalURL(t *testing.T) {
+	const base = "https://gonemaster.example"
+	cases := []struct {
+		name, target, want string
+	}{
+		{"root", "/", base + "/analysis/"},
+		{"empty path", "", base + "/analysis/"},
+		{"trailing slash dropped", "/domains/", base + "/analysis/domains"},
+		{"list state dropped", "/domains?sort=grade&offset=40&grade=A", base + "/analysis/domains"},
+		{"leaked nameserver dropped", "/nameservers/a.dns.it?grade=A&nameserver=c.nic.example", base + "/analysis/nameservers/a.dns.it"},
+		{"pinned kept in order", "/tags?snapshot=2026-07-01&sort=count&dataset_tag=tld", base + "/analysis/tags?dataset_tag=tld&snapshot=2026-07-01"},
+		{"empty pinned dropped", "/tags?dataset_tag=&snapshot=s1", base + "/analysis/tags?snapshot=s1"},
+		{"browser form encoding", "/domains?dataset_tag=a%20b*~", base + "/analysis/domains?dataset_tag=a+b*%7E"},
+		{"encoded slash kept", "/prefixes/195.253.64.0%2F24?nameserver=v0n0.nic.example", base + "/analysis/prefixes/195.253.64.0%2F24"},
+		{"encoded colon kept", "/endpoints/2001%3Adb8%3A%3A1?nameserver=ns.example", base + "/analysis/endpoints/2001%3Adb8%3A%3A1"},
+		{"markup escaped", `/x"><script>`, base + "/analysis/x%22%3E%3Cscript%3E"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			u, err := url.Parse(tc.target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := canonicalURL(base, u); got != tc.want {
+				t.Fatalf("canonicalURL(%q) = %q, want %q", tc.target, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestServeIndexInjectsPageCanonical(t *testing.T) {
+	fsys := fstest.MapFS{"index.html": &fstest.MapFile{
+		Data: []byte(`<link rel="canonical" href="__ANALYSIS_OG_URL__" />`),
+	}}
+	cases := []struct {
+		name, target, want string
+	}{
+		{"detail page", "/nameservers/a.dns.it?grade=A&nameserver=c.nic.example", `<link rel="canonical" href="https://gonemaster.example/analysis/nameservers/a.dns.it" />`},
+		{"pinned params", "/tags/Z01_MNAME_NOT_MASTER?dataset_tag=tld&snapshot=s1", `<link rel="canonical" href="https://gonemaster.example/analysis/tags/Z01_MNAME_NOT_MASTER?dataset_tag=tld&amp;snapshot=s1" />`},
+		{"quote and ampersand in path", "/domains/a'b&c", `<link rel="canonical" href="https://gonemaster.example/analysis/domains/a&#39;b&amp;c" />`},
+		{"markup in path", `/x"><script>alert(1)</script>`, `<link rel="canonical" href="https://gonemaster.example/analysis/x%22%3E%3Cscript%3Ealert%281%29%3C/script%3E" />`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			serveIndex(fsys, rr, httptest.NewRequest(http.MethodGet, tc.target, nil), "https://gonemaster.example/")
+			if got := rr.Body.String(); got != tc.want {
+				t.Fatalf("body = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

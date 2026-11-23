@@ -12,6 +12,7 @@ import (
 	"html"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"path"
 	"regexp"
 	"strings"
@@ -88,13 +89,37 @@ func Handler(publicURL func() string) http.Handler {
 	})
 }
 
-// injectMeta fills the canonical/Open Graph placeholders in index.html with
-// URLs derived from the request. Non-JS crawlers rely on these; the client
-// refines them per route once the SPA hydrates.
+// injectMeta fills the canonical, og:url and og:image placeholders in index.html.
 func injectMeta(data []byte, ogURL, ogImage string) []byte {
 	data = bytes.ReplaceAll(data, []byte("__ANALYSIS_OG_URL__"), []byte(ogURL))
 	data = bytes.ReplaceAll(data, []byte("__ANALYSIS_OG_IMAGE__"), []byte(ogImage))
 	return data
+}
+
+// pinnedParams are the query params a canonical URL keeps, as in analysis-ui pinnedQuery.
+var pinnedParams = []string{"dataset_tag", "snapshot"}
+
+// formEscaper turns url.QueryEscape output into the URLSearchParams encoding.
+var formEscaper = strings.NewReplacer("%2A", "*", "~", "%7E")
+
+// canonicalURL is the page URL with only the pinned params; u is relative to the mount.
+func canonicalURL(base string, u *url.URL) string {
+	// The SPA drops a trailing slash everywhere but the mount root.
+	p := strings.TrimRight(u.EscapedPath(), "/")
+	if p == "" {
+		p = "/"
+	}
+	var b strings.Builder
+	b.WriteString(base + mountPath + p)
+	q := u.Query()
+	sep := "?"
+	for _, key := range pinnedParams {
+		if v := q.Get(key); v != "" {
+			b.WriteString(sep + key + "=" + formEscaper.Replace(url.QueryEscape(v)))
+			sep = "&"
+		}
+	}
+	return b.String()
 }
 
 func dist() (fs.FS, error) {
@@ -173,11 +198,9 @@ func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL st
 		serveUnavailableUIPage(w, r)
 		return
 	}
-	// Inject only the deployment base, not the request path: the path is
-	// attacker-controlled and would be reflected into an HTML attribute. The
-	// client refines canonical/og:url per route once the SPA hydrates.
+	// The request path reaches the page percent-encoded, then HTML-escaped.
 	base := strings.TrimRight(baseurl.Resolve(publicURL, r), "/")
-	ogURL := html.EscapeString(base + mountPath + "/")
+	ogURL := html.EscapeString(canonicalURL(base, r.URL))
 	ogImage := html.EscapeString(base + mountPath + "/og-image.png")
 	data = injectMeta(data, ogURL, ogImage)
 	modTime := time.Time{}

@@ -1,16 +1,14 @@
 // Per-route document metadata for the client-rendered analysis SPA.
 // routeHead/canonicalUrl are pure; applyHead is the DOM side-effect.
 
+import { pinnedQuery } from "$lib/entityLinks";
+
 const SITE = "Gonemaster Analysis";
 
 const DEFAULT_DESCRIPTION =
   "Analyse DNS, delegation, DNSSEC, and nameserver health across many domains.";
 
 export type HeadMeta = { title: string; description: string };
-
-// Params that select the data view and belong in a canonical URL. Volatile
-// state (sort, limit, offset, search, filters) is dropped.
-const CANONICAL_PARAMS = ["dataset_tag", "snapshot"];
 
 function withSite(label: string): string {
   return `${label} - ${SITE}`;
@@ -94,13 +92,9 @@ export function routeHead(routeId: string | null, params: Record<string, string>
   }
 }
 
+// Page URL with only the pinned params; the server writes the same value into index.html.
 export function canonicalUrl(url: URL): string {
-  const canon = new URL(url.origin + url.pathname);
-  for (const key of CANONICAL_PARAMS) {
-    const value = url.searchParams.get(key);
-    if (value) canon.searchParams.set(key, value);
-  }
-  return canon.toString();
+  return `${url.origin}${url.pathname}${pinnedQuery(url.search)}`;
 }
 
 function setMeta(selector: string, attr: "name" | "property", key: string, content: string): void {

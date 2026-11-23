@@ -13,6 +13,7 @@
     domainsSeverityHref,
     endpointHref,
     nameserverHref,
+    pinnedQuery,
     tagHref
   } from "$lib/entityLinks";
   import {
@@ -220,7 +221,7 @@
     }));
   });
 
-  const query = $derived(page.url.search);
+  const query = $derived(pinnedQuery(page.url.search));
   const isEmpty = $derived((data.totals?.domain_count ?? 0) === 0);
 
   // Fastest/slowest by median latency, three entity columns. The server sorts

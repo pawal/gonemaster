@@ -12,6 +12,7 @@
   import type { LayoutData } from "./+layout";
   import { applyTheme, initialTheme, persistTheme, type Theme } from "$lib/theme";
   import { applyHead } from "$lib/head";
+  import { pinnedQuery } from "$lib/entityLinks";
 
   let { children } = $props();
 
@@ -62,23 +63,8 @@
     return url || "/";
   });
 
-  // Forward the active cohort and snapshot pin across nav-bar clicks so
-  // navigating between tabs doesn't drop the user back to auto-latest of
-  // the default cohort. Page-specific params like `sort`, `limit`,
-  // `offset`, `search` are intentionally not propagated - they only make
-  // sense within one list page.
-  const FORWARDED_PARAMS = ["dataset_tag", "snapshot"];
-
-  const navQuery = $derived.by(() => {
-    const source = page.url.searchParams;
-    const params = new URLSearchParams();
-    for (const key of FORWARDED_PARAMS) {
-      const value = source.get(key);
-      if (value) params.set(key, value);
-    }
-    const str = params.toString();
-    return str ? `?${str}` : "";
-  });
+  // Nav-bar links keep the active cohort and snapshot.
+  const navQuery = $derived(pinnedQuery(page.url.search));
 
   function navHref(href: string): string {
     const path = `${base}${href === "/" ? "" : href}`;

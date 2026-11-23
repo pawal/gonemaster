@@ -6,12 +6,13 @@
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
   import ExternalLinks from "$lib/ExternalLinks.svelte";
   import { prefixLinks } from "$lib/externalLinks";
+  import { pinnedQuery } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import type { PrefixDetailPageData } from "./+page";
 
   let { data }: { data: PrefixDetailPageData } = $props();
 
-  const query = $derived(page.url.search);
+  const query = $derived(pinnedQuery(page.url.search));
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">

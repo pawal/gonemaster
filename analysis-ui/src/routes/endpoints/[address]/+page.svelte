@@ -7,12 +7,13 @@
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import ExternalLinks from "$lib/ExternalLinks.svelte";
   import { addressLinks } from "$lib/externalLinks";
+  import { pinnedQuery } from "$lib/entityLinks";
   import { formatCount, formatMs } from "$lib/format";
   import type { EndpointDetailPageData } from "./+page";
 
   let { data }: { data: EndpointDetailPageData } = $props();
 
-  const query = $derived(page.url.search);
+  const query = $derived(pinnedQuery(page.url.search));
   const title = $derived(
     data.nameserver ? `${data.nameserver} · ${data.address}` : data.address
   );

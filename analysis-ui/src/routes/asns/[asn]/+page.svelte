@@ -7,12 +7,13 @@
   import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
   import ExternalLinks from "$lib/ExternalLinks.svelte";
   import { asnLinks } from "$lib/externalLinks";
+  import { pinnedQuery } from "$lib/entityLinks";
   import { formatCount, formatMs } from "$lib/format";
   import type { ASNDetailPageData } from "./+page";
 
   let { data }: { data: ASNDetailPageData } = $props();
 
-  const query = $derived(page.url.search);
+  const query = $derived(pinnedQuery(page.url.search));
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">

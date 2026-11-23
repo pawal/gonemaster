@@ -7,13 +7,14 @@
   import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
   import ExternalLinks from "$lib/ExternalLinks.svelte";
   import { nameserverLinks } from "$lib/externalLinks";
+  import { pinnedQuery } from "$lib/entityLinks";
   import { formatCount, formatMs } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
   import type { NameserverDetailPageData } from "./+page";
 
   let { data }: { data: NameserverDetailPageData } = $props();
 
-  const query = $derived(page.url.search);
+  const query = $derived(pinnedQuery(page.url.search));
 
   function unicodeName(name: string): string | null {
     const decoded = idnToUnicode(name);

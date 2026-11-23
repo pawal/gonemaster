@@ -160,6 +160,7 @@ func Metadata() map[string][]string {
 		},
 		"delegation04": {
 			"IS_NOT_AUTHORITATIVE",
+			"IS_NOT_AUTHORITATIVE_REFERRAL",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"ARE_AUTHORITATIVE",
@@ -569,7 +570,13 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					if err != nil || resp.Msg == nil {
 						continue
 					}
-					if !resp.AA() {
+					if !resp.AA() && resp.Type() == "referral" && resp.HasRRsOfTypeForName("NS", z.Name, "authority") {
+						if _, err := buf.Add("IS_NOT_AUTHORITATIVE_REFERRAL", withNameserverArgs(task.ns, map[string]any{
+							"proto": protoLabel(useVC),
+						})); err != nil {
+							return err
+						}
+					} else if !resp.AA() {
 						if _, err := buf.Add("IS_NOT_AUTHORITATIVE", withNameserverArgs(task.ns, map[string]any{
 							"proto": protoLabel(useVC),
 						})); err != nil {
@@ -598,7 +605,7 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if (len(list4) > 0 || len(list5) > 0) && !hasTag(results, "IS_NOT_AUTHORITATIVE") && len(authoritatives) > 0 {
+	if (len(list4) > 0 || len(list5) > 0) && !hasTag(results, "IS_NOT_AUTHORITATIVE") && !hasTag(results, "IS_NOT_AUTHORITATIVE_REFERRAL") && len(authoritatives) > 0 {
 		uniq := uniqueStrings(authoritatives)
 		sort.Strings(uniq)
 		args := map[string]any{}

@@ -22,7 +22,7 @@ When a resolver first asks the parent zone about your domain, the parent replies
 
 Description:
 
-Each nameserver listed for your domain must answer with the "authoritative answer" flag set. A server that does not claim authority is not really running your zone - it is probably a caching resolver that got listed by mistake, or an old record that points at a server that no longer serves the domain.
+Each nameserver listed for your domain must answer for it with the "authoritative answer" flag set. A server that does not set the flag is not serving your zone: it answers from a cache, forwards the query, refuses it, or holds only the zone above yours and refers the question back to your nameservers.
 
 ## Testcase delegation05
 
@@ -152,7 +152,15 @@ Header: Nameserver is not authoritative
 
 Description:
 
-One of the nameservers listed for your domain answered a query but did not set the "authoritative answer" flag, so it is not really running your zone. Usually this is an old delegation pointing at a server that no longer serves the zone, or a caching resolver mistakenly listed as authoritative.
+One of the nameservers listed for your domain answered the query for your zone's SOA record without setting the "authoritative answer" flag. Every nameserver listed for a zone must answer for it with authority. A server that answers from a cache, forwards queries to another server, or refuses the zone does not set the flag.
+
+## Tag IS_NOT_AUTHORITATIVE_REFERRAL
+
+Header: Nameserver refers queries back to your nameservers
+
+Description:
+
+One of the nameservers listed for your domain does not serve your zone. It holds the zone above yours, including the delegation of your domain, so it answers questions about your domain with a referral to your domain's nameservers instead of an answer. A resolver that follows the referral is sent back to the same list of servers, which can include this one, and some resolvers then return an empty answer for names in your domain. Load your zone on this server, or remove it from the delegation at the parent and from the NS records in your zone.
 
 ## Tag NS_IS_CNAME
 

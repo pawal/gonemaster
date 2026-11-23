@@ -1,72 +1,90 @@
 # gonemaster
 
-gonemaster tests the DNS health of a domain. It checks the delegation, the
-nameservers, zone consistency, DNSSEC, and more, and turns what it finds into
-plain-language findings with severities, a numeric score, and a letter grade.
-Use it to verify a zone before and after a change, to keep an eye on the
-domains you are responsible for, or to measure DNS quality across thousands
-of domains over time.
+gonemaster tests how well a domain's DNS is set up. Give it a domain and it
+queries the parent zone and every authoritative nameserver, runs more than 80
+testcases over the delegation, the zone, and DNSSEC, and reports what it
+found. Each finding has a severity, and the run as a whole gets a score out of
+100 and a grade from A+ to F.
 
-It ships as one test engine with a set of small tools around it: a CLI, an
-HTTP server with embedded web UIs, an automation client, a Nagios plugin,
-and an MCP bridge for AI agents.
+```console
+gonemaster --score example.com
+```
 
-Try it without installing anything: a public instance runs at
+![gonemaster testing a domain in a terminal](docs/demo.gif)
+
+There is one test engine and several ways to run it: a CLI, an HTTP server
+with web UIs built in, an automation client, a Nagios plugin, and an MCP
+bridge for AI agents. If you want to see results before installing anything,
+a public instance runs at
 [gonemaster.evilbit.de](https://gonemaster.evilbit.de/).
 
 **Development happens on Codeberg at https://codeberg.org/pawal/gonemaster. The GitHub repository is a read-only mirror; open issues and pull requests on Codeberg.**
 
-New to the project?
-**[Why gonemaster](https://pawal.codeberg.page/gonemaster/why/)** covers what it is,
-how it compares with Zonemaster, and when to use something else.
+[Why gonemaster](https://pawal.codeberg.page/gonemaster/why/) covers what it
+is, how it compares with Zonemaster, and when to use something else.
 
-## What gonemaster Tests
+## What you can do with it
 
-A test run takes a domain through a series of testcases grouped into modules:
+- Grade a zone. Findings are weighed into a score and a letter grade, so "is
+  this zone fine?" has a short answer, and the public UI lists what stands
+  between a zone and an A+. Weights and grade bands can be changed. See
+  [scoring](https://pawal.codeberg.page/gonemaster/scoring/).
+- Test a zone before it is delegated. Pass the nameservers and DS records on
+  the command line and gonemaster tests the zone as if the parent already
+  pointed there. This is the check to run at the new operator before a
+  nameserver change.
+- Look past the basics. Besides delegation and consistency checks, gonemaster
+  compares DNSKEYs with a blocklist of compromised keys and tests RSA keys for
+  known weaknesses. It validates RFC 9615 DNSSEC bootstrapping signals, and it
+  checks DNS Cookies, Extended DNS Errors, NSID, ZONEMD, CSYNC, CAA, and the
+  SPF lookup limit. Every testcase has a written
+  [specification](https://pawal.codeberg.page/gonemaster/specifications/)
+  that cites the RFC it is based on.
+- Read the result without a DNS textbook. Findings come with plain-language
+  explanations in twelve languages, and for a signed zone the result page
+  draws the DNSSEC chain of trust from the queries the run already made.
+- Reproduce a run. `--save` writes every DNS response the run received to a
+  file and `--restore` replays it, so a finding can be studied after the zone
+  has changed. `--debug-queries` shows what each nameserver was asked and how
+  long it took to answer.
+- Compare before and after. Two runs, or two whole batches, diff at the
+  finding level, which shows whether a change fixed what it was meant to fix.
+- Follow thousands of domains over time. Tag a set of domains, test it in
+  batches, and freeze each batch as a snapshot. Snapshots give trends, diffs,
+  and response times per nameserver, address, and ASN, and can be published
+  as read-only dashboards. See
+  [analysis](https://pawal.codeberg.page/gonemaster/analysis/).
+- Run it as a service from one binary. `gonemaster-server` has a job queue,
+  stored run history, test profiles, and Prometheus metrics, and the admin,
+  public, and analysis UIs are compiled into it. It uses SQLite unless you
+  configure PostgreSQL or MariaDB.
+- Plug it into what you already run. `gonemaster-nagios` maps finding
+  severities to Nagios and Icinga service states. `gonemaster-client` and the
+  HTTP API cover scripts and pipelines, the MCP bridge lets an AI agent run
+  tests and query results, and the engine is a Go library.
 
-- **basic** - does the zone exist and have a working authoritative nameserver.
-- **address** - nameserver IP addresses and their reverse DNS (PTR) mappings.
-- **connectivity** - UDP/TCP reachability and network (ASN and prefix) diversity.
-- **consistency** - whether nameservers agree on SOA, serials, NS sets, and more.
-- **delegation** - parent/child delegation: NS records, glue, and referrals.
-- **dnssec** - the DNSSEC chain of trust: DS, DNSKEY, signatures, and algorithms.
-- **nameserver** - nameserver behaviour and capabilities, such as EDNS handling.
-- **syntax** - hostname and domain name syntax.
-- **zone** - zone-level records such as SOA timers and MX.
+## What gonemaster tests
 
-Every finding is a tagged log message with a severity from DEBUG to CRITICAL,
-and the findings are scored into a numeric result and a letter grade from A+
-to F. The full inventory of testcases is in the
-[specifications](https://pawal.codeberg.page/gonemaster/specifications/), and
-scores and grades are described in the
-[scoring documentation](https://pawal.codeberg.page/gonemaster/scoring/).
+A run takes a domain through testcases grouped into nine modules:
 
-## Highlights
+- `basic`: the zone exists and has a working authoritative nameserver.
+- `address`: nameserver IP addresses and their reverse DNS (PTR) mappings.
+- `connectivity`: UDP and TCP reachability, and ASN and prefix diversity.
+- `consistency`: the nameservers agree on SOA, serials, NS sets, and more.
+- `delegation`: the parent and child sides of the delegation: NS records,
+  glue, and referrals.
+- `dnssec`: the chain of trust: DS, DNSKEY, signatures, and algorithms.
+- `nameserver`: nameserver behaviour and capabilities, such as EDNS handling.
+- `syntax`: hostname and domain name syntax.
+- `zone`: zone-level records such as SOA timers and MX.
 
-- **Test a domain in one command.** The `gonemaster` CLI needs no server or
-  database, prints human-readable text or JSON for scripts, and translates
-  findings into twelve languages.
-- **Check a delegation before it goes live.** Undelegated tests take explicit
-  nameserver and DS input, so a zone can be tested at a new operator before
-  the parent delegation is switched.
-- **Monitor zones continuously.** `gonemaster-nagios` maps finding severities
-  to Nagios/Icinga service states, turning delegation health into a standard
-  operational check.
-- **Run it as a service.** `gonemaster-server` adds a persistent queue,
-  batches, stored run history, test profiles, Prometheus metrics, and
-  embedded web UIs. SQLite works out of the box; PostgreSQL and MariaDB are
-  supported.
-- **Compare before and after.** Two runs, or two whole batches, can be diffed
-  at the finding level to confirm that a change fixed what it was meant to fix.
-- **Analyze domains at scale.** Tag collections of domains, test them in
-  batches, and publish read-only cohort dashboards backed by immutable
-  snapshots.
-- **Automate and embed.** A command-line automation client, an HTTP API, an
-  MCP bridge for AI agents, and a Go engine library for direct embedding.
+Every finding is a tagged log message with a severity from DEBUG to CRITICAL.
+The [specifications](https://pawal.codeberg.page/gonemaster/specifications/)
+list every testcase and every tag it can emit.
 
 ## Install
 
-Prebuilt binaries for Linux, macOS, and Windows are published on the
+Prebuilt binaries for Linux, macOS, and Windows are on the
 [releases page](https://codeberg.org/pawal/gonemaster/releases).
 
 Install the CLI with Go (1.27 or later):
@@ -96,12 +114,11 @@ The `gonemaster-nogui` output is the server without the embedded web UIs and
 builds without Node.js.
 
 `make packages` builds Debian and RPM packages (building the embedded web UIs
-requires Node.js), and `make help` lists the other targets: builds, tests,
-UI builds, packaging, and documentation checks.
+requires Node.js). `make help` lists the other targets.
 
-## Quick Start
+## Quick start
 
-### Test a Domain
+### Test a domain
 
 ```console
 gonemaster example.com
@@ -110,8 +127,10 @@ gonemaster --json --domain example.com | jq
 gonemaster --module dnssec --testcase dnssec01 example.com
 ```
 
-Test a zone that is not delegated yet, for example before a change of DNS
-operator, by passing the nameservers (and optionally DS records) directly:
+An IP address given as the domain is tested as its reverse name.
+
+To test a zone that is not delegated yet, for example before a change of DNS
+operator, pass the nameservers (and optionally DS records) directly:
 
 ```console
 gonemaster --domain example.com \
@@ -121,16 +140,16 @@ gonemaster --domain example.com \
 
 CLI documentation: [pawal.codeberg.page/gonemaster/cli](https://pawal.codeberg.page/gonemaster/cli/)
 
-### Monitor a Zone
+### Monitor a zone
 
 ```console
 gonemaster-nagios -H example.com -w WARNING -c ERROR
 ```
 
-Works with Nagios, Icinga, Naemon, and other Nagios-compatible systems.
-Plugin documentation: [docs/nagios.md](docs/nagios.md)
+The plugin works with Nagios, Icinga, Naemon, and other Nagios-compatible
+systems. Plugin documentation: [docs/nagios.md](docs/nagios.md)
 
-### Start the Server
+### Start the server
 
 The server embeds the admin, public, and analysis web UIs; building them
 requires Node.js:
@@ -146,7 +165,7 @@ with `make build-gonemaster-server-noui`.
 
 Server documentation: [pawal.codeberg.page/gonemaster/server](https://pawal.codeberg.page/gonemaster/server/)
 
-### Automate and Analyze
+### Automate and analyze
 
 `gonemaster-client` drives a running server from the shell or from scripts:
 
@@ -163,30 +182,29 @@ Cohort analysis and public dashboards: [pawal.codeberg.page/gonemaster/analysis]
 
 Full documentation: [pawal.codeberg.page/gonemaster](https://pawal.codeberg.page/gonemaster/)
 
-Start with the [architecture overview](https://pawal.codeberg.page/gonemaster/architecture/) for a one-sitting tour of the system: binaries, request lifecycles, data model, concurrency, security posture, and known limitations.
+The [architecture overview](https://pawal.codeberg.page/gonemaster/architecture/)
+describes the whole system in one document: binaries, request lifecycles,
+data model, concurrency, security posture, and known limitations.
 
-- [Why gonemaster](https://pawal.codeberg.page/gonemaster/why/) - what it is, how it compares with Zonemaster
-- [Migrating from Zonemaster](https://pawal.codeberg.page/gonemaster/migration-from-zonemaster/) - port a CLI, API, or batch workflow
-- [CLI](https://pawal.codeberg.page/gonemaster/cli/) - local test runner
-- [Server](https://pawal.codeberg.page/gonemaster/server/) - HTTP server and queue
-- [Client](https://pawal.codeberg.page/gonemaster/client/) - automation client
-- [Nagios](docs/nagios.md) - Nagios and Icinga plugin
-- [MCP](https://pawal.codeberg.page/gonemaster/mcp/) - Model Context Protocol bridge for AI agents
-- [Analysis](https://pawal.codeberg.page/gonemaster/analysis/) - cohort analysis and snapshots
-- [Specifications](https://pawal.codeberg.page/gonemaster/specifications/) - testcase and tag reference
-- [OpenAPI](docs/openapi.yaml) - machine-readable API spec
-- [Changelog](Changelog) - release history
-- [pkg.go.dev](https://pkg.go.dev/codeberg.org/pawal/gonemaster/engine) - Go package docs; `engine` is the main entry point for embedding gonemaster programmatically
+- [Why gonemaster](https://pawal.codeberg.page/gonemaster/why/): what it is, how it compares with Zonemaster
+- [Migrating from Zonemaster](https://pawal.codeberg.page/gonemaster/migration-from-zonemaster/): port a CLI, API, or batch workflow
+- [CLI](https://pawal.codeberg.page/gonemaster/cli/): local test runner
+- [Server](https://pawal.codeberg.page/gonemaster/server/): HTTP server and queue
+- [Client](https://pawal.codeberg.page/gonemaster/client/): automation client
+- [Nagios](docs/nagios.md): Nagios and Icinga plugin
+- [MCP](https://pawal.codeberg.page/gonemaster/mcp/): Model Context Protocol bridge for AI agents
+- [Analysis](https://pawal.codeberg.page/gonemaster/analysis/): cohort analysis and snapshots
+- [Scoring](https://pawal.codeberg.page/gonemaster/scoring/): how findings become a score and a grade
+- [Specifications](https://pawal.codeberg.page/gonemaster/specifications/): testcase and tag reference
+- [OpenAPI](docs/openapi.yaml): machine-readable API spec
+- [Changelog](Changelog): release history
+- [pkg.go.dev](https://pkg.go.dev/codeberg.org/pawal/gonemaster/engine): Go package docs; `engine` is the entry point for embedding gonemaster in a Go program
 
 ## Screenshots
 
-CLI output:
-
-![ascii animation](docs/demo.gif)
-
 Admin UI:
 
-![UI screenshot](docs/ui-screenshot.png)
+![Admin UI screenshot](docs/ui-screenshot.png)
 
 Metrics view:
 

@@ -29,6 +29,7 @@ _Do not edit by hand - regenerate with the command above._
 | `IPV4_DISABLED` | `DEBUG2` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
 | `IPV6_DISABLED` | `DEBUG2` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
 | `IS_NOT_AUTHORITATIVE` | `WARNING` | [delegation04](../tests/delegation/delegation04.md) | yes |
+| `IS_NOT_AUTHORITATIVE_REFERRAL` | `WARNING` | [delegation04](../tests/delegation/delegation04.md) | yes |
 | `NAMES_MATCH` | `INFO` | [delegation07](../tests/delegation/delegation07.md) | yes |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |
 | `NOT_ENOUGH_IPV4_NS_DEL` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |

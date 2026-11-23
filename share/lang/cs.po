@@ -2650,6 +2650,10 @@ msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "Odpověď jmenného serveru {ns}/{address} není autoritativní na {proto} portu 53."
 
+msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE_REFERRAL"
+msgid "Nameserver {ns}/{address} responds with a referral to the zone's own nameservers on {proto} port 53."
+msgstr "Odpověď jmenného serveru {ns}/{address} na {proto} portu 53 je odkaz (referral) na vlastní jmenné servery zóny."
+
 msgctxt "DELEGATION:NAMES_MATCH"
 msgid "All of the nameserver names are listed both at parent and child."
 msgstr "Všechna jména jmenných serverů jsou uvedena jak v nadřazené, tak v podřízené zóně."
@@ -2727,8 +2731,8 @@ msgid "All the nameservers have SOA record."
 msgstr "Všechny jmenné servery mají SOA záznam."
 
 msgctxt "DELEGATION:SOA_NOT_EXISTS"
-msgid "Empty NOERROR response to SOA query was received from {ns}/{address}."
-msgstr "Od {ns}/{address} byla přijata prázdná odpověď NOERROR na SOA dotaz."
+msgid "NOERROR response to SOA query without an SOA record was received from {ns}/{address}."
+msgstr "Od {ns}/{address} byla přijata odpověď NOERROR na SOA dotaz bez SOA záznamu."
 
 msgctxt "DELEGATION:TOTAL_NAME_MISMATCH"
 msgid "None of the nameservers listed at the parent are listed at the child."

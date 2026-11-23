@@ -13,11 +13,11 @@ Status: Final
   - Deduplicated MX exchange targets from answer section.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: controls parallel per-MX-target syntax checks.
-  - `net.ipv4` and `net.ipv6` can affect `z.QueryOne` transport availability.
+  - `net.ipv4` and `net.ipv6` can affect which nameservers `z.QueryAuthOrFirst` queries.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Execute `z.QueryOne` for MX at zone apex.
+2. Query MX at the zone apex through `z.QueryAuthOrFirst`: [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) in order, skipping disabled transports and failed queries; the first response with `AA=1` is used, or the first response when none sets `AA`. An authoritative NODATA response ends the walk.
 3. If response is present:
    - Extract MX exchanges from answer section.
    - Deduplicate case-insensitively, preserving first-seen order.
@@ -76,5 +76,6 @@ Status: Final
 
 ## Edge Cases And Limitations
 - If MX response exists but has zero MX answers, no MX-specific tag is emitted (only testcase start/end).
+- A referral from a lame nameserver is read only when no nameserver answers with `AA=1`.
 - Duplicate MX targets are checked once (case-insensitive dedupe).
 - When running through `syntax.All`, this testcase is skipped if `syntax01` did not emit `ONLY_ALLOWED_CHARS`.

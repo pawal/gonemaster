@@ -23,7 +23,7 @@ Primary artifact:
 ## Summary
 - Modules: 9
 - Testcases: 87
-- Unique tags: 623
+- Unique tags: 624
 
 Module testcase counts:
 - `address`: 3

@@ -12,11 +12,11 @@ Status: Final
   - SOA response for the child zone apex.
   - `MNAME` value from the first SOA answer record.
 - Profile/config knobs that affect behavior:
-  - `net.ipv4` and `net.ipv6` can affect which transport `z.QueryOne` uses.
+  - `net.ipv4` and `net.ipv6` can affect which nameservers `z.QueryAuthOrFirst` queries.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Execute `z.QueryOne` for SOA at zone apex.
+2. Query SOA at the zone apex through `z.QueryAuthOrFirst`: [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) in order, skipping disabled transports and failed queries; the first response with `AA=1` is used, or the first response when none sets `AA`.
 3. If SOA answer exists, extract first SOA `Ns` (`MNAME`) and run `checkNameSyntax("MNAME", ...)`:
    - Emit `MNAME_NON_ALLOWED_CHARS` if disallowed characters are found.
    - Emit `MNAME_DISCOURAGED_DOUBLE_DASH` for non-ACE `--` in positions 3 and 4.
@@ -74,5 +74,6 @@ Status: Final
 ## Edge Cases And Limitations
 - If SOA answer has multiple records, only the first SOA is used.
 - `NO_RESPONSE_SOA_QUERY` is emitted for both no response and responses lacking SOA answer.
+- A referral from a lame nameserver is read only when no nameserver answers with `AA=1`.
 - When running through `syntax.All`, this testcase is skipped if `syntax01` did not emit `ONLY_ALLOWED_CHARS`.
 - When running through `syntax.All`, this testcase is skipped if `syntax05` emitted `NO_RESPONSE_SOA_QUERY`.

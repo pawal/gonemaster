@@ -9,7 +9,7 @@
   import ExternalLinks from "$lib/ExternalLinks.svelte";
   import RegistryCard from "$lib/RegistryCard.svelte";
   import SigningAlgoChip from "$lib/SigningAlgoChip.svelte";
-  import { tagHref } from "$lib/entityLinks";
+  import { pinnedQuery, tagHref } from "$lib/entityLinks";
   import { domainLinks } from "$lib/externalLinks";
   import {
     formatCount,
@@ -24,7 +24,7 @@
 
   let { data }: { data: DomainDetailPageData } = $props();
 
-  const query = $derived(page.url.search);
+  const query = $derived(pinnedQuery(page.url.search));
   const tagFloor = $derived(
     ((page.data as { effectiveSnapshotTagFloor?: string } | undefined)
       ?.effectiveSnapshotTagFloor ?? "") as string

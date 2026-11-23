@@ -3,9 +3,12 @@ import {
   asnHref,
   cohortHref,
   domainHref,
+  domainsGradeHref,
   domainsPostureHref,
+  domainsSeverityHref,
   endpointHref,
   nameserverHref,
+  pinnedQuery,
   prefixHref,
   scopedQuery,
   tagHref
@@ -86,7 +89,7 @@ describe("entity link builders", () => {
         "ns3.example",
         "?offset=50&nameserver=ns1.example&nameserver=ns2.example"
       )
-    ).toBe("/analysis/endpoints/192.0.2.10?offset=50&nameserver=ns3.example");
+    ).toBe("/analysis/endpoints/192.0.2.10?nameserver=ns3.example");
   });
 
   it("domainsPostureHref filters the domains list on one posture bucket", () => {
@@ -98,5 +101,54 @@ describe("entity link builders", () => {
     expect(domainsPostureHref(BASE, "mixed", "?dnssec_posture=nsec")).toBe(
       "/analysis/domains?dnssec_posture=mixed"
     );
+  });
+
+  // Every param a page may carry, pinned and unpinned, in mixed order.
+  const NOISY = "?grade=A&nameserver=c.nic.example&dataset_tag=tld&sort=grade&snapshot=2026-07-14-51ef2053c397&offset=50";
+  const PINNED = "dataset_tag=tld&snapshot=2026-07-14-51ef2053c397";
+
+  it.each([
+    ["domainHref", () => domainHref(BASE, "alpha.example", NOISY), `/analysis/domains/alpha.example?${PINNED}`],
+    ["nameserverHref", () => nameserverHref(BASE, "a.dns.example", NOISY), `/analysis/nameservers/a.dns.example?${PINNED}`],
+    ["endpointHref", () => endpointHref(BASE, "192.0.2.10", null, NOISY), `/analysis/endpoints/192.0.2.10?${PINNED}`],
+    [
+      "endpointHref with a nameserver",
+      () => endpointHref(BASE, "192.0.2.10", "ns.example", NOISY),
+      `/analysis/endpoints/192.0.2.10?${PINNED}&nameserver=ns.example`
+    ],
+    ["prefixHref", () => prefixHref(BASE, "192.0.2.0/24", NOISY), `/analysis/prefixes/192.0.2.0%2F24?${PINNED}`],
+    ["asnHref", () => asnHref(BASE, 64500, NOISY), `/analysis/asns/64500?${PINNED}`],
+    ["tagHref", () => tagHref(BASE, "Z01_MNAME_NOT_MASTER", NOISY), `/analysis/tags/Z01_MNAME_NOT_MASTER?${PINNED}`],
+    [
+      "cohortHref",
+      () => cohortHref(BASE, "gtld", NOISY),
+      "/analysis/?dataset_tag=gtld&snapshot=2026-07-14-51ef2053c397"
+    ],
+    ["domainsGradeHref", () => domainsGradeHref(BASE, "B", NOISY), `/analysis/domains?${PINNED}&grade=B`],
+    [
+      "domainsSeverityHref",
+      () => domainsSeverityHref(BASE, "ERROR", NOISY),
+      `/analysis/domains?${PINNED}&worst_level=ERROR`
+    ],
+    [
+      "domainsPostureHref",
+      () => domainsPostureHref(BASE, "nsec3", NOISY),
+      `/analysis/domains?${PINNED}&dnssec_posture=nsec3`
+    ]
+  ])("%s carries only dataset_tag and snapshot from the caller's query", (_name, build, want) => {
+    expect(build()).toBe(want);
+  });
+});
+
+describe("pinnedQuery", () => {
+  it.each([
+    ["", ""],
+    ["?sort=grade&offset=50", ""],
+    ["?dataset_tag=tld", "?dataset_tag=tld"],
+    ["dataset_tag=tld", "?dataset_tag=tld"],
+    ["?snapshot=s1&dataset_tag=tld", "?dataset_tag=tld&snapshot=s1"],
+    ["?dataset_tag=&snapshot=s1&nameserver=ns.example", "?snapshot=s1"]
+  ])("pins %j to %j", (query, want) => {
+    expect(pinnedQuery(query)).toBe(want);
   });
 });

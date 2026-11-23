@@ -4,13 +4,14 @@
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import TestcaseChip from "$lib/chips/TestcaseChip.svelte";
   import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
+  import { pinnedQuery } from "$lib/entityLinks";
   import { formatCount, levelTone } from "$lib/format";
   import { testcaseTitle } from "$lib/testcaseTitles";
   import type { TagDetailPageData } from "./+page";
 
   let { data }: { data: TagDetailPageData } = $props();
 
-  const query = $derived(page.url.search);
+  const query = $derived(pinnedQuery(page.url.search));
   const tcTitle = $derived(testcaseTitle(data.detail?.testcase));
 </script>
 

@@ -110,7 +110,8 @@ the first untrusted hop is taken as the client.
 headers are removed from requests that do not come from a trusted proxy. With
 `public_url` unset the server builds its canonical URL from those headers, and
 that URL appears in `robots.txt`, `sitemap.xml`, and the `canonical` and
-`og:url` tags of cached result pages. Set `public_url` to skip auto-detection.
+`og:url` tags of cached result pages and analysis dashboard pages. Set
+`public_url` to skip auto-detection.
 
 ### What goes in `trusted_proxy_cidrs`
 

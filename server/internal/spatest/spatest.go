@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -20,6 +21,14 @@ var faviconFiles = []string{
 	"android-chrome-192x192.png",
 	"android-chrome-512x512.png",
 	"site.webmanifest",
+}
+
+// pageURL matches the canonical and og:url values, which name the requested page.
+var pageURL = regexp.MustCompile(`(<link rel="canonical" href="|<meta property="og:url" content=")[^"]*"`)
+
+// sameIndex reports whether two index bodies match outside their page URLs.
+func sameIndex(a, b string) bool {
+	return pageURL.ReplaceAllString(a, `$1"`) == pageURL.ReplaceAllString(b, `$1"`)
 }
 
 // serve runs one request through h and returns the recorder.
@@ -63,7 +72,7 @@ func IndexForRootAndUnknownPaths(t testing.TB, h http.Handler, unknownPath strin
 	if rr.Code != http.StatusOK {
 		t.Fatalf("%s: status = %d, want %d", unknownPath, rr.Code, http.StatusOK)
 	}
-	if rr.Body.String() != root {
+	if !sameIndex(rr.Body.String(), root) {
 		t.Fatalf("%s did not serve the SPA index content", unknownPath)
 	}
 }
@@ -80,7 +89,7 @@ func PathTraversalCannotEscape(t testing.TB, h http.Handler, targets ...string) 
 			t.Errorf("%s: status = %d, want 200 (SPA fallback)", target, rr.Code)
 			continue
 		}
-		if rr.Body.String() != root {
+		if !sameIndex(rr.Body.String(), root) {
 			t.Errorf("%s: served content other than the SPA index", target)
 		}
 	}

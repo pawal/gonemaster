@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import RegistryCard from "./RegistryCard.svelte";
-import type { DomainRegistry } from "$lib/api";
+import type { DomainRegistry } from "#lib/api.js";
 
 const registry = (over: Partial<DomainRegistry> = {}): DomainRegistry => ({
   state: "fresh",

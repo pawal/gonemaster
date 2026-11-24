@@ -1,8 +1,8 @@
 <script lang="ts">
   import { ADDED_KEY, REMOVED_KEY, layoutFlow, type FlowLink } from "./flowLayout";
-  import { CATEGORY_LABELS, CATEGORY_ORDER } from "$lib/report";
-  import { formatCount } from "$lib/format";
-  import type { DomainCategory } from "$lib/api";
+  import { CATEGORY_LABELS, CATEGORY_ORDER } from "#lib/report.js";
+  import { formatCount } from "#lib/format.js";
+  import type { DomainCategory } from "#lib/api.js";
 
   type Props = {
     order: string[];

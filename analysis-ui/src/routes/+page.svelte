@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
+  import type { SectionId } from "#lib/nav.js";
   import { page } from "$app/state";
-  import FactDistributionBar from "$lib/FactDistributionBar.svelte";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import GradeChip from "$lib/GradeChip.svelte";
-  import Sparkline from "$lib/charts/Sparkline.svelte";
+  import FactDistributionBar from "#lib/FactDistributionBar.svelte";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import GradeChip from "#lib/GradeChip.svelte";
+  import Sparkline from "#lib/charts/Sparkline.svelte";
   import {
     asnHref,
     domainHref,
@@ -15,7 +16,7 @@
     nameserverHref,
     pinnedQuery,
     tagHref
-  } from "$lib/entityLinks";
+  } from "#lib/entityLinks.js";
   import {
     formatCount,
     formatMs,
@@ -23,7 +24,7 @@
     levelTone,
     snapshotDisplayLabel,
     snapshotSourceDate
-  } from "$lib/format";
+  } from "#lib/format.js";
   import {
     asnLatencyRows,
     endpointLatencyRows,
@@ -31,8 +32,8 @@
     nameserverLatencyRows,
     latencyVantageNote,
     type LatencyRankRow
-  } from "$lib/latencyRanking";
-  import { netDirection, sortByMovement, summarizeDiff } from "$lib/diff";
+  } from "#lib/latencyRanking.js";
+  import { netDirection, sortByMovement, summarizeDiff } from "#lib/diff.js";
   import {
     percentOf,
     seriesShareByKeys,
@@ -40,10 +41,10 @@
     seriesShareExcludingKeys,
     seriesTotals,
     summarizeMetric
-  } from "$lib/overview";
-  import { idnTooltip } from "$lib/idn";
-  import { CATEGORY_LABELS, categoryTone } from "$lib/report";
-  import type { DomainCategory } from "$lib/api";
+  } from "#lib/overview.js";
+  import { idnTooltip } from "#lib/idn.js";
+  import { CATEGORY_LABELS, categoryTone } from "#lib/report.js";
+  import type { DomainCategory } from "#lib/api.js";
   import type { LayoutData } from "./+layout";
   import type { OverviewPageData } from "./+page";
 
@@ -133,7 +134,7 @@
     if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
     if (data.diffTo) params.set("snapshot", data.diffTo);
     const q = params.toString();
-    return domainHref(base, domain, q ? `?${q}` : "");
+    return domainHref(domain, q ? `?${q}` : "");
   }
 
   const fullDiffHref = $derived.by(() => {
@@ -142,10 +143,10 @@
     if (data.diffFrom) params.set("from", data.diffFrom);
     if (data.diffTo) params.set("to", data.diffTo);
     params.set("tab", "grade_changed");
-    return `${base}/diff?${params.toString()}`;
+    return `${resolve("diff")}?${params.toString()}`;
   });
 
-  const summaryCards = $derived.by<{ label: string; value: number; href: string | null }[]>(() => {
+  const summaryCards = $derived.by<{ label: string; value: number; href: SectionId | null }[]>(() => {
     const t = data.totals;
     if (!t) return [];
     // Domains lead the hero tiles, so the entity row covers the rest.
@@ -175,9 +176,9 @@
   // Categories whose segments deep-link into a filtered domains list. Other
   // categories render as informational bars (hrefForKey omitted entirely).
   function buildHrefForKey(category: string): ((key: string) => string) | undefined {
-    if (category === "severity") return (k) => domainsSeverityHref(base, k, query);
-    if (category === "grade") return (k) => domainsGradeHref(base, k, query);
-    if (category === "dnssec_posture") return (k) => domainsPostureHref(base, k, query);
+    if (category === "severity") return (k) => domainsSeverityHref(k, query);
+    if (category === "grade") return (k) => domainsGradeHref(k, query);
+    if (category === "dnssec_posture") return (k) => domainsPostureHref(k, query);
     return undefined;
   }
 
@@ -231,19 +232,19 @@
       title: "Nameservers",
       fastest: nameserverLatencyRows(data.latency.nameservers.fastest),
       slowest: nameserverLatencyRows(data.latency.nameservers.slowest),
-      href: (r: LatencyRankRow) => nameserverHref(base, r.label, query)
+      href: (r: LatencyRankRow) => nameserverHref(r.label, query)
     },
     {
       title: "Addresses",
       fastest: endpointLatencyRows(data.latency.endpoints.fastest),
       slowest: endpointLatencyRows(data.latency.endpoints.slowest),
-      href: (r: LatencyRankRow) => endpointHref(base, r.label, r.sublabel || null, query)
+      href: (r: LatencyRankRow) => endpointHref(r.label, r.sublabel || null, query)
     },
     {
       title: "ASNs",
       fastest: asnLatencyRows(data.latency.asns.fastest),
       slowest: asnLatencyRows(data.latency.asns.slowest),
-      href: (r: LatencyRankRow) => asnHref(base, r.key, query)
+      href: (r: LatencyRankRow) => asnHref(r.key, query)
     }
   ]);
   const showLatencyRankings = $derived(
@@ -356,7 +357,7 @@
     </section>
   {:else}
     <section class="hero" aria-label="Cohort headline metrics">
-      <a class="hero-tile" href={`${base}/domains${query}`} title={HERO_HELP.domains}>
+      <a class="hero-tile" href={`${resolve("domains")}${query}`} title={HERO_HELP.domains}>
         <span class="hero-label">Domains</span>
         <span class="hero-value">{formatCount(domainCount)}</span>
         <span class="hero-foot">
@@ -370,7 +371,7 @@
         <span class="sr-only">{HERO_HELP.domains}</span>
       </a>
       {#if healthyMetric.latest !== null}
-        <a class="hero-tile" href={`${base}/trends?category=severity${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.healthy}>
+        <a class="hero-tile" href={`${resolve("trends")}?category=severity${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.healthy}>
           <span class="hero-label">Healthy</span>
           <span class="hero-value">{healthyMetric.latest}%</span>
           <span class="hero-foot">
@@ -385,7 +386,7 @@
         </a>
       {/if}
       {#if topGradeMetric.latest !== null}
-        <a class="hero-tile" href={`${base}/trends?category=grade${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.grade}>
+        <a class="hero-tile" href={`${resolve("trends")}?category=grade${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.grade}>
           <span class="hero-label">Grade A / A+</span>
           <span class="hero-value">{topGradeMetric.latest}%</span>
           <span class="hero-foot">
@@ -400,7 +401,7 @@
         </a>
       {/if}
       {#if signedMetric.latest !== null}
-        <a class="hero-tile" href={`${base}/trends?category=dnssec_posture${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.signed}>
+        <a class="hero-tile" href={`${resolve("trends")}?category=dnssec_posture${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.signed}>
           <span class="hero-label">Signed</span>
           <span class="hero-value">{signedMetric.latest}%</span>
           <span class="hero-foot">
@@ -422,7 +423,7 @@
           this={card.href ? "a" : "div"}
           class="summary-card"
           class:static={!card.href}
-          href={card.href ? `${base}${card.href}${query}` : undefined}
+          href={card.href ? `${resolve(card.href)}${query}` : undefined}
         >
           <span class="summary-count">{formatCount(card.value)}</span>
           <span class="summary-label">{card.label}</span>
@@ -516,7 +517,7 @@
         <ol class="top-tags-list">
           {#each topTagRows as row (row.tag)}
             <li>
-              <a class="top-tag-row" href={tagHref(base, row.tag, query)}>
+              <a class="top-tag-row" href={tagHref(row.tag, query)}>
                 <span class="top-tag-name">{row.tag}</span>
                 <span class="top-tag-bar-track" aria-hidden="true">
                   <span
@@ -551,7 +552,7 @@
             <ol class="infra-list">
               {#each topNameserverRows as row (row.name)}
                 <li>
-                  <a class="infra-row" href={nameserverHref(base, row.name, query)}>
+                  <a class="infra-row" href={nameserverHref(row.name, query)}>
                     <span class="infra-name" title={idnTooltip(row.name)}>{row.name}</span>
                     <span class="infra-bar-track" aria-hidden="true">
                       <span class="infra-bar" style:width="{row.widthPct}%"></span>
@@ -576,7 +577,7 @@
             <ol class="infra-list">
               {#each topASNRows as row (row.asn)}
                 <li>
-                  <a class="infra-row" href={asnHref(base, row.asn, query)}>
+                  <a class="infra-row" href={asnHref(row.asn, query)}>
                     <span class="infra-name">
                       <span class="infra-asn">AS{row.asn}</span>
                       {#if row.label}

@@ -1,7 +1,8 @@
 // Per-route document metadata for the client-rendered analysis SPA.
 // routeHead/canonicalUrl are pure; applyHead is the DOM side-effect.
 
-import { pinnedQuery } from "$lib/entityLinks";
+import type { ReadonlyURL } from "$app/state";
+import { pinnedQuery } from "#lib/entityLinks.js";
 
 const SITE = "Gonemaster Analysis";
 
@@ -93,7 +94,7 @@ export function routeHead(routeId: string | null, params: Record<string, string>
 }
 
 // Page URL with only the pinned params; the server writes the same value into index.html.
-export function canonicalUrl(url: URL): string {
+export function canonicalUrl(url: ReadonlyURL): string {
   return `${url.origin}${url.pathname}${pinnedQuery(url.search)}`;
 }
 
@@ -119,7 +120,7 @@ function setCanonical(href: string): void {
 
 // Update the live head in place, reusing the server-injected static tags so
 // crawlers that run JS see per-route values and others keep the defaults.
-export function applyHead(routeId: string | null, params: Record<string, string>, url: URL): void {
+export function applyHead(routeId: string | null, params: Record<string, string>, url: ReadonlyURL): void {
   if (typeof document === "undefined") return;
   const { title, description } = routeHead(routeId, params);
   const canonical = canonicalUrl(url);

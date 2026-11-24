@@ -1,5 +1,5 @@
-import { getTrends, type TrendKeyMeta, type TrendPoint, type TrendResponse } from "$lib/api";
-import { TREND_CATEGORIES, type TrendCategoryKey } from "$lib/trends";
+import { getTrends, type TrendKeyMeta, type TrendPoint, type TrendResponse } from "#lib/api.js";
+import { TREND_CATEGORIES, type TrendCategoryKey } from "#lib/trends.js";
 
 export type TrendsPageData = {
   datasetTag: string | null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ASNView, EndpointView, NameserverView } from "$lib/api";
+import type { ASNView, EndpointView, NameserverView } from "#lib/api.js";
 import {
   asnLatencyRows,
   endpointLatencyRows,

@@ -1,12 +1,10 @@
 // Keyboard-shortcut resolution for the analysis UI. Pure and DOM-free so the
 // decision logic is unit-testable; the layout performs the effects.
 
-import type { NavItem } from "$lib/nav";
+import type { NavItem, SectionId } from "#lib/nav.js";
 
-// Second key of a g-sequence -> nav section href (relative to the SvelteKit
-// base). Letters mirror the admin UI where they overlap (d/t/c) so muscle
-// memory carries across dashboards; the rest are mnemonic.
-export const KEY_MAP: Record<string, string> = {
+// Second key of a g-sequence to its nav section route ID; d, t and c match the admin UI.
+export const KEY_MAP: Record<string, SectionId> = {
   o: "/",
   c: "/cohorts",
   d: "/domains",
@@ -25,7 +23,7 @@ export type ShortcutAction =
   | { type: "set-g" }
   | { type: "clear-g" }
   | { type: "focus-filter" }
-  | { type: "navigate"; href: string };
+  | { type: "navigate"; href: SectionId };
 
 // Minimal shape read off a keydown; a real KeyboardEvent satisfies it, and
 // tests can pass a plain stub.

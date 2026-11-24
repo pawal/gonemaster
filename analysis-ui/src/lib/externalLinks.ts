@@ -1,7 +1,7 @@
 // Outbound links to the authoritative reference for an entity. Pure
 // builders so the link set is a data table rather than scattered markup.
 
-import { idnToUnicode } from "$lib/idn";
+import { idnToUnicode } from "#lib/idn.js";
 
 export type ExternalLink = {
   label: string;

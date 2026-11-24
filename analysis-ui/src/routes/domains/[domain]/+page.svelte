@@ -1,25 +1,25 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
-  import ASNChip from "$lib/chips/ASNChip.svelte";
-  import EndpointChip from "$lib/chips/EndpointChip.svelte";
-  import NameserverChip from "$lib/chips/NameserverChip.svelte";
-  import PrefixChip from "$lib/chips/PrefixChip.svelte";
-  import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
-  import ExternalLinks from "$lib/ExternalLinks.svelte";
-  import RegistryCard from "$lib/RegistryCard.svelte";
-  import SigningAlgoChip from "$lib/SigningAlgoChip.svelte";
-  import { pinnedQuery, tagHref } from "$lib/entityLinks";
-  import { domainLinks } from "$lib/externalLinks";
+  import ASNChip from "#lib/chips/ASNChip.svelte";
+  import EndpointChip from "#lib/chips/EndpointChip.svelte";
+  import NameserverChip from "#lib/chips/NameserverChip.svelte";
+  import PrefixChip from "#lib/chips/PrefixChip.svelte";
+  import EntityHistorySparkline from "#lib/EntityHistorySparkline.svelte";
+  import ExternalLinks from "#lib/ExternalLinks.svelte";
+  import RegistryCard from "#lib/RegistryCard.svelte";
+  import SigningAlgoChip from "#lib/SigningAlgoChip.svelte";
+  import { pinnedQuery, tagHref } from "#lib/entityLinks.js";
+  import { domainLinks } from "#lib/externalLinks.js";
   import {
     formatCount,
     formatFamilyCoverage,
     formatTimestamp,
     gradeTone,
     levelTone
-  } from "$lib/format";
-  import { idnToUnicode } from "$lib/idn";
-  import type { DomainDetailEntry, DomainDetailTag, NameserverTiming } from "$lib/api";
+  } from "#lib/format.js";
+  import { idnToUnicode } from "#lib/idn.js";
+  import type { DomainDetailEntry, DomainDetailTag, NameserverTiming } from "#lib/api.js";
   import type { DomainDetailPageData } from "./+page";
 
   let { data }: { data: DomainDetailPageData } = $props();
@@ -135,7 +135,7 @@
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">
-  <a href={`${base}/domains${query}`}>← Domains</a>
+  <a href={`${resolve("domains")}${query}`}>← Domains</a>
 </nav>
 
 {#if !data.datasetTag}
@@ -363,7 +363,7 @@
                       <li class="result-row">
                         <span class="level level-{levelTone(r.level)}">{r.level}</span>
                         {#if tagIsClickable(r.level)}
-                          <a class="entry-tag" href={tagHref(base, r.tag, query)} title={r.tag}>{r.tag}</a>
+                          <a class="entry-tag" href={tagHref(r.tag, query)} title={r.tag}>{r.tag}</a>
                         {:else}
                           <span class="entry-tag entry-tag-static" title={r.tag}>{r.tag}</span>
                         {/if}
@@ -379,7 +379,7 @@
                   {#each tcRows as r, i (i)}
                     <li class="result-row">
                       <span class="level level-{levelTone(r.level)}">{r.level}</span>
-                      <a class="entry-tag" href={tagHref(base, r.tag, query)} title={r.tag}>{r.tag}</a>
+                      <a class="entry-tag" href={tagHref(r.tag, query)} title={r.tag}>{r.tag}</a>
                       {#if r.message && r.message !== r.raw}
                         <span class="result-message">{r.message}</span>
                       {/if}

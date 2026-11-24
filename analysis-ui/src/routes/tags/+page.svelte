@@ -1,14 +1,13 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
-  import { page } from "$app/state";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import Pagination from "$lib/Pagination.svelte";
-  import SortHeader from "$lib/SortHeader.svelte";
-  import TagChip from "$lib/chips/TagChip.svelte";
-  import { tagHref } from "$lib/entityLinks";
-  import { formatCount, levelTone } from "$lib/format";
-  import { updateURLParam, filterFromURL } from "$lib/filters";
+    import { page } from "$app/state";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import Pagination from "#lib/Pagination.svelte";
+  import SortHeader from "#lib/SortHeader.svelte";
+  import TagChip from "#lib/chips/TagChip.svelte";
+  import { tagHref } from "#lib/entityLinks.js";
+  import { formatCount, levelTone } from "#lib/format.js";
+  import { updateURLParam, filterFromURL } from "#lib/filters.js";
   import {
     downloadCSV,
     downloadJSON,
@@ -17,8 +16,8 @@
     exportCaption,
     exportScopeSuffix,
     type ExportColumn
-  } from "$lib/exporters";
-  import { listTags, type TagView, type AnalysisFilter } from "$lib/api";
+  } from "#lib/exporters.js";
+  import { listTags, type TagView, type AnalysisFilter } from "#lib/api.js";
   import type { LayoutData } from "../+layout";
   import type { TagsPageData } from "./+page";
 
@@ -154,7 +153,7 @@
         </thead>
         <tbody>
           {#each rows as row (row.tag)}
-            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, tagHref(base, row.tag, search))}>
+            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, tagHref(row.tag, search))}>
               <th scope="row" class="row-ident">
                 <TagChip tag={row.tag} />
               </th>

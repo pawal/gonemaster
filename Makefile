@@ -11,8 +11,8 @@ UI_ANALYSIS_DIR := analysis-ui
 UI_STAMP := $(UI_DIR)/node_modules/.install-stamp
 UI_PUBLIC_STAMP := $(UI_PUBLIC_DIR)/node_modules/.install-stamp
 UI_ANALYSIS_STAMP := $(UI_ANALYSIS_DIR)/node_modules/.install-stamp
-# Node versions every UI dependency's engines field accepts (vite, vitest, jsdom, vite-plugin-svelte).
-NODE_RANGE := ^20.19, ^22.13 or 24+
+# Node versions every UI dependency's engines field accepts (vite, vitest, jsdom, vite-plugin-svelte, @sveltejs/kit).
+NODE_RANGE := ^22.17 or 24+
 NPM_MIN ?= 11
 
 CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios gonemaster-mcp
@@ -54,7 +54,7 @@ help:
 	@echo "  ui-analysis-install   Install analysis UI dependencies"
 	@echo "  ui-analysis-build     Build the analysis embedded UI"
 	@echo "  ui-analysis-dev       Run the analysis UI dev server"
-	@echo "  ui-analysis-test      Run analysis UI tests"
+	@echo "  ui-analysis-test      Type-check and test the analysis UI"
 	@echo "  build-gonemaster-badkeys-embed  Build CLI with embedded badkeys blocklist"
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
 	@echo "  build-gonemaster-server-badkeys-embed  Build server with embedded badkeys blocklist (with UI)"
@@ -105,7 +105,7 @@ ui-check:
 		echo "Error: npm not found. Install npm $(NPM_MIN)+ to build the UI."; \
 		exit 1; \
 	}
-	@$(NODE) -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit((a === 20 && b >= 19) || (a === 22 && b >= 13) || a >= 24 ? 0 : 1)' || { \
+	@$(NODE) -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit((a === 22 && b >= 17) || a >= 24 ? 0 : 1)' || { \
 		echo "Error: Node.js `$(NODE) -v` found. Need $(NODE_RANGE) to build the UI."; \
 		exit 1; \
 	}
@@ -177,6 +177,7 @@ ui-analysis-dev: ui-analysis-install
 	$(NPM) --prefix $(UI_ANALYSIS_DIR) run dev
 
 ui-analysis-test: ui-analysis-install
+	$(NPM) --prefix $(UI_ANALYSIS_DIR) run check
 	$(NPM) --prefix $(UI_ANALYSIS_DIR) run test
 
 build: $(BIN_DIR)

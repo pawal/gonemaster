@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Sparkline from "$lib/charts/Sparkline.svelte";
-  import type { HistoryPoint } from "$lib/api";
+  import Sparkline from "#lib/charts/Sparkline.svelte";
+  import type { HistoryPoint } from "#lib/api.js";
 
   type Metric = "domain_count" | "latency_p50_ms" | "score";
   type Tone = "ok" | "notice" | "warning" | "error" | "critical" | "neutral";

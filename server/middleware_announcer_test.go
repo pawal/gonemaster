@@ -42,27 +42,25 @@ Found inline style in the embedded analysis-ui bundle:
 	}
 }
 
-// extractAnalysisAnnouncerStyle pulls the inline style attribute of
-// #svelte-announcer out of the embedded SvelteKit entry chunk by walking
-// the same Handler the production server uses.
+// extractAnalysisAnnouncerStyle reads the #svelte-announcer inline style from the chunks index.html references.
 func extractAnalysisAnnouncerStyle(t *testing.T) string {
 	t.Helper()
 	h := analysisui.Handler(nil)
 
 	indexBody := fetch(t, h, "/index.html")
-	entryRE := regexp.MustCompile(`/_app/immutable/entry/app\.[A-Za-z0-9_-]+\.js`)
-	match := entryRE.FindString(indexBody)
-	if match == "" {
-		t.Fatalf("could not find entry script path in analysis-ui index.html; bundle layout changed?")
+	chunks := regexp.MustCompile(`/_app/immutable/[A-Za-z0-9_/.-]+\.js`).FindAllString(indexBody, -1)
+	if len(chunks) == 0 {
+		t.Fatalf("no immutable script paths in analysis-ui index.html; bundle layout changed?")
 	}
 
-	chunkBody := fetch(t, h, match)
 	styleRE := regexp.MustCompile(`id="svelte-announcer"[^>]*style="([^"]*)"`)
-	m := styleRE.FindStringSubmatch(chunkBody)
-	if len(m) != 2 {
-		t.Fatalf("could not find #svelte-announcer inline style in %s; SvelteKit template changed?", match)
+	for _, chunk := range chunks {
+		if m := styleRE.FindStringSubmatch(fetch(t, h, chunk)); len(m) == 2 {
+			return m[1]
+		}
 	}
-	return m[1]
+	t.Fatalf("no #svelte-announcer inline style in the %d chunks index.html references; SvelteKit template changed?", len(chunks))
+	return ""
 }
 
 func fetch(t *testing.T, h http.Handler, path string) string {

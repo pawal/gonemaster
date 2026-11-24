@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
-  import ASNChip from "$lib/chips/ASNChip.svelte";
-  import DomainChip from "$lib/chips/DomainChip.svelte";
-  import EndpointChip from "$lib/chips/EndpointChip.svelte";
-  import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
-  import ExternalLinks from "$lib/ExternalLinks.svelte";
-  import { nameserverLinks } from "$lib/externalLinks";
-  import { pinnedQuery } from "$lib/entityLinks";
-  import { formatCount, formatMs } from "$lib/format";
-  import { idnToUnicode } from "$lib/idn";
+  import ASNChip from "#lib/chips/ASNChip.svelte";
+  import DomainChip from "#lib/chips/DomainChip.svelte";
+  import EndpointChip from "#lib/chips/EndpointChip.svelte";
+  import EntityHistorySparkline from "#lib/EntityHistorySparkline.svelte";
+  import ExternalLinks from "#lib/ExternalLinks.svelte";
+  import { nameserverLinks } from "#lib/externalLinks.js";
+  import { pinnedQuery } from "#lib/entityLinks.js";
+  import { formatCount, formatMs } from "#lib/format.js";
+  import { idnToUnicode } from "#lib/idn.js";
   import type { NameserverDetailPageData } from "./+page";
 
   let { data }: { data: NameserverDetailPageData } = $props();
@@ -41,7 +41,7 @@
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">
-  <a href={`${base}/nameservers${query}`}>← Nameservers</a>
+  <a href={`${resolve("nameservers")}${query}`}>← Nameservers</a>
 </nav>
 
 {#if !data.datasetTag}

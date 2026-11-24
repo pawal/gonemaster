@@ -1,4 +1,4 @@
-import type { ASNView, EndpointView, LatencyFields, NameserverView } from "$lib/api";
+import type { ASNView, EndpointView, LatencyFields, NameserverView } from "#lib/api.js";
 
 // Latency is measured from wherever this instance runs, so every surface
 // that shows it repeats the caveat, naming the location when the operator

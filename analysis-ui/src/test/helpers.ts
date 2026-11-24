@@ -70,7 +70,11 @@ export type PageHolder = { url: URL; data?: unknown };
 // vi.mock() factory, so this module must be imported before anything that
 // pulls in $app/* - keep the helpers import first in the file.
 export function appPaths(base = "/analysis") {
-  return { base };
+  return {
+    // Route IDs keep their slash; pathnames are relative to the base.
+    resolve: (path: string) => (path.startsWith("/") ? `${base}${path}` : `${base}/${path}`),
+    asset: (file: string) => `${base}/${file}`
+  };
 }
 
 export function appNavigation() {

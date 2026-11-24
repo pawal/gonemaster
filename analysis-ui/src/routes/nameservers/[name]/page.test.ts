@@ -1,7 +1,7 @@
 import { appNavigation, appPaths, appState } from "../../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
-import type { NameserverDetail } from "$lib/api";
+import type { NameserverDetail } from "#lib/api.js";
 import type { NameserverDetailPageData } from "./+page";
 
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/nameservers/ns1.example") }));

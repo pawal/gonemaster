@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ExternalLink } from "$lib/externalLinks";
+  import type { ExternalLink } from "#lib/externalLinks.js";
 
   type Props = {
     links: ExternalLink[];

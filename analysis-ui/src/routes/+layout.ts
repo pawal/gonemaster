@@ -1,6 +1,6 @@
-import type { CatalogResponse, Cohort, SnapshotListEntry } from "$lib/api";
-import { getCatalog, listSnapshots } from "$lib/api";
-import { snapshotSourceDate } from "$lib/format";
+import type { CatalogResponse, Cohort, SnapshotListEntry } from "#lib/api.js";
+import { getCatalog, listSnapshots } from "#lib/api.js";
+import { snapshotSourceDate } from "#lib/format.js";
 
 // The analysis UI is a pure client-side SPA embedded in the Go server.
 export const ssr = false;

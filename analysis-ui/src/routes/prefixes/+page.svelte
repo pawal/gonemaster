@@ -1,15 +1,14 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
-  import { page } from "$app/state";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import Pagination from "$lib/Pagination.svelte";
-  import SortHeader from "$lib/SortHeader.svelte";
-  import PrefixChip from "$lib/chips/PrefixChip.svelte";
-  import ASNChip from "$lib/chips/ASNChip.svelte";
-  import { prefixHref } from "$lib/entityLinks";
-  import { formatCount } from "$lib/format";
-  import { updateURLParam, filterFromURL } from "$lib/filters";
+    import { page } from "$app/state";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import Pagination from "#lib/Pagination.svelte";
+  import SortHeader from "#lib/SortHeader.svelte";
+  import PrefixChip from "#lib/chips/PrefixChip.svelte";
+  import ASNChip from "#lib/chips/ASNChip.svelte";
+  import { prefixHref } from "#lib/entityLinks.js";
+  import { formatCount } from "#lib/format.js";
+  import { updateURLParam, filterFromURL } from "#lib/filters.js";
   import {
     downloadCSV,
     downloadJSON,
@@ -18,8 +17,8 @@
     exportCaption,
     exportScopeSuffix,
     type ExportColumn
-  } from "$lib/exporters";
-  import { listPrefixes, type PrefixView, type AnalysisFilter } from "$lib/api";
+  } from "#lib/exporters.js";
+  import { listPrefixes, type PrefixView, type AnalysisFilter } from "#lib/api.js";
   import type { LayoutData } from "../+layout";
   import type { PrefixesPageData } from "./+page";
 
@@ -159,7 +158,7 @@
         </thead>
         <tbody>
           {#each rows as row (row.prefix)}
-            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, prefixHref(base, row.prefix, search))}>
+            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, prefixHref(row.prefix, search))}>
               <th scope="row" class="row-ident">
                 <PrefixChip prefix={row.prefix} />
               </th>

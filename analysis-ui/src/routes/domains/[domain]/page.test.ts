@@ -1,7 +1,7 @@
 import { appNavigation, appPaths, appState, loadEvent, stubResponse } from "../../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
-import type { DomainDetail } from "$lib/api";
+import type { DomainDetail } from "#lib/api.js";
 import { load, type DomainDetailPageData } from "./+page";
 
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/domains/alpha.example") }));

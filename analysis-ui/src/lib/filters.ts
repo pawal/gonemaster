@@ -17,8 +17,9 @@
 //                  overview grade distribution bar).
 //   - dnssec_posture: exact posture bucket filter on /domains.
 
+import type { ReadonlyURL, ReadonlyURLSearchParams } from "$app/state";
 import { goto } from "$app/navigation";
-import type { AnalysisFilter } from "$lib/api";
+import type { AnalysisFilter } from "#lib/api.js";
 
 const FILTER_KEYS = [
   "dataset_tag",
@@ -31,7 +32,7 @@ const FILTER_KEYS = [
 
 export type FilterKey = (typeof FILTER_KEYS)[number];
 
-export function filterFromURL(url: URL): AnalysisFilter {
+export function filterFromURL(url: ReadonlyURL): AnalysisFilter {
   const filter: AnalysisFilter = {};
   for (const key of FILTER_KEYS) {
     const value = url.searchParams.get(key);
@@ -43,10 +44,10 @@ export function filterFromURL(url: URL): AnalysisFilter {
 }
 
 export function applyFilterToParams(
-  current: URLSearchParams,
+  current: ReadonlyURLSearchParams,
   patch: Partial<Record<FilterKey, string>>
 ): URLSearchParams {
-  const next = new URLSearchParams(current);
+  const next = new URLSearchParams(current.toString());
   for (const [key, value] of Object.entries(patch) as [FilterKey, string][]) {
     if (value === "" || value === undefined || value === null) {
       next.delete(key);
@@ -62,17 +63,10 @@ export function searchToString(params: URLSearchParams): string {
   return s ? `?${s}` : "";
 }
 
-// Navigate to the current path with one URL param set or cleared. Used by
-// list pages to update sort, limit, and other non-filter params without
-// losing the existing filter state. `keepFocus` + `noScroll` prevents the
-// page from jumping when the user changes page size mid-list.
-export function updateURLParam(url: URL, key: string, value: string): void {
-  const params = new URLSearchParams(url.searchParams);
+// Set or clear one URL param on the current path, keeping scroll position and focus.
+export function updateURLParam(url: ReadonlyURL, key: string, value: string): void {
+  const params = new URLSearchParams(url.search);
   if (value) params.set(key, value);
   else params.delete(key);
-  goto(`${url.pathname}${searchToString(params)}`, {
-    replaceState: false,
-    noScroll: false,
-    keepFocus: true
-  });
+  goto(`${url.pathname}${searchToString(params)}`, { reset: false });
 }

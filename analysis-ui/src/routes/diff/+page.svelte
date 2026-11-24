@@ -1,14 +1,13 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
-  import { page } from "$app/state";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import GradeChip from "$lib/GradeChip.svelte";
-  import TagChip from "$lib/chips/TagChip.svelte";
-  import TransitionFlow from "$lib/charts/TransitionFlow.svelte";
-  import { domainHref, scopedQuery } from "$lib/entityLinks";
-  import { snapshotDisplayLabel, snapshotOptionLabel, levelTone, formatCount } from "$lib/format";
-  import { downloadBlob, downloadCSV, type ExportColumn } from "$lib/exporters";
+    import { page } from "$app/state";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import GradeChip from "#lib/GradeChip.svelte";
+  import TagChip from "#lib/chips/TagChip.svelte";
+  import TransitionFlow from "#lib/charts/TransitionFlow.svelte";
+  import { domainHref, scopedQuery } from "#lib/entityLinks.js";
+  import { snapshotDisplayLabel, snapshotOptionLabel, levelTone, formatCount } from "#lib/format.js";
+  import { downloadBlob, downloadCSV, type ExportColumn } from "#lib/exporters.js";
   import {
     buildMatrix,
     dimensionOrder,
@@ -20,7 +19,7 @@
     sortByMovement,
     summarizeDiff,
     type Dimension
-  } from "$lib/diff";
+  } from "#lib/diff.js";
   import {
     CATEGORY_LABELS,
     CATEGORY_ORDER,
@@ -33,8 +32,8 @@
     signedNumber,
     splitTagsByClassification,
     unrecordedScoringSnapshot
-  } from "$lib/report";
-  import type { DiffEntry, DomainCategory, ReportTagEntry, TagDiffEntry } from "$lib/api";
+  } from "#lib/report.js";
+  import type { DiffEntry, DomainCategory, ReportTagEntry, TagDiffEntry } from "#lib/api.js";
   import type { LayoutData } from "../+layout";
   import type { DiffPageData } from "./+page";
 
@@ -70,10 +69,10 @@
   });
 
   function setParam(name: string, value: string) {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     if (value) params.set(name, value);
     else params.delete(name);
-    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+    goto(`${page.url.pathname}?${params.toString()}`, { replace: true, reset: false });
   }
 
   function setTab(key: TabKey) {
@@ -87,14 +86,14 @@
   // Swap the two sides so the reader can flip the direction of the comparison
   // without re-picking both dropdowns.
   function swapSides() {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     const from = data.fromSlug;
     const to = data.toSlug;
     if (from) params.set("to", from);
     else params.delete("to");
     if (to) params.set("from", to);
     else params.delete("from");
-    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+    goto(`${page.url.pathname}?${params.toString()}`, { replace: true, reset: false });
   }
 
   // Either granularity carries the same provenance header; the domain diff
@@ -124,7 +123,7 @@
   const PAIR_PARAMS = { grade: ["from_grade", "to_grade"], level: ["from_level", "to_level"] } as const;
 
   function pairHref(d: Dimension, from: string, to: string): string {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     for (const key of [...PAIR_PARAMS.grade, ...PAIR_PARAMS.level]) params.delete(key);
     params.set("tab", d === "grade" ? "grade_changed" : "level_changed");
     params.set(PAIR_PARAMS[d][0], from);
@@ -133,9 +132,9 @@
   }
 
   function clearPair() {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     for (const key of [...PAIR_PARAMS.grade, ...PAIR_PARAMS.level]) params.delete(key);
-    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+    goto(`${page.url.pathname}?${params.toString()}`, { replace: true, reset: false });
   }
 
   function cellTitle(from: string, to: string, count: number): string {
@@ -211,7 +210,7 @@
   // Open the domain detail in the "to" snapshot's context, keeping the cohort
   // scope so the page resolves the right materialized rows.
   function domainLink(domain: string): string {
-    return domainHref(base, domain, scopedQuery(data.datasetTag, data.toSlug));
+    return domainHref(domain, scopedQuery(data.datasetTag, data.toSlug));
   }
 
   // Tag detail is snapshot-scoped: a cleared tag exists only in "from",

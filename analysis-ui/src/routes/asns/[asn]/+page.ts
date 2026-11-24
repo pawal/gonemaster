@@ -4,7 +4,7 @@ import {
   type AnalysisFilter,
   type ASNDetail,
   type HistoryPoint
-} from "$lib/api";
+} from "#lib/api.js";
 
 export type ASNDetailPageData = {
   asn: string;

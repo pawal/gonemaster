@@ -1,9 +1,9 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import type { Cohort, SnapshotListEntry } from "$lib/api";
-  import { applyFilterToParams, searchToString, type FilterKey } from "$lib/filters";
-  import { snapshotOptionLabel } from "$lib/format";
+  import type { Cohort, SnapshotListEntry } from "#lib/api.js";
+  import { applyFilterToParams, searchToString, type FilterKey } from "#lib/filters.js";
+  import { snapshotOptionLabel } from "#lib/format.js";
 
   type Props = {
     cohorts?: Cohort[];
@@ -28,11 +28,7 @@
 
   function patch(updates: Partial<Record<FilterKey, string>>) {
     const next = applyFilterToParams(params, updates);
-    goto(`${page.url.pathname}${searchToString(next)}`, {
-      replaceState: true,
-      noScroll: true,
-      keepFocus: true
-    });
+    goto(`${page.url.pathname}${searchToString(next)}`, { replace: true, reset: false });
   }
 
   function onChange(key: FilterKey, value: string) {

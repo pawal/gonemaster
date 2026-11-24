@@ -74,24 +74,16 @@ describe("filters", () => {
 });
 
 describe("updateURLParam", () => {
-  it("sets a new param and calls goto with keepFocus options", async () => {
+  it("sets a new param and navigates without resetting scroll or focus", async () => {
     const { goto } = await import("$app/navigation");
     updateURLParam(new URL("http://localhost/domains?dataset_tag=tld"), "sort", "name_asc");
-    expect(goto).toHaveBeenCalledWith("/domains?dataset_tag=tld&sort=name_asc", {
-      replaceState: false,
-      noScroll: false,
-      keepFocus: true
-    });
+    expect(goto).toHaveBeenCalledWith("/domains?dataset_tag=tld&sort=name_asc", { reset: false });
   });
 
   it("removes the param when value is empty", async () => {
     const { goto } = await import("$app/navigation");
     updateURLParam(new URL("http://localhost/domains?dataset_tag=tld&sort=name_asc"), "sort", "");
-    expect(goto).toHaveBeenCalledWith("/domains?dataset_tag=tld", {
-      replaceState: false,
-      noScroll: false,
-      keepFocus: true
-    });
+    expect(goto).toHaveBeenCalledWith("/domains?dataset_tag=tld", { reset: false });
   });
 
   it("preserves unrelated params when setting a new one", async () => {

@@ -1,5 +1,5 @@
-import { listTags, type ListResponse, type TagView } from "$lib/api";
-import { filterFromURL } from "$lib/filters";
+import { listTags, type ListResponse, type TagView } from "#lib/api.js";
+import { filterFromURL } from "#lib/filters.js";
 
 const DEFAULT_LIMIT = 50;
 

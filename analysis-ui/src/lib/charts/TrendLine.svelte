@@ -1,6 +1,6 @@
 <script lang="ts">
   import { layoutLine, pickLabelIndices } from "./trendLayout";
-  import { formatCount } from "$lib/format";
+  import { formatCount } from "#lib/format.js";
 
   // Full trend chart for the trends focus view: one numeric series across
   // snapshots, with y-axis ticks, dots, and a visually-hidden data table so

@@ -1,4 +1,4 @@
-import type { Cohort } from "$lib/api";
+import type { Cohort } from "#lib/api.js";
 
 export type CohortsPageData = {
   cohorts: Cohort[];

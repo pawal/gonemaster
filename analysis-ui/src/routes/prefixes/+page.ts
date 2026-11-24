@@ -1,5 +1,5 @@
-import { listPrefixes, type PrefixView, type ListResponse } from "$lib/api";
-import { filterFromURL } from "$lib/filters";
+import { listPrefixes, type PrefixView, type ListResponse } from "#lib/api.js";
+import { filterFromURL } from "#lib/filters.js";
 
 const DEFAULT_LIMIT = 50;
 

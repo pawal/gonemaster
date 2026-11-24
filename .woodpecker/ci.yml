@@ -31,6 +31,7 @@ steps:
       - npm --prefix analysis-ui ci
       - npm --prefix ui run test
       - npm --prefix ui-public run test
+      - npm --prefix analysis-ui run check
       - npm --prefix analysis-ui run test
       - npm --prefix ui run build
       - npm --prefix ui-public run build

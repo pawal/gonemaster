@@ -54,7 +54,7 @@ help:
 	@echo "  ui-analysis-install   Install analysis UI dependencies"
 	@echo "  ui-analysis-build     Build the analysis embedded UI"
 	@echo "  ui-analysis-dev       Run the analysis UI dev server"
-	@echo "  ui-analysis-test      Run analysis UI tests"
+	@echo "  ui-analysis-test      Type-check and test the analysis UI"
 	@echo "  build-gonemaster-badkeys-embed  Build CLI with embedded badkeys blocklist"
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
 	@echo "  build-gonemaster-server-badkeys-embed  Build server with embedded badkeys blocklist (with UI)"
@@ -177,6 +177,7 @@ ui-analysis-dev: ui-analysis-install
 	$(NPM) --prefix $(UI_ANALYSIS_DIR) run dev
 
 ui-analysis-test: ui-analysis-install
+	$(NPM) --prefix $(UI_ANALYSIS_DIR) run check
 	$(NPM) --prefix $(UI_ANALYSIS_DIR) run test
 
 build: $(BIN_DIR)

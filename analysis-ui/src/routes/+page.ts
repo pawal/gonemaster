@@ -24,8 +24,8 @@ import {
   type TopTagEntry,
   type TrendKeyMeta,
   type TrendPoint
-} from "$lib/api";
-import { previousSlug } from "$lib/diff";
+} from "#lib/api.js";
+import { previousSlug } from "#lib/diff.js";
 
 // Front-page latency rankings: fastest/slowest N per entity, min-sample gated.
 const RANK_LIMIT = 10;

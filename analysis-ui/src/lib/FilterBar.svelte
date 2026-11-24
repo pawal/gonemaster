@@ -1,9 +1,9 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import type { Cohort, SnapshotListEntry } from "$lib/api";
-  import { applyFilterToParams, searchToString, type FilterKey } from "$lib/filters";
-  import { snapshotOptionLabel } from "$lib/format";
+  import type { Cohort, SnapshotListEntry } from "#lib/api.js";
+  import { applyFilterToParams, searchToString, type FilterKey } from "#lib/filters.js";
+  import { snapshotOptionLabel } from "#lib/format.js";
 
   type Props = {
     cohorts?: Cohort[];

@@ -1,12 +1,12 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import DomainChip from "$lib/chips/DomainChip.svelte";
-  import TestcaseChip from "$lib/chips/TestcaseChip.svelte";
-  import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
-  import { pinnedQuery } from "$lib/entityLinks";
-  import { formatCount, levelTone } from "$lib/format";
-  import { testcaseTitle } from "$lib/testcaseTitles";
+  import DomainChip from "#lib/chips/DomainChip.svelte";
+  import TestcaseChip from "#lib/chips/TestcaseChip.svelte";
+  import EntityHistorySparkline from "#lib/EntityHistorySparkline.svelte";
+  import { pinnedQuery } from "#lib/entityLinks.js";
+  import { formatCount, levelTone } from "#lib/format.js";
+  import { testcaseTitle } from "#lib/testcaseTitles.js";
   import type { TagDetailPageData } from "./+page";
 
   let { data }: { data: TagDetailPageData } = $props();

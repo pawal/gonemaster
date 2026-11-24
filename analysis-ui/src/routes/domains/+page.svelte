@@ -2,21 +2,21 @@
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import Pagination from "$lib/Pagination.svelte";
-  import SortHeader from "$lib/SortHeader.svelte";
-  import SigningAlgoChip from "$lib/SigningAlgoChip.svelte";
-  import PostureChip from "$lib/PostureChip.svelte";
-  import { asnHref, domainHref } from "$lib/entityLinks";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import Pagination from "#lib/Pagination.svelte";
+  import SortHeader from "#lib/SortHeader.svelte";
+  import SigningAlgoChip from "#lib/SigningAlgoChip.svelte";
+  import PostureChip from "#lib/PostureChip.svelte";
+  import { asnHref, domainHref } from "#lib/entityLinks.js";
   import {
     formatCount,
     formatFamilyCoverage,
     formatTimestamp,
     gradeTone,
     levelTone
-  } from "$lib/format";
-  import { idnTooltip } from "$lib/idn";
-  import { updateURLParam, filterFromURL } from "$lib/filters";
+  } from "#lib/format.js";
+  import { idnTooltip } from "#lib/idn.js";
+  import { updateURLParam, filterFromURL } from "#lib/filters.js";
   import {
     downloadCSV,
     downloadJSON,
@@ -25,8 +25,8 @@
     exportCaption,
     exportScopeSuffix,
     type ExportColumn
-  } from "$lib/exporters";
-  import { listDomains, type DomainView, type AnalysisFilter } from "$lib/api";
+  } from "#lib/exporters.js";
+  import { listDomains, type DomainView, type AnalysisFilter } from "#lib/api.js";
   import type { LayoutData } from "../+layout";
   import type { DomainsPageData } from "./+page";
 

@@ -4,7 +4,7 @@ import {
   type AnalysisFilter,
   type HistoryPoint,
   type NameserverDetail
-} from "$lib/api";
+} from "#lib/api.js";
 
 export type NameserverDetailPageData = {
   nameserver: string;

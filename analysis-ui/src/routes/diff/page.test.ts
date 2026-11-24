@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { goto } from "$app/navigation";
 import { load, type DiffPageData } from "./+page";
-import { previousSlug } from "$lib/diff";
-import type { DiffResponse, TagDiffResponse } from "$lib/api";
+import { previousSlug } from "#lib/diff.js";
+import type { DiffResponse, TagDiffResponse } from "#lib/api.js";
 
 // A mutable URL holder so each render can set the active ?tab= before mounting.
 const h = vi.hoisted(() => ({

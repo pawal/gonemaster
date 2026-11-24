@@ -1,7 +1,7 @@
 import { loadEvent, stubResponse } from "../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { load } from "./+layout";
-import type { CatalogResponse } from "$lib/api";
+import type { CatalogResponse } from "#lib/api.js";
 
 type FetchMock = ReturnType<typeof vi.fn>;
 

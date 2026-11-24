@@ -1,8 +1,8 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import { nameserverHref } from "$lib/entityLinks";
-  import { idnTooltip } from "$lib/idn";
+  import { nameserverHref } from "#lib/entityLinks.js";
+  import { idnTooltip } from "#lib/idn.js";
   import EntityChip from "./EntityChip.svelte";
 
   type Props = { nameserver: string; preserveQuery?: boolean };

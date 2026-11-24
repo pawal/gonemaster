@@ -1,7 +1,7 @@
 // Keyboard-shortcut resolution for the analysis UI. Pure and DOM-free so the
 // decision logic is unit-testable; the layout performs the effects.
 
-import type { NavItem } from "$lib/nav";
+import type { NavItem } from "#lib/nav.js";
 
 // Second key of a g-sequence -> nav section href (relative to the SvelteKit
 // base). Letters mirror the admin UI where they overlap (d/t/c) so muscle

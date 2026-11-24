@@ -1,8 +1,8 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { formatCount } from "$lib/format";
-  import { searchToString } from "$lib/filters";
+  import { formatCount } from "#lib/format.js";
+  import { searchToString } from "#lib/filters.js";
 
   type Props = { total: number; offset: number; limit: number; itemCount: number };
   let { total, offset, limit, itemCount }: Props = $props();

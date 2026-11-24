@@ -5,8 +5,8 @@ import {
   type DiffResponse,
   type ReportResponse,
   type TagDiffResponse
-} from "$lib/api";
-import { previousSlug } from "$lib/diff";
+} from "#lib/api.js";
+import { previousSlug } from "#lib/diff.js";
 
 export type DiffPageData = {
   datasetTag: string | null;

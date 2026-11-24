@@ -1,13 +1,13 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import ASNChip from "$lib/chips/ASNChip.svelte";
-  import DomainChip from "$lib/chips/DomainChip.svelte";
-  import EndpointChip from "$lib/chips/EndpointChip.svelte";
-  import ExternalLinks from "$lib/ExternalLinks.svelte";
-  import { prefixLinks } from "$lib/externalLinks";
-  import { pinnedQuery } from "$lib/entityLinks";
-  import { formatCount } from "$lib/format";
+  import ASNChip from "#lib/chips/ASNChip.svelte";
+  import DomainChip from "#lib/chips/DomainChip.svelte";
+  import EndpointChip from "#lib/chips/EndpointChip.svelte";
+  import ExternalLinks from "#lib/ExternalLinks.svelte";
+  import { prefixLinks } from "#lib/externalLinks.js";
+  import { pinnedQuery } from "#lib/entityLinks.js";
+  import { formatCount } from "#lib/format.js";
   import type { PrefixDetailPageData } from "./+page";
 
   let { data }: { data: PrefixDetailPageData } = $props();

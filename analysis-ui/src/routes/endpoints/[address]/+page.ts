@@ -1,4 +1,4 @@
-import { getEndpointDetail, type EndpointDetail } from "$lib/api";
+import { getEndpointDetail, type EndpointDetail } from "#lib/api.js";
 
 export type EndpointDetailPageData = {
   address: string;

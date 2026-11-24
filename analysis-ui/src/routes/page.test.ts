@@ -1,7 +1,7 @@
 import { appNavigation, appPaths, appState, fetchRouter, loadEvent, reportFixture, stubResponse } from "../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
-import type { NameserverView } from "$lib/api";
+import type { NameserverView } from "#lib/api.js";
 import { load, type OverviewPageData } from "./+page";
 
 const h = vi.hoisted(() => ({

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentSortState, nextSortToken, sortIndicator, type SortColumnSpec } from "$lib/sort";
+  import { currentSortState, nextSortToken, sortIndicator, type SortColumnSpec } from "#lib/sort.js";
 
   type Props = {
     label: string;

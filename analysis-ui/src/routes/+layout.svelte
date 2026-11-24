@@ -4,15 +4,15 @@
   import { page, navigating } from "$app/state";
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
-  import { getVersion } from "$lib/api";
-  import NavProgress from "$lib/NavProgress.svelte";
-  import ShortcutsHelp from "$lib/ShortcutsHelp.svelte";
-  import { navItems, isActive, visibleNavItems } from "$lib/nav";
-  import { resolveShortcut } from "$lib/shortcuts";
+  import { getVersion } from "#lib/api.js";
+  import NavProgress from "#lib/NavProgress.svelte";
+  import ShortcutsHelp from "#lib/ShortcutsHelp.svelte";
+  import { navItems, isActive, visibleNavItems } from "#lib/nav.js";
+  import { resolveShortcut } from "#lib/shortcuts.js";
   import type { LayoutData } from "./+layout";
-  import { applyTheme, initialTheme, persistTheme, type Theme } from "$lib/theme";
-  import { applyHead } from "$lib/head";
-  import { pinnedQuery } from "$lib/entityLinks";
+  import { applyTheme, initialTheme, persistTheme, type Theme } from "#lib/theme.js";
+  import { applyHead } from "#lib/head.js";
+  import { pinnedQuery } from "#lib/entityLinks.js";
 
   let { children } = $props();
 

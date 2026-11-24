@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import FactDistributionBar from "./FactDistributionBar.svelte";
-import type { FactBucket } from "$lib/api";
+import type { FactBucket } from "#lib/api.js";
 
 const bucket = (over: Partial<FactBucket> = {}): FactBucket => ({
   key: "ok",

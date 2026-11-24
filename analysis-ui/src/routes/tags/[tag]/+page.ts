@@ -5,7 +5,7 @@ import {
   type AnalysisFilter,
   type HistoryPoint,
   type TagDetail
-} from "$lib/api";
+} from "#lib/api.js";
 
 export type TagDetailPageData = {
   tag: string;

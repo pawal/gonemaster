@@ -1,7 +1,7 @@
 // Per-route document metadata for the client-rendered analysis SPA.
 // routeHead/canonicalUrl are pure; applyHead is the DOM side-effect.
 
-import { pinnedQuery } from "$lib/entityLinks";
+import { pinnedQuery } from "#lib/entityLinks.js";
 
 const SITE = "Gonemaster Analysis";
 

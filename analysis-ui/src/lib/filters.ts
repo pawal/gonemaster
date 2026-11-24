@@ -18,7 +18,7 @@
 //   - dnssec_posture: exact posture bucket filter on /domains.
 
 import { goto } from "$app/navigation";
-import type { AnalysisFilter } from "$lib/api";
+import type { AnalysisFilter } from "#lib/api.js";
 
 const FILTER_KEYS = [
   "dataset_tag",

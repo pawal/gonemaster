@@ -1,5 +1,5 @@
-import { listASNs, type ASNView, type ListResponse } from "$lib/api";
-import { filterFromURL } from "$lib/filters";
+import { listASNs, type ASNView, type ListResponse } from "#lib/api.js";
+import { filterFromURL } from "#lib/filters.js";
 
 const DEFAULT_LIMIT = 50;
 

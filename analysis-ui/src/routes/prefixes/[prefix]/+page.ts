@@ -1,4 +1,4 @@
-import { getPrefixDetail, type AnalysisFilter, type PrefixDetail } from "$lib/api";
+import { getPrefixDetail, type AnalysisFilter, type PrefixDetail } from "#lib/api.js";
 
 export type PrefixDetailPageData = {
   prefix: string;

@@ -2,7 +2,7 @@ import { appPaths, appState, loadEvent } from "../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import { load, type CohortsPageData } from "./+page";
-import type { CatalogResponse } from "$lib/api";
+import type { CatalogResponse } from "#lib/api.js";
 
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/analysis/cohorts") }));
 vi.mock("$app/paths", () => appPaths());

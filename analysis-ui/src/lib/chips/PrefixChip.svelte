@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import { prefixHref } from "$lib/entityLinks";
+  import { prefixHref } from "#lib/entityLinks.js";
   import EntityChip from "./EntityChip.svelte";
 
   type Props = { prefix: string; preserveQuery?: boolean };

@@ -2,13 +2,13 @@
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import TrendLine from "$lib/charts/TrendLine.svelte";
-  import TrendPanels, { type Panel, type PanelPoint } from "$lib/charts/TrendPanels.svelte";
-  import { domainsGradeHref, domainsPostureHref, domainsSeverityHref, tagHref } from "$lib/entityLinks";
-  import { downloadCSV, type ExportColumn } from "$lib/exporters";
-  import { formatCount, levelTone, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
-  import { TREND_CATEGORIES, computeTagMovers, pinnedSeries } from "$lib/trends";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import TrendLine from "#lib/charts/TrendLine.svelte";
+  import TrendPanels, { type Panel, type PanelPoint } from "#lib/charts/TrendPanels.svelte";
+  import { domainsGradeHref, domainsPostureHref, domainsSeverityHref, tagHref } from "#lib/entityLinks.js";
+  import { downloadCSV, type ExportColumn } from "#lib/exporters.js";
+  import { formatCount, levelTone, snapshotDisplayLabel, snapshotSourceDate } from "#lib/format.js";
+  import { TREND_CATEGORIES, computeTagMovers, pinnedSeries } from "#lib/trends.js";
   import type { LayoutData } from "../+layout";
   import type { TrendsPageData } from "./+page";
 

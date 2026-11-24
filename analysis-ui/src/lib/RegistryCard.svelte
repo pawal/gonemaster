@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { DomainRegistry } from "$lib/api";
-  import { formatDate, formatTimestamp } from "$lib/format";
+  import type { DomainRegistry } from "#lib/api.js";
+  import { formatDate, formatTimestamp } from "#lib/format.js";
 
   type Props = {
     registry?: DomainRegistry;

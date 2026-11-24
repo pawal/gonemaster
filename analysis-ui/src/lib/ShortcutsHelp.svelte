@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { navItems } from "$lib/nav";
-  import { shortcutNavRows } from "$lib/shortcuts";
+  import { navItems } from "#lib/nav.js";
+  import { shortcutNavRows } from "#lib/shortcuts.js";
 
   let { open = false, onClose = () => {} }: { open?: boolean; onClose?: () => void } = $props();
 

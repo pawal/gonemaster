@@ -1,10 +1,10 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import FactDistributionBar from "$lib/FactDistributionBar.svelte";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import GradeChip from "$lib/GradeChip.svelte";
-  import Sparkline from "$lib/charts/Sparkline.svelte";
+  import FactDistributionBar from "#lib/FactDistributionBar.svelte";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import GradeChip from "#lib/GradeChip.svelte";
+  import Sparkline from "#lib/charts/Sparkline.svelte";
   import {
     asnHref,
     domainHref,
@@ -15,7 +15,7 @@
     nameserverHref,
     pinnedQuery,
     tagHref
-  } from "$lib/entityLinks";
+  } from "#lib/entityLinks.js";
   import {
     formatCount,
     formatMs,
@@ -23,7 +23,7 @@
     levelTone,
     snapshotDisplayLabel,
     snapshotSourceDate
-  } from "$lib/format";
+  } from "#lib/format.js";
   import {
     asnLatencyRows,
     endpointLatencyRows,
@@ -31,8 +31,8 @@
     nameserverLatencyRows,
     latencyVantageNote,
     type LatencyRankRow
-  } from "$lib/latencyRanking";
-  import { netDirection, sortByMovement, summarizeDiff } from "$lib/diff";
+  } from "#lib/latencyRanking.js";
+  import { netDirection, sortByMovement, summarizeDiff } from "#lib/diff.js";
   import {
     percentOf,
     seriesShareByKeys,
@@ -40,10 +40,10 @@
     seriesShareExcludingKeys,
     seriesTotals,
     summarizeMetric
-  } from "$lib/overview";
-  import { idnTooltip } from "$lib/idn";
-  import { CATEGORY_LABELS, categoryTone } from "$lib/report";
-  import type { DomainCategory } from "$lib/api";
+  } from "#lib/overview.js";
+  import { idnTooltip } from "#lib/idn.js";
+  import { CATEGORY_LABELS, categoryTone } from "#lib/report.js";
+  import type { DomainCategory } from "#lib/api.js";
   import type { LayoutData } from "./+layout";
   import type { OverviewPageData } from "./+page";
 

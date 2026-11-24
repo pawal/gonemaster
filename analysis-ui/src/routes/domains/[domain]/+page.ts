@@ -4,7 +4,7 @@ import {
   type AnalysisFilter,
   type DomainDetail,
   type HistoryPoint
-} from "$lib/api";
+} from "#lib/api.js";
 
 export type DomainDetailPageData = {
   domain: string;

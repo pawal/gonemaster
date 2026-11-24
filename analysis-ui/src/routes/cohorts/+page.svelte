@@ -1,8 +1,8 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import CohortChip from "$lib/chips/CohortChip.svelte";
-  import { formatCount, snapshotSourceDate } from "$lib/format";
+  import CohortChip from "#lib/chips/CohortChip.svelte";
+  import { formatCount, snapshotSourceDate } from "#lib/format.js";
   import type { CohortsPageData } from "./+page";
 
   let { data }: { data: CohortsPageData } = $props();

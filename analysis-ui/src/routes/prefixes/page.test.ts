@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen, within, fireEvent, waitFor } from "@testing-library/svelte";
 import { load, type PrefixesPageData } from "./+page";
 import { goto } from "$app/navigation";
-import type { PrefixView } from "$lib/api";
+import type { PrefixView } from "#lib/api.js";
 
 // A mutable URL holder so each render can set the active query before mounting.
 const h = vi.hoisted(() => ({

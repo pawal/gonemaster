@@ -2,13 +2,13 @@
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import GradeChip from "$lib/GradeChip.svelte";
-  import TagChip from "$lib/chips/TagChip.svelte";
-  import TransitionFlow from "$lib/charts/TransitionFlow.svelte";
-  import { domainHref, scopedQuery } from "$lib/entityLinks";
-  import { snapshotDisplayLabel, snapshotOptionLabel, levelTone, formatCount } from "$lib/format";
-  import { downloadBlob, downloadCSV, type ExportColumn } from "$lib/exporters";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import GradeChip from "#lib/GradeChip.svelte";
+  import TagChip from "#lib/chips/TagChip.svelte";
+  import TransitionFlow from "#lib/charts/TransitionFlow.svelte";
+  import { domainHref, scopedQuery } from "#lib/entityLinks.js";
+  import { snapshotDisplayLabel, snapshotOptionLabel, levelTone, formatCount } from "#lib/format.js";
+  import { downloadBlob, downloadCSV, type ExportColumn } from "#lib/exporters.js";
   import {
     buildMatrix,
     dimensionOrder,
@@ -20,7 +20,7 @@
     sortByMovement,
     summarizeDiff,
     type Dimension
-  } from "$lib/diff";
+  } from "#lib/diff.js";
   import {
     CATEGORY_LABELS,
     CATEGORY_ORDER,
@@ -33,8 +33,8 @@
     signedNumber,
     splitTagsByClassification,
     unrecordedScoringSnapshot
-  } from "$lib/report";
-  import type { DiffEntry, DomainCategory, ReportTagEntry, TagDiffEntry } from "$lib/api";
+  } from "#lib/report.js";
+  import type { DiffEntry, DomainCategory, ReportTagEntry, TagDiffEntry } from "#lib/api.js";
   import type { LayoutData } from "../+layout";
   import type { DiffPageData } from "./+page";
 

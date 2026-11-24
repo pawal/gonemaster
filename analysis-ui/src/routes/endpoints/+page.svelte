@@ -2,16 +2,16 @@
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import FilterBar from "$lib/FilterBar.svelte";
-  import Pagination from "$lib/Pagination.svelte";
-  import SortHeader from "$lib/SortHeader.svelte";
-  import ASNChip from "$lib/chips/ASNChip.svelte";
-  import EndpointChip from "$lib/chips/EndpointChip.svelte";
-  import NameserverChip from "$lib/chips/NameserverChip.svelte";
-  import PrefixChip from "$lib/chips/PrefixChip.svelte";
-  import { endpointHref } from "$lib/entityLinks";
-  import { formatCount, formatMs } from "$lib/format";
-  import { updateURLParam, filterFromURL } from "$lib/filters";
+  import FilterBar from "#lib/FilterBar.svelte";
+  import Pagination from "#lib/Pagination.svelte";
+  import SortHeader from "#lib/SortHeader.svelte";
+  import ASNChip from "#lib/chips/ASNChip.svelte";
+  import EndpointChip from "#lib/chips/EndpointChip.svelte";
+  import NameserverChip from "#lib/chips/NameserverChip.svelte";
+  import PrefixChip from "#lib/chips/PrefixChip.svelte";
+  import { endpointHref } from "#lib/entityLinks.js";
+  import { formatCount, formatMs } from "#lib/format.js";
+  import { updateURLParam, filterFromURL } from "#lib/filters.js";
   import {
     downloadCSV,
     downloadJSON,
@@ -20,9 +20,9 @@
     exportCaption,
     exportScopeSuffix,
     type ExportColumn
-  } from "$lib/exporters";
-  import { listEndpoints, type EndpointView, type AnalysisFilter } from "$lib/api";
-  import { latencyVantageNote } from "$lib/latencyRanking";
+  } from "#lib/exporters.js";
+  import { listEndpoints, type EndpointView, type AnalysisFilter } from "#lib/api.js";
+  import { latencyVantageNote } from "#lib/latencyRanking.js";
   import type { LayoutData } from "../+layout";
   import type { EndpointsPageData } from "./+page";
 

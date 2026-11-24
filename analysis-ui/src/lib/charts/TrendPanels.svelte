@@ -1,6 +1,6 @@
 <script lang="ts">
   import TrendLine from "./TrendLine.svelte";
-  import { formatCount } from "$lib/format";
+  import { formatCount } from "#lib/format.js";
 
   type Tone = "ok" | "notice" | "warning" | "error" | "critical" | "neutral";
   export type PanelPoint = {

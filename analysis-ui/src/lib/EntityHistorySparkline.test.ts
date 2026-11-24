@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/svelte";
-import type { HistoryPoint } from "$lib/api";
+import type { HistoryPoint } from "#lib/api.js";
 import EntityHistorySparkline from "./EntityHistorySparkline.svelte";
 
 function pt(over: Partial<HistoryPoint>): HistoryPoint {

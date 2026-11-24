@@ -2,7 +2,7 @@ import { appNavigation, appPaths, appState } from "../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { goto } from "$app/navigation";
-import type { NameserverView } from "$lib/api";
+import type { NameserverView } from "#lib/api.js";
 import type { NameserversPageData } from "./+page";
 
 // A mutable URL holder so each render controls the active query.

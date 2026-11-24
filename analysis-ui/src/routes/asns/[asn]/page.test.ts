@@ -1,7 +1,7 @@
 import { appPaths, appState } from "../../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
-import type { ASNDetail } from "$lib/api";
+import type { ASNDetail } from "#lib/api.js";
 import type { ASNDetailPageData } from "./+page";
 
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/asns/64500") }));

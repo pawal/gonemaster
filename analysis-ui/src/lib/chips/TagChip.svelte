@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import { tagHref } from "$lib/entityLinks";
+  import { tagHref } from "#lib/entityLinks.js";
   import EntityChip from "./EntityChip.svelte";
 
   // `query` overrides the preserved URL query to pin a specific snapshot.

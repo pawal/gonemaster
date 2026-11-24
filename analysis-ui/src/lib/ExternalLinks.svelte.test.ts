@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import ExternalLinks from "./ExternalLinks.svelte";
-import type { ExternalLink } from "$lib/externalLinks";
+import type { ExternalLink } from "#lib/externalLinks.js";
 
 const link = (over: Partial<ExternalLink> = {}): ExternalLink => ({
   label: "RIPEstat",

@@ -11,7 +11,7 @@ Status: Final
   - A `zone.Zone` object is available.
 - Required inputs:
   - Nameserver addresses from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
-  - A per-run random 8-byte Client Cookie, hex-encoded, reused read-only across the run's probes.
+  - A random 8-byte Client Cookie per nameserver, hex-encoded, carried by every probe to that nameserver.
   - SOA responses to UDP queries carrying a COOKIE option (option code `10`).
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -19,7 +19,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Generate one random 8-byte Client Cookie for the run (`crypto/rand`, hex-encoded).
+2. Generate a random 8-byte Client Cookie for each nameserver (`crypto/rand`, hex-encoded); no two nameservers share one (RFC 9018 section 3).
 3. Initialize per-behaviour collectors keyed by nameserver.
 4. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 5. For each nameserver (parallelized, input-order merged logs):
@@ -34,7 +34,8 @@ Status: Final
      - NOERROR, well-formed full cookie (16-40 bytes, client portion echoed; 24 bytes = RFC 9018 section 4.4 Version 1): collect for `N17_COOKIE_SUPPORTED` and proceed to query 2.
    - Query 2 (round-trip, for both `N17_COOKIE_SUPPORTED` and `N17_COOKIE_ENFORCED`): re-query with the full cookie returned by query 1.
      - NOERROR: collect for `N17_COOKIE_ROUNDTRIP_OK` (proves the server did not reject its own cookie, not that it validated it).
-     - BADCOOKIE: retry once (query 2b) with the fresh Server Cookie the BADCOOKIE reply carries (RFC 7873 section 5.3). If query 2b is NOERROR, the server merely rotated its cookie: collect for `N17_COOKIE_ROUNDTRIP_OK`. If query 2b is also BADCOOKIE, collect for `N17_COOKIE_SELF_REJECT`.
+     - BADCOOKIE carrying a well-formed full cookie (same checks as query 1): retry once (query 2b) with that fresh Server Cookie (RFC 7873 section 5.3). If query 2b is NOERROR, the server merely rotated its cookie: collect for `N17_COOKIE_ROUNDTRIP_OK`. If query 2b is also BADCOOKIE, collect for `N17_COOKIE_SELF_REJECT`.
+     - BADCOOKIE without a well-formed full cookie: collect for `N17_COOKIE_SELF_REJECT` without query 2b (RFC 7873 section 5.2.3 requires a Server Cookie in a BADCOOKIE response).
 6. Emit `N17_COOKIE_SUPPORTED` with sorted unique `servers` when non-empty.
 7. Emit `N17_COOKIE_ENFORCED` with sorted unique `servers` when non-empty.
 8. Emit `N17_NO_COOKIE` with sorted unique `servers` when non-empty.
@@ -66,7 +67,8 @@ per nameserver (parallel):
                                                    v
         query 2: UDP-pinned SOA + COOKIE(returned full cookie)
          +- NOERROR                         -> N17_COOKIE_ROUNDTRIP_OK
-         +- BADCOOKIE
+         +- BADCOOKIE, no well-formed full cookie -> N17_COOKIE_SELF_REJECT
+         +- BADCOOKIE + well-formed full cookie
               |
               v
            query 2b: retry with the fresh Server Cookie from the BADCOOKIE reply
@@ -83,7 +85,7 @@ per nameserver (parallel):
 | `N17_COOKIE_ENFORCED` | Server enforces DNS Cookies: it answered a client-only probe with BADCOOKIE and a well-formed Server Cookie. |
 | `N17_COOKIE_MALFORMED` | Server returned a cookie of an invalid length, or a wrong client-cookie echo (RFC 7873 sections 4 and 5.3). |
 | `N17_COOKIE_ROUNDTRIP_OK` | Server did not reject the Server Cookie it issued on a follow-up query. |
-| `N17_COOKIE_SELF_REJECT` | Server rejected with BADCOOKIE, even after the RFC 7873 section 5.3 retry, a Server Cookie it had just issued (RFC 7873 section 5.2.5). |
+| `N17_COOKIE_SELF_REJECT` | Server rejected with BADCOOKIE a Server Cookie it had just issued, either after the RFC 7873 section 5.3 retry or without a fresh Server Cookie to retry with (RFC 7873 section 5.2.5). |
 | `N17_COOKIE_SUPPORTED` | Server returned a well-formed full DNS Cookie. |
 | `N17_NO_COOKIE` | Server responded NOERROR but returned no COOKIE option. |
 | `N17_NO_RESPONSE` | Cookie probe produced no DNS response (RFC 8906 section 3.2.3), or a truncated response. |
@@ -137,4 +139,5 @@ per nameserver (parallel):
 - A truncated (TC=1) probe is treated as inconclusive and is not retried over TCP, since TCP return-routability would mask cookie enforcement.
 - The BADCOOKIE carve-out for `N17_COOKIE_ENFORCED` is deliberately narrow: only RCODE 23 carrying a well-formed Server Cookie (correct length and client-cookie echo) qualifies. A BADCOOKIE without a well-formed Server Cookie, and any other non-NOERROR RCODE (REFUSED / SERVFAIL / FORMERR), stay generic anomalies graded by basic/N16, so a transient or malformed BADCOOKIE never produces a cookie verdict here.
 - `N17_COOKIE_ENFORCED` proves only that the server demanded and issued a Server Cookie; the follow-up round-trip (`N17_COOKIE_ROUNDTRIP_OK`) still proves only non-rejection, not cryptographic validation, and a single vantage point cannot prove the RFC 9018 section 4 construction.
+- A BADCOOKIE round-trip reply without a well-formed full cookie gets no retry: a retry with the same cookie is answered from the per-run cache.
 - A FORMERR to a valid 8-byte Client Cookie is itself a server defect (RFC 7873 section 5.2.2), but it is left to basic/N16 and adds no dedicated tag here.

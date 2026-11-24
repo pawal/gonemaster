@@ -1200,7 +1200,7 @@ These callsites use non-literal/non-tracked args expressions and require manual 
 | `IPV4_DISABLED` | `engine/test/dnssec/dnssec.go` | 7479 | `withNameserverArgs(server, map[string]any{
 	"query_type": rrtype,
 })` |
-| `IPV4_DISABLED` | `engine/test/nameserver/nameserver.go` | 2832 | `withNameserverArgs(server, map[string]any{
+| `IPV4_DISABLED` | `engine/test/nameserver/nameserver.go` | 2831 | `withNameserverArgs(server, map[string]any{
 	"query_type": rrtype,
 })` |
 | `IPV4_DISABLED` | `engine/test/syntax/syntax.go` | 783 | `withNameserverArgs(ns, map[string]any{
@@ -1235,7 +1235,7 @@ These callsites use non-literal/non-tracked args expressions and require manual 
 | `IPV6_DISABLED` | `engine/test/dnssec/dnssec.go` | 7469 | `withNameserverArgs(server, map[string]any{
 	"query_type": rrtype,
 })` |
-| `IPV6_DISABLED` | `engine/test/nameserver/nameserver.go` | 2822 | `withNameserverArgs(server, map[string]any{
+| `IPV6_DISABLED` | `engine/test/nameserver/nameserver.go` | 2821 | `withNameserverArgs(server, map[string]any{
 	"query_type": rrtype,
 })` |
 | `IPV6_DISABLED` | `engine/test/syntax/syntax.go` | 791 | `withNameserverArgs(ns, map[string]any{

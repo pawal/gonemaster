@@ -2214,11 +2214,6 @@ func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	clientCookieHex, err := newClientCookie()
-	if err != nil {
-		return results, err
-	}
-
 	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
@@ -2253,6 +2248,11 @@ func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
+				// One Client Cookie per server IP address (RFC 9018 section 3).
+				clientCookieHex, err := newClientCookie()
+				if err != nil {
+					return err
+				}
 				resp, err := cookieQuery(ctx, server, z.Name.String(), clientCookieHex)
 				if err != nil || resp.Msg == nil || resp.TC() {
 					// Truncated/no response: inconclusive, no TCP fallback.
@@ -2447,9 +2447,8 @@ func classifyCookie(resp packet.Packet, clientCookieHex string) (tag string, ful
 	return "N17_COOKIE_SUPPORTED", cookieHex, cookieBytes
 }
 
-// cookieRoundTripOK re-queries with the issued cookie. A BADCOOKIE reply is
-// retried once with the fresh Server Cookie it carries (RFC 7873 5.3); the server
-// self-rejects only when both attempts return BADCOOKIE.
+// cookieRoundTripOK re-queries with the issued cookie; a BADCOOKIE is retried
+// once only with a well-formed fresh cookie from that reply (RFC 7873 5.3).
 func cookieRoundTripOK(ctx context.Context, server ns.Nameserver, qname string, fullCookieHex string) bool {
 	resp, err := cookieQuery(ctx, server, qname, fullCookieHex)
 	if err != nil || resp.Msg == nil {
@@ -2458,9 +2457,9 @@ func cookieRoundTripOK(ctx context.Context, server ns.Nameserver, qname string, 
 	if resp.Msg.Rcode != dns.RcodeBadCookie {
 		return true
 	}
-	retryCookieHex := fullCookieHex
-	if c := resp.Cookie(); c != nil && len(c.Cookie) >= 16 {
-		retryCookieHex = strings.ToLower(c.Cookie)
+	tag, retryCookieHex, _ := classifyCookie(resp, fullCookieHex[:16])
+	if tag != "N17_COOKIE_SUPPORTED" {
+		return false
 	}
 	retry, err := cookieQuery(ctx, server, qname, retryCookieHex)
 	if err != nil || retry.Msg == nil {

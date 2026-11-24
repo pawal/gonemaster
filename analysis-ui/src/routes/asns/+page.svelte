@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
-  import { page } from "$app/state";
+    import { page } from "$app/state";
   import FilterBar from "#lib/FilterBar.svelte";
   import Pagination from "#lib/Pagination.svelte";
   import SortHeader from "#lib/SortHeader.svelte";
@@ -169,7 +168,7 @@
         </thead>
         <tbody>
           {#each rows as row (row.asn)}
-            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, asnHref(base, row.asn, search))}>
+            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, asnHref(row.asn, search))}>
               <th scope="row" class="row-ident">
                 <ASNChip asn={row.asn} label={row.label ?? undefined} />
               </th>

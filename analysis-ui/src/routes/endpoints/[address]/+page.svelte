@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import ASNChip from "#lib/chips/ASNChip.svelte";
   import DomainChip from "#lib/chips/DomainChip.svelte";
@@ -20,7 +20,7 @@
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">
-  <a href={`${base}/endpoints${query}`}>← Endpoints</a>
+  <a href={`${resolve("endpoints")}${query}`}>← Endpoints</a>
 </nav>
 
 {#if !data.datasetTag}

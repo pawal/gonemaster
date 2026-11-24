@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import { page } from "$app/state";
+    import { page } from "$app/state";
   import { tagHref } from "#lib/entityLinks.js";
   import EntityChip from "./EntityChip.svelte";
 
@@ -8,7 +7,7 @@
   type Props = { tag: string; preserveQuery?: boolean; query?: string };
   let { tag, preserveQuery = true, query }: Props = $props();
 
-  const href = $derived(tagHref(base, tag, query ?? (preserveQuery ? page.url.search : "")));
+  const href = $derived(tagHref(tag, query ?? (preserveQuery ? page.url.search : "")));
 </script>
 
 <EntityChip {href} variant="tag" title={tag}>

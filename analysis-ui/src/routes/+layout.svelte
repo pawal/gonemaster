@@ -3,11 +3,11 @@
   import { onMount } from "svelte";
   import { page, navigating } from "$app/state";
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
+  import { asset, resolve } from "$app/paths";
   import { getVersion } from "#lib/api.js";
   import NavProgress from "#lib/NavProgress.svelte";
   import ShortcutsHelp from "#lib/ShortcutsHelp.svelte";
-  import { navItems, isActive, visibleNavItems } from "#lib/nav.js";
+  import { navItems, isActive, visibleNavItems, type SectionId } from "#lib/nav.js";
   import { resolveShortcut } from "#lib/shortcuts.js";
   import type { LayoutData } from "./+layout";
   import { applyTheme, initialTheme, persistTheme, type Theme } from "#lib/theme.js";
@@ -53,22 +53,14 @@
     return visibleNavItems(navItems, cohorts.length);
   });
 
-  // Strip the base prefix so the isActive() helper can compare against
-  // relative hrefs declared in nav.ts.
-  const currentPath = $derived.by(() => {
-    const url = page.url.pathname;
-    if (base && url.startsWith(base)) {
-      return url.slice(base.length) || "/";
-    }
-    return url || "/";
-  });
+  // Route ID of the current page, compared with the nav.ts hrefs by isActive().
+  const currentPath = $derived(page.route.id ?? "");
 
   // Nav-bar links keep the active cohort and snapshot.
   const navQuery = $derived(pinnedQuery(page.url.search));
 
-  function navHref(href: string): string {
-    const path = `${base}${href === "/" ? "" : href}`;
-    return `${path}${navQuery}`;
+  function navHref(href: SectionId): string {
+    return `${resolve(href)}${navQuery}`;
   }
 
   // Keyboard shortcuts. helpOpen is reactive; pendingG/gTimer are not, since
@@ -134,8 +126,8 @@
 
 <div class="app-shell">
   <header class="app-header">
-    <a class="brand" href="{base}/">
-      <img class="brand-logo" src={`${base}/gonemaster.svg`} alt="Gonemaster" />
+    <a class="brand" href={resolve("")}>
+      <img class="brand-logo" src={asset("gonemaster.svg")} alt="Gonemaster" />
       <span class="brand-kicker">Analysis</span>
     </a>
     <div class="header-controls">

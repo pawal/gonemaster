@@ -13,7 +13,7 @@
   const hasNext = $derived(offset + limit < total);
 
   function gotoOffset(nextOffset: number) {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     if (nextOffset > 0) params.set("offset", String(nextOffset));
     else params.delete("offset");
     goto(`${page.url.pathname}${searchToString(params)}`);

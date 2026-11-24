@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import DomainChip from "#lib/chips/DomainChip.svelte";
   import NameserverChip from "#lib/chips/NameserverChip.svelte";
@@ -17,7 +17,7 @@
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">
-  <a href={`${base}/asns${query}`}>← ASNs</a>
+  <a href={`${resolve("asns")}${query}`}>← ASNs</a>
 </nav>
 
 {#if !data.datasetTag}

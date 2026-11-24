@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import CohortChip from "#lib/chips/CohortChip.svelte";
   import { formatCount, snapshotSourceDate } from "#lib/format.js";
@@ -9,7 +9,7 @@
 
   // When a cohort is clicked we navigate to the overview with the
   // corresponding ?dataset_tag= so the rest of the dashboard rescopes.
-  const overviewHref = (tag: string) => `${base}/?dataset_tag=${encodeURIComponent(tag)}`;
+  const overviewHref = (tag: string) => `${resolve("")}?dataset_tag=${encodeURIComponent(tag)}`;
 
   const activeTag = $derived(page.url.searchParams.get("dataset_tag") ?? "");
 </script>

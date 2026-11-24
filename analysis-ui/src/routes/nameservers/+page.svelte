@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
-  import { page } from "$app/state";
+    import { page } from "$app/state";
   import FilterBar from "#lib/FilterBar.svelte";
   import Pagination from "#lib/Pagination.svelte";
   import SortHeader from "#lib/SortHeader.svelte";
@@ -168,7 +167,7 @@
         </thead>
         <tbody>
           {#each rows as row (row.nameserver)}
-            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, nameserverHref(base, row.nameserver, search))}>
+            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, nameserverHref(row.nameserver, search))}>
               <th scope="row" class="row-ident">
                 <NameserverChip nameserver={row.nameserver} />
               </th>

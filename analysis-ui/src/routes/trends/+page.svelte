@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "#lib/FilterBar.svelte";
   import TrendLine from "#lib/charts/TrendLine.svelte";
@@ -34,9 +34,9 @@
     if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
     params.set("snapshot", slug);
     const q = `?${params.toString()}`;
-    if (data.category === "severity") return domainsSeverityHref(base, key, q);
-    if (data.category === "grade") return domainsGradeHref(base, key, q);
-    if (data.category === "dnssec_posture") return domainsPostureHref(base, key, q);
+    if (data.category === "severity") return domainsSeverityHref(key, q);
+    if (data.category === "grade") return domainsGradeHref(key, q);
+    if (data.category === "dnssec_posture") return domainsPostureHref(key, q);
     return null;
   }
 
@@ -53,19 +53,16 @@
     params.set("from", from);
     params.set("to", to);
     params.set("tab", "grade_changed");
-    return `${base}/diff?${params.toString()}`;
+    return `${resolve("diff")}?${params.toString()}`;
   }
 
   function onCategoryChange(value: string) {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     params.set("category", value);
     // Buckets differ per category, so a pinned key from the old category is
     // meaningless under the new one.
     params.delete("key");
-    goto(`${page.url.pathname}?${params.toString()}`, {
-      replaceState: true,
-      noScroll: true
-    });
+    goto(`${page.url.pathname}?${params.toString()}`, { replace: true, reset: false });
   }
 
   // Focus mode: ?key= pins one bucket to a line chart; ?scale= toggles the
@@ -75,24 +72,24 @@
   const view = $derived(page.url.searchParams.get("view") === "stacked" ? "stacked" : "panels");
 
   function setView(value: "panels" | "stacked") {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     if (value === "stacked") params.set("view", "stacked");
     else params.delete("view");
-    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+    goto(`${page.url.pathname}?${params.toString()}`, { replace: true, reset: false });
   }
 
   function setKey(key: string) {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     if (key) params.set("key", key);
     else params.delete("key");
-    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+    goto(`${page.url.pathname}?${params.toString()}`, { replace: true, reset: false });
   }
 
   function setScale(value: "count" | "share") {
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new URLSearchParams(page.url.search);
     if (value === "share") params.set("scale", "share");
     else params.delete("scale");
-    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+    goto(`${page.url.pathname}?${params.toString()}`, { replace: true, reset: false });
   }
 
   function onKeydown(event: KeyboardEvent) {
@@ -516,7 +513,7 @@
       <ol class="mover-list">
         {#each movers as m (m.tag)}
           <li class="mover-row">
-            <a class="mover-tag" href={tagHref(base, m.tag, query)}>{m.tag}</a>
+            <a class="mover-tag" href={tagHref(m.tag, query)}>{m.tag}</a>
             {#if m.level}
               <span class="level level-{levelTone(m.level)}">{m.level}</span>
             {:else}

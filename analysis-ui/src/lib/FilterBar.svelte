@@ -28,11 +28,7 @@
 
   function patch(updates: Partial<Record<FilterKey, string>>) {
     const next = applyFilterToParams(params, updates);
-    goto(`${page.url.pathname}${searchToString(next)}`, {
-      replaceState: true,
-      noScroll: true,
-      keepFocus: true
-    });
+    goto(`${page.url.pathname}${searchToString(next)}`, { replace: true, reset: false });
   }
 
   function onChange(key: FilterKey, value: string) {

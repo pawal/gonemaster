@@ -1,10 +1,12 @@
-// Top-level dashboard sections. Paths are relative to the SvelteKit base
-// ("/analysis"), so the browser URLs are "/analysis", "/analysis/domains",
-// etc. The "end" flag tells the active-link matcher whether to match only
-// the exact path (for the root overview) or any descendant.
+// Top-level dashboard sections by route ID; "end" limits the active match to the exact route.
+
+import type { RouteId } from "$app/types";
+
+// A route ID without [params], which resolve() takes without a params argument.
+export type SectionId = Exclude<RouteId, `${string}[${string}`>;
 
 export type NavItem = {
-  href: string;
+  href: SectionId;
   label: string;
   end: boolean;
 };

@@ -17,6 +17,9 @@ export default defineConfig({
       }),
       paths: {
         base: "/analysis"
+      },
+      version: {
+        pollInterval: 0
       }
     })
   ],

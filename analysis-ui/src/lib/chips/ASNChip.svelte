@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import { page } from "$app/state";
+    import { page } from "$app/state";
   import { asnHref } from "#lib/entityLinks.js";
   import EntityChip from "./EntityChip.svelte";
 
@@ -12,7 +11,7 @@
 
   let { asn, label, preserveQuery = true }: Props = $props();
 
-  const href = $derived(asnHref(base, asn, preserveQuery ? page.url.search : ""));
+  const href = $derived(asnHref(asn, preserveQuery ? page.url.search : ""));
   const tooltip = $derived(label ? `AS${asn} · ${label}` : `AS${asn}`);
 </script>
 

@@ -1711,25 +1711,28 @@ func TestNameserver17UndersizedCookieSafe(t *testing.T) {
 	}
 }
 
-func TestNameserver17ClientCookieStable(t *testing.T) {
+func TestNameserver17ClientCookiePerServer(t *testing.T) {
 	ctx := tctest.Context(t)
 
 	var mu sync.Mutex
-	var seen []string
-	record := func(opts *ens.QueryOptions) {
-		mu.Lock()
-		defer mu.Unlock()
-		seen = append(seen, cookieFromOpts(opts))
-	}
-	handler := func(q tctest.Query) packet.Packet {
-		if strings.ToUpper(q.Type) != "SOA" {
-			return packet.Packet{}
+	seen := map[string][]string{}
+	handler := func(server string) tctest.Handler {
+		return func(q tctest.Query) packet.Packet {
+			if strings.ToUpper(q.Type) != "SOA" {
+				return packet.Packet{}
+			}
+			c := cookieFromOpts(q.Opts)
+			mu.Lock()
+			seen[server] = append(seen[server], c)
+			mu.Unlock()
+			if len(c) == 16 { // query 1: issue a full cookie so query 2 runs
+				return soaPacketWithCookieRcode("example", dns.RcodeSuccess, c+cookieServer16)
+			}
+			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, c)
 		}
-		record(q.Opts)
-		return soaPacket("example") // cookieless: keeps each server to a single probe
 	}
-	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", handler)
-	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.18", handler)
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", handler("ns1"))
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.18", handler("ns2"))
 	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	})
@@ -1738,16 +1741,66 @@ func TestNameserver17ClientCookieStable(t *testing.T) {
 	if _, err := Nameserver17(ctx, &z); err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if len(seen) != 2 {
-		t.Fatalf("expected one probe per nameserver, got %d", len(seen))
-	}
-	for _, c := range seen {
-		if len(c) != 16 {
-			t.Fatalf("expected an 8-byte (16-hex) Client Cookie, got %q", c)
+	clients := map[string]string{}
+	for _, server := range []string{"ns1", "ns2"} {
+		cookies := seen[server]
+		if len(cookies) != 2 {
+			t.Fatalf("%s: expected query 1 and query 2, got %q", server, cookies)
 		}
+		if len(cookies[0]) != 16 {
+			t.Fatalf("%s: expected an 8-byte (16-hex) Client Cookie, got %q", server, cookies[0])
+		}
+		if cookies[1] != cookies[0]+cookieServer16 {
+			t.Fatalf("%s: query 2 cookie = %q, want %q", server, cookies[1], cookies[0]+cookieServer16)
+		}
+		clients[server] = cookies[0]
 	}
-	if seen[0] != seen[1] {
-		t.Fatalf("expected the same Client Cookie across probes, got %q and %q", seen[0], seen[1])
+	if clients["ns1"] == clients["ns2"] {
+		t.Fatalf("expected a different Client Cookie per server, both got %q", clients["ns1"])
+	}
+}
+
+func TestNameserver17BadCookieRoundTripWithoutFreshCookie(t *testing.T) {
+	cases := []struct {
+		name  string
+		reply func(client string) string
+	}{
+		{"client echo only", func(client string) string { return client }},
+		{"no cookie", func(string) string { return "" }},
+		{"wrong echo", func(string) string { return "ffffffffffffffff" + cookieServer16 }},
+		{"malformed 12B", func(client string) string { return client + "aabbccdd" }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+
+			var queries []string
+			ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+				if strings.ToUpper(q.Type) != "SOA" {
+					return packet.Packet{}
+				}
+				c := cookieFromOpts(q.Opts)
+				queries = append(queries, c)
+				if len(c) == 16 { // query 1: well-formed full cookie
+					return soaPacketWithCookieRcode("example", dns.RcodeSuccess, c+cookieServer16)
+				}
+				return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, tc.reply(clientPortion(c)))
+			})
+			tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+				return []ens.Nameserver{ns1}, nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := Nameserver17(ctx, &z)
+			if err != nil {
+				t.Fatalf("nameserver17: %v", err)
+			}
+			tctest.RequireTags(t, entries, "N17_COOKIE_SUPPORTED", "N17_COOKIE_SELF_REJECT")
+			tctest.RequireNoTag(t, entries, "N17_COOKIE_ROUNDTRIP_OK")
+			if len(queries) != 2 {
+				t.Fatalf("expected query 1 and query 2 with no retry, got %q", queries)
+			}
+		})
 	}
 }
 

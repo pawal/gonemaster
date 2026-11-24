@@ -4,6 +4,11 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Fixed
+
+- nameserver17: each nameserver gets its own Client Cookie (RFC 9018 section 3)
+- nameserver17: a BADCOOKIE round-trip reply without a well-formed fresh cookie emits `N17_COOKIE_SELF_REJECT` instead of `N17_COOKIE_ROUNDTRIP_OK`
+
 ### Security
 
 - deps: bump @sveltejs/kit to 2.70.4, @sveltejs/adapter-static to 3.0.11, undici to 7.30.2, vite to 8.3.8 and vitest to 4.1.12 to fix npm advisories in UI dev dependencies

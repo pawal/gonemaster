@@ -4,7 +4,9 @@ Status: Final
 
 ## Purpose
 - Validate that delegation-side and child-side nameserver sets meet minimum-count requirements overall and per IP family.
-- Flag any in-domain delegation NS name that the parent referral ships without the required A/AAAA glue.
+- Apply the per-family minimum of RFC 10001 section 4.1: "at least two IPv4-reachable and two IPv6-reachable name servers MUST be configured for a zone. A single name server that is reachable over both IPv4 and IPv6 counts once per address family."
+- Flag each nameserver name that resolves in one address family only (RFC 10001 section 4.1: all names used in NS RRs RECOMMENDED to have an A and AAAA record set).
+- Flag any in-domain delegation NS name that the parent referral ships without glue, or without glue of a family the child serves for that name (RFC 10001 section 3.1, RFC 9471 section 3.1).
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -18,6 +20,7 @@ Status: Final
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
   - Minimum required nameserver count is fixed by `constants.MinimumNumberOfNameservers` (two: RFC 1034 section 4.1 overall, RFC 10001 section 4.1 per IP family).
+- No step sends a DNS query of its own; every step reads views that nameserver discovery has already resolved.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
@@ -33,18 +36,53 @@ Status: Final
 5. Get delegation addressed NS ([`GlueNameservers`](../../nameserver-resolution.md#gluenameservers)), split by IP family, count unique NS names per family, and emit per family:
    - IPv4: `ENOUGH_IPV4_NS_DEL`, `NOT_ENOUGH_IPV4_NS_DEL`, or `NO_IPV4_NS_DEL`.
    - IPv6: `ENOUGH_IPV6_NS_DEL`, `NOT_ENOUGH_IPV6_NS_DEL`, or `NO_IPV6_NS_DEL`.
-6. Get raw delegation items ([`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers)). For each in-domain NS name that has no address in any item (the referral shipped no glue for it), emit `IN_DOMAIN_GLUE_MISSING` (one per name, sorted). Not-in-domain names are out of scope here.
-7. Emit `TEST_CASE_END`.
+6. Over the union of the addressed NS from steps 4 and 5, collect the address families of each unique lowercased NS name. For each name, in sorted order:
+   - IPv4 addresses only: emit `NS_NAME_NO_IPV6_ADDR`.
+   - IPv6 addresses only: emit `NS_NAME_NO_IPV4_ADDR`.
+   - Both families: no tag.
+   A name without any address is not part of the union and gets no tag here.
+7. Get raw delegation items ([`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers)). For each in-domain NS name, in sorted order, collect the glue families from its items and the child families from the step 4 view, then emit at most one of:
+   - No item for the name has an address: `IN_DOMAIN_GLUE_MISSING`.
+   - The glue has no IPv4 address and the child view holds an IPv4 address for the name: `IN_DOMAIN_GLUE_MISSING_IPV4`.
+   - The glue has no IPv6 address and the child view holds an IPv6 address for the name: `IN_DOMAIN_GLUE_MISSING_IPV6`.
+   - Otherwise no tag.
+   Not-in-domain names are out of scope here.
+8. Emit `TEST_CASE_END`.
 
-### In-Domain Glue Presence Check (step 6)
+### Per-Name Address Families (step 6)
 
-A delegation NS name that lies inside the zone (in-domain, RFC 9499 section 7) can only be reached if the parent referral carries its address as glue; otherwise a resolver holding only the referral cannot resolve the name (the address lives inside the very zone the name serves). The raw referral view from `DelegationNameservers` is used here rather than [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers), because the latter resolves the name through the recursor and would mask the missing glue.
+RFC 10001 section 3.1 names "No A/AAAA records for NS names" as a cause of name space partitioning, and section 4.1 RECOMMENDS an A and an AAAA record set for every name used in NS RRs. Both sides are read, so a name counts as dual-stack when either view shows the missing family.
+
+{{% expand "Show diagram" %}}
+```
+families = {}
+for ns in GlueNameservers(z) + ApexNameservers(z):
+   families[lower(ns.name)] += family(ns.address)
+
+for name in sort(keys(families)):
+   {IPv4}       -> NS_NAME_NO_IPV6_ADDR (ns)
+   {IPv6}       -> NS_NAME_NO_IPV4_ADDR (ns)
+   {IPv4, IPv6} -> no tag
+```
+{{% /expand %}}
+
+### In-Domain Glue Checks (step 7)
+
+A delegation NS name that lies inside the zone (in-domain, RFC 9499 section 7) can only be reached if the parent referral includes its address as glue; otherwise a resolver holding only the referral cannot resolve the name (the address lives inside the very zone the name serves). RFC 10001 section 3.1 requires glue of both families, and a resolver limited to one family needs glue of that family. The raw referral view from `DelegationNameservers` is used here rather than [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers), because the latter resolves the name through the recursor and would mask the missing glue.
+
+A per-family glue tag requires child-side evidence. RFC 10001 section 3.1 separates "Missing glue" (the parent lacks glue the child could supply) from "No A/AAAA records for NS names" (no record exists to glue). The step 4 view resolves each name from the root, so for an in-domain name it holds the child's own A and AAAA records; a family absent there is reported by step 6, not as missing glue.
 
 {{% expand "Show diagram" %}}
 ```
 items = DelegationNameservers(z)
-for each in-domain NS name with no addressed item:
-   IN_DOMAIN_GLUE_MISSING (ns)
+child = families per name from ApexNameservers(z)   (step 4 view)
+
+for each in-domain NS name, sorted:
+   glue = families of the name's addressed items
+   glue empty                          -> IN_DOMAIN_GLUE_MISSING      (ns)
+   IPv4 not in glue, IPv4 in child     -> IN_DOMAIN_GLUE_MISSING_IPV4 (ns)
+   IPv6 not in glue, IPv6 in child     -> IN_DOMAIN_GLUE_MISSING_IPV6 (ns)
+   otherwise                           -> no tag
 ```
 {{% /expand %}}
 
@@ -90,6 +128,8 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 | `ENOUGH_NS_CHILD` | Child NS name count is at least minimum. |
 | `ENOUGH_NS_DEL` | Delegation NS name count is at least minimum. |
 | `IN_DOMAIN_GLUE_MISSING` | An in-domain delegation NS name has no A/AAAA glue in the parent referral (RFC 1034 section 4.2.1, RFC 9471 section 3.1). |
+| `IN_DOMAIN_GLUE_MISSING_IPV4` | An in-domain delegation NS name has glue, none of it IPv4, while the child serves an IPv4 address for the name (RFC 10001 section 3.1). |
+| `IN_DOMAIN_GLUE_MISSING_IPV6` | An in-domain delegation NS name has glue, none of it IPv6, while the child serves an IPv6 address for the name (RFC 10001 section 3.1). |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | Child side has IPv4-addressed NS names, but fewer than minimum. |
 | `NOT_ENOUGH_IPV4_NS_DEL` | Delegation side has IPv4-addressed NS names, but fewer than minimum. |
 | `NOT_ENOUGH_IPV6_NS_CHILD` | Child side has IPv6-addressed NS names, but fewer than minimum. |
@@ -100,6 +140,8 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 | `NO_IPV4_NS_DEL` | Delegation side has zero NS names with IPv4 addresses. |
 | `NO_IPV6_NS_CHILD` | Child side has zero NS names with IPv6 addresses. |
 | `NO_IPV6_NS_DEL` | Delegation side has zero NS names with IPv6 addresses. |
+| `NS_NAME_NO_IPV4_ADDR` | A nameserver name has IPv6 addresses and no IPv4 address in either view (RFC 10001 section 4.1). |
+| `NS_NAME_NO_IPV6_ADDR` | A nameserver name has IPv4 addresses and no IPv6 address in either view (RFC 10001 section 4.1). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -125,6 +167,8 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 | `ENOUGH_NS_DEL` | `minimum` | `int` | Required minimum NS count. |
 | `ENOUGH_NS_DEL` | `servers` | `array<object>` | Structured delegation nameserver names as `{ns}` items. |
 | `IN_DOMAIN_GLUE_MISSING` | `ns` | `string` | The in-domain delegation NS name that lacks glue. |
+| `IN_DOMAIN_GLUE_MISSING_IPV4` | `ns` | `string` | The in-domain delegation NS name that lacks IPv4 glue. |
+| `IN_DOMAIN_GLUE_MISSING_IPV6` | `ns` | `string` | The in-domain delegation NS name that lacks IPv6 glue. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `count` | `int` | Number of unique child NS names with IPv4 addresses. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `minimum` | `int` | Required minimum NS count. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `servers` | `array<object>` | Structured child `{ns,address}` object items considered for IPv4. |
@@ -155,6 +199,8 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 | `NO_IPV6_NS_DEL` | `count` | `int` | Number of unique delegation NS names with IPv6 addresses (`0`). |
 | `NO_IPV6_NS_DEL` | `minimum` | `int` | Required minimum NS count. |
 | `NO_IPV6_NS_DEL` | `servers` | `array<object>` | Structured delegation `{ns,address}` object items considered for IPv6. |
+| `NS_NAME_NO_IPV4_ADDR` | `ns` | `string` | The nameserver name with no IPv4 address. |
+| `NS_NAME_NO_IPV6_ADDR` | `ns` | `string` | The nameserver name with no IPv6 address. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Delegation01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation01`). |
 
@@ -168,16 +214,20 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 | `ENOUGH_NS_CHILD` | `INFO` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `ENOUGH_NS_DEL` | `INFO` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `IN_DOMAIN_GLUE_MISSING` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `IN_DOMAIN_GLUE_MISSING_IPV4` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). The name stays reachable over IPv6. |
+| `IN_DOMAIN_GLUE_MISSING_IPV6` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). The name stays reachable over IPv4. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `NOT_ENOUGH_IPV4_NS_DEL` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `NOT_ENOUGH_IPV6_NS_CHILD` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `NOT_ENOUGH_IPV6_NS_DEL` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `NOT_ENOUGH_NS_CHILD` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `NOT_ENOUGH_NS_DEL` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
-| `NO_IPV4_NS_CHILD` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
-| `NO_IPV4_NS_DEL` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
-| `NO_IPV6_NS_CHILD` | `NOTICE` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
-| `NO_IPV6_NS_DEL` | `NOTICE` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `NO_IPV4_NS_CHILD` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). RFC 10001 section 4.1 MUST, as for `NOT_ENOUGH_IPV4_NS_CHILD`. |
+| `NO_IPV4_NS_DEL` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). RFC 10001 section 4.1 MUST, as for `NOT_ENOUGH_IPV4_NS_DEL`. |
+| `NO_IPV6_NS_CHILD` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). RFC 10001 section 4.1 MUST, as for `NOT_ENOUGH_IPV6_NS_CHILD`. |
+| `NO_IPV6_NS_DEL` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). RFC 10001 section 4.1 MUST, as for `NOT_ENOUGH_IPV6_NS_DEL`. |
+| `NS_NAME_NO_IPV4_ADDR` | `NOTICE` | Default from `share/profile.json` (`test_levels.DELEGATION`). Zero penalty in the default scoring config. |
+| `NS_NAME_NO_IPV6_ADDR` | `NOTICE` | Default from `share/profile.json` (`test_levels.DELEGATION`). Zero penalty in the default scoring config. |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
@@ -185,13 +235,23 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes delegation-side IPv4/IPv6 checks before child-side IPv4/IPv6 checks. Gonemaster: performs child-side family checks first, then delegation-side family checks.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
-  - Upstream: only counts NS names with at least one address in aggregate, so a single in-domain name missing its glue is absorbed into the count and never flagged. Gonemaster: additionally flags each such name with `IN_DOMAIN_GLUE_MISSING`.
+  - Upstream: sets `NO_IPV4_NS_CHILD` and `NO_IPV4_NS_DEL` to `WARNING`, and `NO_IPV6_NS_CHILD` and `NO_IPV6_NS_DEL` to `NOTICE` in the released test plan, `WARNING` on the development branch since [zonemaster#1533](https://github.com/zonemaster/zonemaster/pull/1533), which also quotes RFC 10001 section 4.1 as the objective. Gonemaster: all four at `ERROR`, the level of the one-server `NOT_ENOUGH_*` tags, since zero servers in a family violates the same RFC 10001 section 4.1 MUST.
+  - Upstream: only counts NS names with at least one address in aggregate, so a single in-domain name missing its glue is absorbed into the count and never flagged. Gonemaster: additionally flags each such name with `IN_DOMAIN_GLUE_MISSING`, and each name whose glue lacks a family the child serves with `IN_DOMAIN_GLUE_MISSING_IPV4` or `IN_DOMAIN_GLUE_MISSING_IPV6`.
+  - Upstream: counts NS names per family and names no NS name that resolves in one family only. Gonemaster: flags each such name with `NS_NAME_NO_IPV4_ADDR` or `NS_NAME_NO_IPV6_ADDR`.
 - Potential upstream report:
   - `yes` (feature proposal: per-name in-domain glue presence)
+  - Severity reported as [zonemaster#1529](https://github.com/zonemaster/zonemaster/issues/1529); the remaining difference is tracked as `DIV-DEL01-IPV6-SEVERITY` in [known-behavior-divergences.md](../../known-behavior-divergences.md).
 
 ## Edge Cases And Limitations
 - Per-family counts are by unique NS name, not by count of IP addresses.
 - A single NS name can contribute to both IPv4 and IPv6 counts when it has both address families.
 - Any method error aborts testcase execution and can prevent later tags from being emitted.
-- The glue-presence check uses the raw parent referral (`DelegationNameservers`), not `GlueNameservers`, so a name resolvable only via the recursor still counts as missing glue.
-- Not-in-domain NS names are out of scope for the glue-presence check; their resolvability is covered by other testcases.
+- An IPv4-mapped address (`::ffff:0:0/96`) in an AAAA record counts as IPv4 in every step: the nameserver views unmap it, and step 7 unmaps glue items the same way. A name whose only AAAA is mapped counts as IPv4-only. NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`) and IPv4-compatible (`::/96`) addresses count as IPv6 here; Address01 reports all four forms as `A01_IPV4_EMBEDDED_IPV6_ADDR`.
+- The glue checks use the raw parent referral (`DelegationNameservers`), not `GlueNameservers`, so a name resolvable only via the recursor still counts as missing glue.
+- When the parent answers with AA instead of a referral, `DelegationNameservers` fills the addresses through the recursor, so the glue checks there see the name's address records rather than referral glue.
+- An in-domain name with no record of a family anywhere gets `NS_NAME_NO_IPV4_ADDR` or `NS_NAME_NO_IPV6_ADDR` and no per-family glue tag: there is no record to glue.
+- A child that does not answer for an in-domain name gives no child-side evidence, so no per-family glue tag fires for it.
+- Consistency05 reports a family the child serves beyond the glue in the aggregate `EXTRA_ADDRESS_CHILD`; the per-family glue tags name the same defect per NS name. Glue covering both families while the child lacks one is Consistency05's `IN_DOMAIN_ADDR_MISMATCH`, not a finding of this testcase.
+- Not-in-domain NS names are out of scope for the glue checks; their resolvability is covered by other testcases.
+- A name whose address lookup ends in NXDOMAIN has no address and gets no per-name tag.
+- `ApexNameservers` is built from the first successful apex response, while `ApexNSNames` is the union over all child servers. A name only in that union has no address data and gets no per-name tag unless the delegation side supplies one.

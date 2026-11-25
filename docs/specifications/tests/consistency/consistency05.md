@@ -246,6 +246,7 @@ The same asymmetry governs the address comparison:
 - `CHILD_ZONE_LAME` short-circuits testcase execution and suppresses later mismatch checks when no usable in-domain address lookup path was found.
 - In-domain mismatch reporting is per NS name: a zone with several names carrying wrong glue produces one `IN_DOMAIN_ADDR_MISMATCH` per name, each naming only that name's unconfirmed addresses.
 - A name with `IN_DOMAIN_ADDR_MISMATCH` contributes nothing to `EXTRA_ADDRESS_CHILD`.
+- A name whose glue lacks a family the child serves also gets `IN_DOMAIN_GLUE_MISSING_IPV4` or `IN_DOMAIN_GLUE_MISSING_IPV6` from Delegation01, per name; `EXTRA_ADDRESS_CHILD` lists the same addresses in aggregate.
 - A not-in-domain lookup that times out, fails, or returns a non-authoritative empty answer leaves that family's glue uncompared. An authoritative NXDOMAIN or NODATA still reports the glue as a mismatch.
 - A zone whose parents supply no usable glue, including the root zone and a delegation whose nameservers are all not-in-domain, has nothing to compare and reports `ADDRESSES_MATCH`.
 - Not-in-domain mismatch reporting is per NS name group; each emission includes full parent list for that group.

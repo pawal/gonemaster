@@ -28,7 +28,7 @@ make spec-export-implemented
 - basic03 - Detect the "broken but functional" case by probing `A` records for `www.<child-zone>` against delegation nameservers.
 
 ### address (3)
-- address01 - Classify authoritative nameserver IP addresses as globally reachable, documentation, local-use, or otherwise not globally reachable.
+- address01 - Classify authoritative nameserver IP addresses as IPv4-embedded, globally reachable, documentation, local-use, or otherwise not globally reachable.
 - address02 - Verify that every unique nameserver IP address has a usable reverse DNS PTR mapping.
 - address03 - Verify that reverse PTR hostnames for nameserver IPs match the corresponding nameserver hostname.
 

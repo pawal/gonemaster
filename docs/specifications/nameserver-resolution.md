@@ -12,8 +12,10 @@ except `Zone.GlueNames` and `Zone.ApexNSNames`, which are methods on
 `*zone.Zone` in [`engine/zone`](https://codeberg.org/pawal/gonemaster/src/branch/main/engine/zone).
 
 A nameserver address in IPv4-mapped IPv6 form (RFC 4291 section 2.5.5.2)
-is queried as the IPv4 address it carries: the IPv4 switch of the profile
-governs it, and it shares that address's cache.
+is queried as its embedded IPv4 address: the IPv4 switch of the profile
+governs it, and it shares that address's cache. Views of
+`nameserver.Nameserver` values convert it to that IPv4 address; views of
+`NSItem` values keep the IPv6 form of the AAAA record.
 
 ## GlueNameservers
 
@@ -51,9 +53,11 @@ name+address pairs. The child's claim about itself.
 func ApexNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error)
 ```
 
-Equivalent to `z.NS(ctx)` with a nil-zone guard. For in-domain names
-this resolves via the zone's own glue; not-in-domain names are
-resolved via the recursor.
+Equivalent to `z.NS(ctx)` with a nil-zone guard. Each name's A and AAAA
+records are resolved from the root through the recursor; for an in-domain
+name the walk reaches the child's servers through the parent's glue, so
+the addresses are the child's own records. An undelegated test returns
+the supplied glue instead.
 
 Source: `engine/nsdiscovery/nsdiscovery.go`.
 

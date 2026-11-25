@@ -58,10 +58,27 @@ func NotQueryableReason(ip netip.Addr) string {
 	return ""
 }
 
-var nat64WellKnown = netip.MustParsePrefix("64:ff9b::/96")
+var (
+	nat64WellKnown = netip.MustParsePrefix("64:ff9b::/96")
+	nat64LocalUse  = netip.MustParsePrefix("64:ff9b:1::/48")
+	ipv4Compatible = netip.MustParsePrefix("::/96")
+)
 
 // Deprecated IPv6 ranges absent from the special-purpose registry.
 var deprecatedIPv6 = []SpecialIPBlock{
 	{Prefix: netip.MustParsePrefix("fec0::/10"), Name: "Site-Local (deprecated)", Reference: "[RFC3879]", GloballyReachable: "False"},
-	{Prefix: netip.MustParsePrefix("::/96"), Name: "IPv4-Compatible (deprecated)", Reference: "[RFC4291]", GloballyReachable: "False"},
+	{Prefix: ipv4Compatible, Name: "IPv4-Compatible (deprecated)", Reference: "[RFC4291]", GloballyReachable: "False"},
+}
+
+// IsIPv4Embedded reports whether ip is an IPv4-mapped, IPv4-compatible or NAT64 address (RFC 10001 section 4.1).
+func IsIPv4Embedded(ip netip.Addr) bool {
+	ip = ip.WithZone("")
+	switch {
+	case ip.Is4In6():
+		return true
+	case ipv4Compatible.Contains(ip):
+		return ip != netip.IPv6Unspecified() && ip != netip.IPv6Loopback()
+	default:
+		return nat64WellKnown.Contains(ip) || nat64LocalUse.Contains(ip)
+	}
 }

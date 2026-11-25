@@ -416,7 +416,8 @@ func getOOBIPs(ctx context.Context, z *zone.Zone, nsNames []dnsname.Name) ([]NSI
 	return uniqueSortedItems(ctx, z.Name.String(), out), nil
 }
 
-func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+// getIBAddrInZone returns in-bailiwick NS addresses as served, without the nameserver unmapping.
+func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	delItems, err := DelegationNameservers(ctx, z)
 	if err != nil {
 		return nil, err
@@ -431,7 +432,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 
 	hasInBailiwick := slices.ContainsFunc(nsNames, z.Name.IsInBailiwick)
 	if !hasInBailiwick {
-		return []nameserver.Nameserver{}, nil
+		return []NSItem{}, nil
 	}
 
 	r := z.Recursor()
@@ -439,24 +440,14 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 		return nil, fmt.Errorf("missing recursor")
 	}
 	if r.Undelegated(z.Name.String()) {
-		seen := map[string]nameserver.Nameserver{}
+		seen := map[string]NSItem{}
 		for _, item := range delItems {
 			if !item.HasAddress || !z.Name.IsInBailiwick(item.Name) {
 				continue
 			}
-			ns, ok := toNameserver(ctx, z, item)
-			if !ok {
-				continue
-			}
-			seen[strings.ToLower(ns.String())] = ns
+			seen[strings.ToLower(item.String())] = item
 		}
-
-		keys := slices.Sorted(maps.Keys(seen))
-		out := make([]nameserver.Nameserver, 0, len(keys))
-		for _, key := range keys {
-			out = append(out, seen[key])
-		}
-		return out, nil
+		return itemsByKey(seen), nil
 	}
 
 	var delServers []nameserver.Nameserver
@@ -497,24 +488,24 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 		}
 	}
 
-	seen := map[string]nameserver.Nameserver{}
+	seen := map[string]NSItem{}
 	for nsName, addrs := range ibNS {
 		for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
-			ns, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
-			if err != nil {
-				continue
-			}
-			seen[strings.ToLower(ns.String())] = ns
+			item := NSItem{Name: dnsname.New(nsName), Address: addr, HasAddress: true}
+			seen[strings.ToLower(item.String())] = item
 		}
 	}
+	return itemsByKey(seen), nil
+}
 
+// itemsByKey returns the items in sorted key order.
+func itemsByKey(seen map[string]NSItem) []NSItem {
 	keys := slices.Sorted(maps.Keys(seen))
-
-	out := make([]nameserver.Nameserver, 0, len(keys))
+	out := make([]NSItem, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, seen[key])
 	}
-	return out, nil
+	return out
 }
 
 func toNameserver(ctx context.Context, z *zone.Zone, item NSItem) (nameserver.Nameserver, bool) {

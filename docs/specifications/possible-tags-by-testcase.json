@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 87,
-    "unique_tag_count": 624
+    "unique_tag_count": 629
   },
   "modules": {
     "address": {
@@ -22,6 +22,7 @@
         "A01_ADDR_NOT_GLOBALLY_REACHABLE",
         "A01_DOCUMENTATION_ADDR",
         "A01_GLOBALLY_REACHABLE_ADDR",
+        "A01_IPV4_EMBEDDED_IPV6_ADDR",
         "A01_LOCAL_USE_ADDR",
         "A01_NO_GLOBALLY_REACHABLE_ADDR",
         "A01_NO_NAME_SERVERS_FOUND",
@@ -275,6 +276,8 @@
         "ENOUGH_NS_CHILD",
         "ENOUGH_NS_DEL",
         "IN_DOMAIN_GLUE_MISSING",
+        "IN_DOMAIN_GLUE_MISSING_IPV4",
+        "IN_DOMAIN_GLUE_MISSING_IPV6",
         "NOT_ENOUGH_IPV4_NS_CHILD",
         "NOT_ENOUGH_IPV4_NS_DEL",
         "NOT_ENOUGH_IPV6_NS_CHILD",
@@ -285,6 +288,8 @@
         "NO_IPV4_NS_DEL",
         "NO_IPV6_NS_CHILD",
         "NO_IPV6_NS_DEL",
+        "NS_NAME_NO_IPV4_ADDR",
+        "NS_NAME_NO_IPV6_ADDR",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ],

@@ -84,6 +84,7 @@ func AddressMetadata() map[string][]string {
 			"A01_ADDR_NOT_GLOBALLY_REACHABLE",
 			"A01_DOCUMENTATION_ADDR",
 			"A01_GLOBALLY_REACHABLE_ADDR",
+			"A01_IPV4_EMBEDDED_IPV6_ADDR",
 			"A01_LOCAL_USE_ADDR",
 			"A01_NO_GLOBALLY_REACHABLE_ADDR",
 			"A01_NO_NAME_SERVERS_FOUND",
@@ -173,10 +174,16 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var localUseAddr []string
 	var notGloballyReachable []string
 	var globallyReachable []string
+	var ipv4Embedded []string
 
 	for _, ip := range ipKeys {
 		group := ipGroups[ip]
 		if len(group) == 0 {
+			continue
+		}
+
+		if constants.IsIPv4Embedded(group[0].Address) {
+			ipv4Embedded = append(ipv4Embedded, nsItemStrings(group)...)
 			continue
 		}
 
@@ -232,6 +239,14 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		args := map[string]any{}
 		setTypedServersFromEndpoints(args, notGloballyReachable)
 		if err := appendAddressLog(ctx, &results, testcase, "A01_ADDR_NOT_GLOBALLY_REACHABLE", args); err != nil {
+			return results, err
+		}
+	}
+
+	if len(ipv4Embedded) > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, ipv4Embedded)
+		if err := appendAddressLog(ctx, &results, testcase, "A01_IPV4_EMBEDDED_IPV6_ADDR", args); err != nil {
 			return results, err
 		}
 	}

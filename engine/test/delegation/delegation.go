@@ -138,6 +138,10 @@ func Metadata() map[string][]string {
 			"NO_IPV6_NS_CHILD",
 			"NO_IPV6_NS_DEL",
 			"IN_DOMAIN_GLUE_MISSING",
+			"IN_DOMAIN_GLUE_MISSING_IPV4",
+			"IN_DOMAIN_GLUE_MISSING_IPV6",
+			"NS_NAME_NO_IPV4_ADDR",
+			"NS_NAME_NO_IPV6_ADDR",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -341,50 +345,110 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	nameFamilies := familiesByName(slices.Concat(childNS, delNS))
+	for _, name := range slices.Sorted(maps.Keys(nameFamilies)) {
+		args := map[string]any{"ns": logargs.EndpointName(name)}
+		switch f := nameFamilies[name]; {
+		case f.v4 && !f.v6:
+			if err := appendLog(ctx, &results, testcase, "NS_NAME_NO_IPV6_ADDR", args); err != nil {
+				return results, err
+			}
+		case f.v6 && !f.v4:
+			if err := appendLog(ctx, &results, testcase, "NS_NAME_NO_IPV4_ADDR", args); err != nil {
+				return results, err
+			}
+		}
+	}
+
 	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	for _, name := range missingInBailiwickGlue(delItems, z.Name) {
-		if err := appendLog(ctx, &results, testcase, "IN_DOMAIN_GLUE_MISSING", map[string]any{
-			"ns": logargs.EndpointName(name),
-		}); err != nil {
-			return results, err
+	for _, g := range inBailiwickGlueDefects(delItems, z.Name, familiesByName(childNS)) {
+		args := map[string]any{"ns": logargs.EndpointName(g.name)}
+		switch g.defect {
+		case glueMissing:
+			if err := appendLog(ctx, &results, testcase, "IN_DOMAIN_GLUE_MISSING", args); err != nil {
+				return results, err
+			}
+		case glueMissingIPv4:
+			if err := appendLog(ctx, &results, testcase, "IN_DOMAIN_GLUE_MISSING_IPV4", args); err != nil {
+				return results, err
+			}
+		case glueMissingIPv6:
+			if err := appendLog(ctx, &results, testcase, "IN_DOMAIN_GLUE_MISSING_IPV6", args); err != nil {
+				return results, err
+			}
 		}
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
 }
 
-// missingInBailiwickGlue returns in-bailiwick delegation NS names the parent
-// referral ships without any A/AAAA glue. Uses the raw referral glue from
-// DelegationNameservers, not z.Glue, which masks the defect via the recursor.
-func missingInBailiwickGlue(items []nsdiscovery.NSItem, zoneName dnsname.Name) []string {
-	hasGlue := map[string]bool{}
-	seen := map[string]bool{}
-	var order []string
+// addressFamilies records which IP families a nameserver name has addresses in.
+type addressFamilies struct{ v4, v6 bool }
+
+// familiesByName returns the address families of each addressed NS name, keyed by lowercase name.
+func familiesByName(nss []nameserver.Nameserver) map[string]addressFamilies {
+	out := map[string]addressFamilies{}
+	for _, ns := range nss {
+		if !ns.Address.IsValid() {
+			continue
+		}
+		key := ns.Name.StringLower()
+		f := out[key]
+		f.v4 = f.v4 || ns.Address.Is4()
+		f.v6 = f.v6 || ns.Address.Is6()
+		out[key] = f
+	}
+	return out
+}
+
+// glueDefect is the in-domain glue finding for one delegation NS name.
+type glueDefect int
+
+const (
+	glueMissing glueDefect = iota + 1
+	glueMissingIPv4
+	glueMissingIPv6
+)
+
+type nameGlueDefect struct {
+	name   string
+	defect glueDefect
+}
+
+// inBailiwickGlueDefects classifies the referral glue of each in-bailiwick NS name against the child's families.
+func inBailiwickGlueDefects(items []nsdiscovery.NSItem, zoneName dnsname.Name, child map[string]addressFamilies) []nameGlueDefect {
+	glue := map[string]addressFamilies{}
 	for _, item := range items {
 		if !zoneName.IsInBailiwick(item.Name) {
 			continue
 		}
-		name := item.Name.String()
-		if !seen[name] {
-			seen[name] = true
-			order = append(order, name)
-		}
+		key := item.Name.StringLower()
+		f := glue[key]
 		if item.HasAddress {
-			hasGlue[name] = true
+			// A mapped AAAA counts as IPv4, as in the nameserver views.
+			addr := item.Address.Unmap()
+			f.v4 = f.v4 || addr.Is4()
+			f.v6 = f.v6 || addr.Is6()
 		}
+		glue[key] = f
 	}
 
-	var missing []string
-	for _, name := range order {
-		if !hasGlue[name] {
-			missing = append(missing, name)
+	var out []nameGlueDefect
+	for _, name := range slices.Sorted(maps.Keys(glue)) {
+		g, c := glue[name], child[name]
+		switch {
+		case !g.v4 && !g.v6:
+			out = append(out, nameGlueDefect{name, glueMissing})
+		case !g.v4 && c.v4:
+			out = append(out, nameGlueDefect{name, glueMissingIPv4})
+		case !g.v6 && c.v6:
+			out = append(out, nameGlueDefect{name, glueMissingIPv6})
 		}
 	}
-	sort.Strings(missing)
-	return missing
+	return out
 }
 
 // Delegation02 runs the DELEGATION02 test case.

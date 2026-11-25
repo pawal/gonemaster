@@ -58,10 +58,7 @@ type BonusCriteriaConfig struct {
 	ASDiversity         bool `json:"as_diversity"`
 }
 
-// LoadConfig reads a JSON scoring config file and returns the parsed Config.
-// Fields absent from the file retain the values from DefaultConfig.
-// Note: map fields (SeverityPenalties, CategoryWeights, ModuleCategories) are
-// replaced entirely when present in the file, not merged with defaults.
+// LoadConfig reads a JSON scoring config file over DefaultConfig; map entries merge with the defaults.
 func LoadConfig(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -148,11 +145,9 @@ func DefaultConfig() Config {
 			"DNSKEY_RSA_EXPONENT_LARGE": 0,
 			// DS19_BLOCKLIST_NOT_FOUND: the badkeys blocklist is missing on the test host.
 			"DS19_BLOCKLIST_NOT_FOUND": 0,
-			// NO_IPV6_NS_CHILD / NO_IPV6_NS_DEL: zero nameservers have IPv6
-			// addresses - the zone is entirely unreachable over IPv6. Both are
-			// NOTICE (1 pt) by default but warrant the same weight as an ERROR.
-			"NO_IPV6_NS_CHILD": 20,
-			"NO_IPV6_NS_DEL":   20,
+			// NS_NAME_NO_IPV*_ADDR: per-name detail; the delegation01 count tags hold the penalty.
+			"NS_NAME_NO_IPV4_ADDR": 0,
+			"NS_NAME_NO_IPV6_ADDR": 0,
 			// N15_SOFTWARE_VERSION: nameserver reveals its software version string
 			// via version.bind. This is a cosmetic privacy/hardening notice - the
 			// zone works correctly. No penalty.

@@ -483,6 +483,35 @@ func TestLoadConfig_RenamedTagCurrentKeyWins(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_MergesMapsWithDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "scoring.json")
+	body := `{
+		"severity_penalties": {"WARNING": 3},
+		"tag_penalties": {"IN_DOMAIN_ADDR_MISMATCH": 7}
+	}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	loaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	for severity, want := range map[string]int{"WARNING": 3, "ERROR": 20} {
+		if got := loaded.SeverityPenalties[severity]; got != want {
+			t.Errorf("severity penalty for %s = %d, want %d", severity, got, want)
+		}
+	}
+	for tag, want := range map[string]int{"IN_DOMAIN_ADDR_MISMATCH": 7, "DS07_NOT_SIGNED": 20} {
+		if got := loaded.TagPenalties[tag]; got != want {
+			t.Errorf("penalty for %s = %d, want %d", tag, got, want)
+		}
+	}
+	if got, ok := loaded.TagPenalties["NS_NAME_NO_IPV6_ADDR"]; !ok || got != 0 {
+		t.Errorf("penalty for NS_NAME_NO_IPV6_ADDR = %d (present %t), want a default 0", got, ok)
+	}
+}
+
 // Severity alone gives 5 points for WARNING and 1 for NOTICE.
 func TestComputeTagPenalties(t *testing.T) {
 	for _, tc := range []struct {
@@ -494,8 +523,10 @@ func TestComputeTagPenalties(t *testing.T) {
 	}{
 		{"not signed overrides its severity", e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"), cfg, "dnssec", 20},
 		{"no DS for a signed zone", e("DNSSEC", "DS07_NO_DS_FOR_SIGNED_ZONE", "WARNING"), cfg, "dnssec", 20},
-		{"no IPv6 NS at the child", e("DELEGATION", "NO_IPV6_NS_CHILD", "NOTICE"), cfg, "nameserver_health", 20},
-		{"no IPv6 NS in the delegation", e("DELEGATION", "NO_IPV6_NS_DEL", "NOTICE"), cfg, "nameserver_health", 20},
+		{"no IPv6 NS at the child scores its ERROR level", e("DELEGATION", "NO_IPV6_NS_CHILD", "ERROR"), cfg, "nameserver_health", 20},
+		{"no IPv6 NS in the delegation scores its ERROR level", e("DELEGATION", "NO_IPV6_NS_DEL", "ERROR"), cfg, "nameserver_health", 20},
+		{"a nameserver name without IPv4 costs nothing", e("DELEGATION", "NS_NAME_NO_IPV4_ADDR", "NOTICE"), cfg, "nameserver_health", 0},
+		{"a nameserver name without IPv6 costs nothing", e("DELEGATION", "NS_NAME_NO_IPV6_ADDR", "NOTICE"), cfg, "nameserver_health", 0},
 		{"not enough IPv6 NS keeps its severity", e("DELEGATION", "NOT_ENOUGH_IPV6_NS_CHILD", "ERROR"), cfg, "nameserver_health", 20},
 		{"an unlisted tag keeps its severity", e("DNSSEC", "DS04_RRSIG_EXPIRY_SOON", "WARNING"), cfg, "dnssec", 5},
 		{

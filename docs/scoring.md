@@ -57,8 +57,6 @@ Some tags warrant a penalty disproportionate to their log level. The
 |------------------------------|---------|----------|------------------------------------|
 | `DS07_NOT_SIGNED`            | WARNING | **20**   | Zone entirely unsigned             |
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | WARNING | **20**   | Chain of trust broken              |
-| `NO_IPV6_NS_CHILD`          | NOTICE  | **20**   | Zone unreachable over IPv6         |
-| `NO_IPV6_NS_DEL`            | NOTICE  | **20**   | Delegation has no IPv6 addresses   |
 | `CN05_ANSWER_NEEDS_TCP`      | NOTICE  | **0**    | Correct behaviour, reported only   |
 | `N15_SOFTWARE_VERSION`       | NOTICE  | **0**    | Cosmetic - zone works correctly    |
 | `N16_HAS_NSID`               | INFO    | **0**    | Informational - explicit NSID reply|
@@ -69,6 +67,8 @@ Some tags warrant a penalty disproportionate to their log level. The
 | `N18_RESOLVER_BEHAVIOR_REPORTED`| WARNING | **0**  | Diagnostic - gates A+ only             |
 | `N18_FILTERED_RESPONSE`      | WARNING | **0**    | Diagnostic - gates A+ only             |
 | `N18_NO_RESPONSE`            | WARNING | **0**    | Diagnostic - reachability via other tests|
+| `NS_NAME_NO_IPV4_ADDR`       | NOTICE  | **0**    | Per-name detail of the delegation01 counts |
+| `NS_NAME_NO_IPV6_ADDR`       | NOTICE  | **0**    | Per-name detail of the delegation01 counts |
 
 Setting a tag penalty to 0 suppresses it entirely.
 
@@ -233,8 +233,6 @@ or the `scoring_config_path` server config key.
   "tag_penalties": {
     "DS07_NOT_SIGNED":            20,
     "DS07_NO_DS_FOR_SIGNED_ZONE": 20,
-    "NO_IPV6_NS_CHILD":           20,
-    "NO_IPV6_NS_DEL":             20,
     "CN05_ANSWER_NEEDS_TCP":       0,
     "N15_SOFTWARE_VERSION":        0,
     "N16_HAS_NSID":                0,
@@ -244,7 +242,9 @@ or the `scoring_config_path` server config key.
     "N18_SERVER_ERROR_REPORTED":      0,
     "N18_RESOLVER_BEHAVIOR_REPORTED": 0,
     "N18_FILTERED_RESPONSE":          0,
-    "N18_NO_RESPONSE":                0
+    "N18_NO_RESPONSE":                0,
+    "NS_NAME_NO_IPV4_ADDR":           0,
+    "NS_NAME_NO_IPV6_ADDR":           0
   },
   "grade_bands": [
     { "grade": "A", "min_score": 90 },
@@ -265,15 +265,16 @@ or the `scoring_config_path` server config key.
 }
 ```
 
-Fields absent from the file retain their default values. Map fields
+Fields absent from the file keep their default values. Map fields
 (`severity_penalties`, `category_weights`, `module_categories`,
-`tag_penalties`) are replaced entirely when present - they are not merged
-with defaults.
+`tag_penalties`) merge with the defaults, key by key, so a file that sets one
+tag penalty keeps every other default.
 
-A stored configuration is therefore a full snapshot, and a `tag_penalties`
-map written before a tag existed does not acquire its default override. A
-deployment whose file predates `CN05_ANSWER_NEEDS_TCP` scores that tag by its
-NOTICE severity until the entry is added.
+A configuration saved on the server through `PUT /api/v1/scoring-config`, as
+the admin UI scoring settings do, is a full snapshot and does not merge. Its
+`tag_penalties` map has no entry for a tag added after the save, so a server
+whose saved configuration predates `CN05_ANSWER_NEEDS_TCP` scores that tag by
+its NOTICE severity until the entry is added.
 
 ### Disabling categories
 

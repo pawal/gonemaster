@@ -2,6 +2,7 @@ package delegation
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -259,6 +260,155 @@ func TestDelegation01InBailiwickGluePresent(t *testing.T) {
 	}
 
 	tctest.RequireNoTag(t, entries, "IN_DOMAIN_GLUE_MISSING")
+}
+
+func TestDelegation01FamilyFindings(t *testing.T) {
+	tests := []struct {
+		name  string
+		glue  []string
+		del   []string
+		child []string
+		want  []string
+	}{
+		{
+			name:  "IPv4 glue, child serves AAAA",
+			glue:  []string{"ns1.example/192.0.2.1"},
+			del:   []string{"ns1.example/192.0.2.1"},
+			child: []string{"ns1.example/192.0.2.1", "ns1.example/2001:db8::1"},
+			want:  []string{"IN_DOMAIN_GLUE_MISSING_IPV6 ns1.example"},
+		},
+		{
+			name:  "IPv6 glue, child serves A",
+			glue:  []string{"ns1.example/2001:db8::1"},
+			del:   []string{"ns1.example/2001:db8::1"},
+			child: []string{"ns1.example/192.0.2.1", "ns1.example/2001:db8::1"},
+			want:  []string{"IN_DOMAIN_GLUE_MISSING_IPV4 ns1.example"},
+		},
+		{
+			name:  "IPv4 glue, no AAAA anywhere",
+			glue:  []string{"ns1.example/192.0.2.1"},
+			del:   []string{"ns1.example/192.0.2.1"},
+			child: []string{"ns1.example/192.0.2.1"},
+			want:  []string{"NS_NAME_NO_IPV6_ADDR ns1.example"},
+		},
+		{
+			name:  "IPv6 glue, no A anywhere",
+			glue:  []string{"ns1.example/2001:db8::1"},
+			del:   []string{"ns1.example/2001:db8::1"},
+			child: []string{"ns1.example/2001:db8::1"},
+			want:  []string{"NS_NAME_NO_IPV4_ADDR ns1.example"},
+		},
+		{
+			name:  "no glue",
+			glue:  []string{"ns1.example"},
+			child: []string{"ns1.example/192.0.2.1", "ns1.example/2001:db8::1"},
+			want:  []string{"IN_DOMAIN_GLUE_MISSING ns1.example"},
+		},
+		{
+			name:  "glue in both families",
+			glue:  []string{"ns1.example/192.0.2.1", "ns1.example/2001:db8::1"},
+			del:   []string{"ns1.example/192.0.2.1", "ns1.example/2001:db8::1"},
+			child: []string{"ns1.example/192.0.2.1", "ns1.example/2001:db8::1"},
+		},
+		{
+			name:  "IPv4-mapped glue counts as IPv4",
+			glue:  []string{"ns1.example/::ffff:192.0.2.1"},
+			del:   []string{"ns1.example/::ffff:192.0.2.1"},
+			child: []string{"ns1.example/::ffff:192.0.2.1", "ns1.example/2001:db8::1"},
+			want:  []string{"IN_DOMAIN_GLUE_MISSING_IPV6 ns1.example"},
+		},
+		{
+			name: "IPv4-mapped address counts as IPv4 per name",
+			del:  []string{"ns.example.net/::ffff:192.0.2.1"},
+			want: []string{"NS_NAME_NO_IPV6_ADDR ns.example.net"},
+		},
+		{
+			name:  "families split across the two views",
+			del:   []string{"ns.example.net/192.0.2.1"},
+			child: []string{"ns.example.net/2001:db8::1"},
+		},
+		{
+			name:  "name in both views reported once",
+			del:   []string{"ns.example.net/192.0.2.1"},
+			child: []string{"ns.example.net/192.0.2.2"},
+			want:  []string{"NS_NAME_NO_IPV6_ADDR ns.example.net"},
+		},
+		{
+			name:  "out-of-domain name gets no glue tag",
+			glue:  []string{"ns.example.net/192.0.2.1"},
+			del:   []string{"ns.example.net/192.0.2.1"},
+			child: []string{"ns.example.net/192.0.2.1", "ns.example.net/2001:db8::1"},
+		},
+		{
+			name:  "mixed-case glue name matches the child",
+			glue:  []string{"NS1.Example/192.0.2.1"},
+			del:   []string{"ns1.example/192.0.2.1"},
+			child: []string{"ns1.example/192.0.2.1", "ns1.example/2001:db8::1"},
+			want:  []string{"IN_DOMAIN_GLUE_MISSING_IPV6 ns1.example"},
+		},
+		{
+			name: "names in sorted order, one tag each",
+			glue: []string{"ns3.example/2001:db8::3", "ns2.example/192.0.2.2", "ns1.example"},
+			del:  []string{"ns3.example/2001:db8::3", "ns2.example/192.0.2.2"},
+			child: []string{
+				"ns1.example/192.0.2.1", "ns1.example/2001:db8::1",
+				"ns2.example/192.0.2.2", "ns2.example/2001:db8::2",
+				"ns3.example/2001:db8::3",
+			},
+			want: []string{
+				"NS_NAME_NO_IPV4_ADDR ns3.example",
+				"IN_DOMAIN_GLUE_MISSING ns1.example",
+				"IN_DOMAIN_GLUE_MISSING_IPV6 ns2.example",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			stubDelegation01Counts(t)
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nameservers(t, ctx, tt.del...), nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nameservers(t, ctx, tt.child...), nil
+			})
+			tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+				return tctest.NSItems(tt.glue...), nil
+			})
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := Delegation01(ctx, &z)
+			if err != nil {
+				t.Fatalf("delegation01: %v", err)
+			}
+			if got := familyFindings(entries); !slices.Equal(got, tt.want) {
+				t.Fatalf("findings = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// nameservers builds nameservers from "name/address" specs.
+func nameservers(t *testing.T, ctx context.Context, specs ...string) []nameserver.Nameserver {
+	t.Helper()
+	out := make([]nameserver.Nameserver, 0, len(specs))
+	for _, spec := range specs {
+		name, address, _ := strings.Cut(spec, "/")
+		out = append(out, tctest.NS(t, ctx, name, address, nil))
+	}
+	return out
+}
+
+// familyFindings renders the per-name family and in-domain glue entries as "TAG ns".
+func familyFindings(entries []*logger.Entry) []string {
+	var out []string
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Tag, "IN_DOMAIN_GLUE_MISSING") || strings.HasPrefix(entry.Tag, "NS_NAME_NO_") {
+			ns, _ := entry.Args["ns"].(string)
+			out = append(out, entry.Tag+" "+ns)
+		}
+	}
+	return out
 }
 
 func TestDelegation02DuplicateIPs(t *testing.T) {

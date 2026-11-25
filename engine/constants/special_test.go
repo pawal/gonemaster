@@ -101,6 +101,32 @@ func TestIsQueryableEmbeddedIPv4(t *testing.T) {
 	}
 }
 
+func TestIsIPv4Embedded(t *testing.T) {
+	cases := []struct {
+		addr string
+		want bool
+	}{
+		{"::ffff:192.0.2.1", true},
+		{"::192.0.2.1", true},
+		{"64:ff9b::c000:201", true},
+		{"64:ff9b:1::c000:201", true},
+		{"64:ff9b::c000:201%eth0", true},
+		{"::", false},
+		{"::1", false},
+		{"::1:c000:201", false},
+		{"::fffe:c000:201", false},
+		{"64:ff9b::1:c000:201", false},
+		{"64:ff9b:2::c000:201", false},
+		{"192.0.2.1", false},
+		{"2001:db8::1", false},
+	}
+	for _, c := range cases {
+		if got := IsIPv4Embedded(netip.MustParseAddr(c.addr)); got != c.want {
+			t.Errorf("IsIPv4Embedded(%s) = %v, want %v", c.addr, got, c.want)
+		}
+	}
+}
+
 func TestIsQueryableRefusesMulticastAndZonedForms(t *testing.T) {
 	for _, addr := range []string{"224.0.0.1", "239.255.255.250", "ff02::1", "ff0e::1", "fe80::1%eth0", "fd00::1%eth0"} {
 		if IsQueryable(netip.MustParseAddr(addr)) {

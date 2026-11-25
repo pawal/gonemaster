@@ -63,6 +63,92 @@ func TestAddress01NestedBlockGloballyReachable(t *testing.T) {
 	}
 }
 
+func TestAddress01IPv4Embedded(t *testing.T) {
+	tests := []struct {
+		name     string
+		addr     string
+		endpoint string
+	}{
+		{"IPv4-mapped embedding a documentation address", "::ffff:192.0.2.1", "ns1.example/::ffff:192.0.2.1"},
+		{"IPv4-compatible", "::198.51.100.1", "ns1.example/::c633:6401"},
+		{"NAT64 well-known prefix", "64:ff9b::198.51.100.1", "ns1.example/64:ff9b::c633:6401"},
+		{"NAT64 local-use prefix", "64:ff9b:1::c633:6401", "ns1.example/64:ff9b:1::c633:6401"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testContext(t)
+			z := tctest.ZoneWithAddrs(t, "example", map[string][]string{
+				"ns1.example": {tt.addr},
+			})
+
+			entries, err := Address01(ctx, z)
+			if err != nil {
+				t.Fatalf("address01: %v", err)
+			}
+			entry := tctest.RequireTag(t, entries, "A01_IPV4_EMBEDDED_IPV6_ADDR")
+			if endpoints := tctest.ServerEndpoints(t, entry.Args); !slices.Equal(endpoints, []string{tt.endpoint}) {
+				t.Fatalf("servers = %v, want [%s]", endpoints, tt.endpoint)
+			}
+			tctest.RequireTag(t, entries, "A01_NO_GLOBALLY_REACHABLE_ADDR")
+			tctest.RequireNoTag(t, entries, "A01_GLOBALLY_REACHABLE_ADDR", "A01_ADDR_NOT_GLOBALLY_REACHABLE",
+				"A01_DOCUMENTATION_ADDR", "A01_LOCAL_USE_ADDR")
+		})
+	}
+}
+
+func TestAddress01IPv4EmbeddedBesideOtherCategories(t *testing.T) {
+	ctx := testContext(t)
+	z := tctest.ZoneWithAddrs(t, "example", map[string][]string{
+		"ns1.example": {"::ffff:8.8.8.8"},
+		"ns2.example": {"2001:db8::1"},
+		"ns3.example": {"8.8.8.8"},
+	})
+
+	entries, err := Address01(ctx, z)
+	if err != nil {
+		t.Fatalf("address01: %v", err)
+	}
+	want := []string{"A01_GLOBALLY_REACHABLE_ADDR", "A01_DOCUMENTATION_ADDR", "A01_IPV4_EMBEDDED_IPV6_ADDR"}
+	if tags := tctest.TagsWithPrefix(entries, "A01_"); !slices.Equal(tags, want) {
+		t.Fatalf("tags = %v, want %v", tags, want)
+	}
+	for tag, endpoint := range map[string]string{
+		"A01_GLOBALLY_REACHABLE_ADDR": "ns3.example/8.8.8.8",
+		"A01_DOCUMENTATION_ADDR":      "ns2.example/2001:db8::1",
+		"A01_IPV4_EMBEDDED_IPV6_ADDR": "ns1.example/::ffff:8.8.8.8",
+	} {
+		if endpoints := tctest.ServerEndpoints(t, tctest.RequireTag(t, entries, tag).Args); !slices.Equal(endpoints, []string{endpoint}) {
+			t.Fatalf("%s servers = %v, want [%s]", tag, endpoints, endpoint)
+		}
+	}
+}
+
+// TestAddress01IPv4MappedAAAAFromWire pins that an unpacked AAAA record keeps the IPv4-mapped form.
+func TestAddress01IPv4MappedAAAAFromWire(t *testing.T) {
+	ctx := testContext(t)
+	wire := tctest.Wire(t, tctest.Response(tctest.Additional(tctest.AAAARR("ns1.example.", "::ffff:192.0.2.1"))))
+	rrs := wire.GetRecords("AAAA", "additional")
+	if len(rrs) != 1 {
+		t.Fatalf("AAAA records = %d, want 1", len(rrs))
+	}
+	aaaa, ok := rrs[0].(*dns.AAAA)
+	if !ok {
+		t.Fatalf("record = %T, want *dns.AAAA", rrs[0])
+	}
+	z := tctest.ZoneWithAddrs(t, "example", map[string][]string{
+		"ns1.example": {aaaa.Addr.String()},
+	})
+
+	entries, err := Address01(ctx, z)
+	if err != nil {
+		t.Fatalf("address01: %v", err)
+	}
+	entry := tctest.RequireTag(t, entries, "A01_IPV4_EMBEDDED_IPV6_ADDR")
+	if endpoints := tctest.ServerEndpoints(t, entry.Args); !slices.Equal(endpoints, []string{"ns1.example/::ffff:192.0.2.1"}) {
+		t.Fatalf("servers = %v, want [ns1.example/::ffff:192.0.2.1]", endpoints)
+	}
+}
+
 func TestAddress01NoNameServersFound(t *testing.T) {
 	ctx := testContext(t)
 	z := tctest.ZoneWithAddrs(t, "example", map[string][]string{

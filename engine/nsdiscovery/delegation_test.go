@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
 	"sync/atomic"
 	"testing"
 
@@ -351,6 +352,66 @@ func ibTestRootHook(zoneName string, nsGlue map[string]string) func(context.Cont
 
 // TestGetIBAddrInZoneSkipsDeadDelegationServer exercises in-bailiwick
 // resolution where one delegation server is unreachable.
+func TestZoneNameserversUndelegatedKeepsIPv4MappedGlue(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": {
+			"ns1.example": {"::ffff:192.0.2.53"},
+		},
+	})
+	z := newZone(t, "example", r)
+
+	items, err := ZoneNameservers(ctx, &z)
+	if err != nil {
+		t.Fatalf("ZoneNameservers: %v", err)
+	}
+	if got := itemStrings(items); !slices.Equal(got, []string{"ns1.example/::ffff:192.0.2.53"}) {
+		t.Fatalf("items = %v, want [ns1.example/::ffff:192.0.2.53]", got)
+	}
+}
+
+func TestZoneNameserversInBailiwickKeepsIPv4MappedAddress(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = false
+
+	r := nstest.RootRecursor(t, map[string][]string{"ns.root": {"192.0.2.9"}})
+	nstest.HookedNS(t, ctx, r, "ns.root", "192.0.2.9", ibTestRootHook("example", map[string]string{
+		"ns1.example": "192.0.2.21",
+	}))
+	nstest.HookedNS(t, ctx, r, "ns1.example", "192.0.2.21", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch {
+		case name == "example" && qtype == "NS":
+			return authoritativeNSPacket("example", "ns1.example"), nil
+		case name == "ns1.example" && qtype == "A":
+			return authoritativeAPacket("ns1.example", "192.0.2.21"), nil
+		case name == "ns1.example" && qtype == "AAAA":
+			return dnstest.Response(dnstest.Answers(dnstest.AAAARR("ns1.example", "::ffff:198.51.100.21"))), nil
+		}
+		return packet.Packet{}, nil
+	})
+	z := newZone(t, "example", r)
+
+	items, err := ZoneNameservers(ctx, &z)
+	if err != nil {
+		t.Fatalf("ZoneNameservers: %v", err)
+	}
+	want := []string{"ns1.example/192.0.2.21", "ns1.example/::ffff:198.51.100.21"}
+	if got := itemStrings(items); !slices.Equal(got, want) {
+		t.Fatalf("items = %v, want %v", got, want)
+	}
+}
+
+// itemStrings renders items as "name/address" strings.
+func itemStrings(items []NSItem) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.String())
+	}
+	return out
+}
+
 func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true

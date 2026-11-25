@@ -51,7 +51,7 @@ Status: Final
 
 ### Per-Name Address Families (step 6)
 
-RFC 10001 section 3.1 names "No A/AAAA records for NS names" as a cause of name space partitioning, and section 4.1 RECOMMENDS an A and an AAAA record set for every name used in NS RRs. Both sides are read, so a name counts as dual-stack when either view shows the missing family.
+RFC 10001 section 3.1 names "No A/AAAA records for NS names" as a cause of name space partitioning, and section 4.1 RECOMMENDS an A and an AAAA record set for every name used in NS RRs. The step reads both views, so a name with an IPv4 address in one view and an IPv6 address in the other counts as dual-stack.
 
 {{% expand "Show diagram" %}}
 ```
@@ -68,9 +68,9 @@ for name in sort(keys(families)):
 
 ### In-Domain Glue Checks (step 7)
 
-A delegation NS name that lies inside the zone (in-domain, RFC 9499 section 7) can only be reached if the parent referral includes its address as glue; otherwise a resolver holding only the referral cannot resolve the name (the address lives inside the very zone the name serves). RFC 10001 section 3.1 requires glue of both families, and a resolver limited to one family needs glue of that family. The raw referral view from `DelegationNameservers` is used here rather than [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers), because the latter resolves the name through the recursor and would mask the missing glue.
+A delegation NS name that lies inside the zone (in-domain, RFC 9499 section 7) can only be reached if the parent referral includes its address as glue; otherwise a resolver holding only the referral cannot resolve the name (the address lives inside the very zone the name serves). RFC 10001 section 3.1 requires glue of both families. The raw referral view from `DelegationNameservers` is used here rather than [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers), because the latter resolves the name through the recursor and would mask the missing glue.
 
-A per-family glue tag requires child-side evidence. RFC 10001 section 3.1 separates "Missing glue" (the parent lacks glue the child could supply) from "No A/AAAA records for NS names" (no record exists to glue). The step 4 view resolves each name from the root, so for an in-domain name it holds the child's own A and AAAA records; a family absent there is reported by step 6, not as missing glue.
+A per-family glue tag fires only when the child serves the missing family for the name. RFC 10001 section 3.1 separates "Missing glue" (the parent lacks glue the child could supply) from "No A/AAAA records for NS names" (no record exists to glue). The step 4 view resolves each name from the root, so for an in-domain name it holds the child's own A and AAAA records; a family absent there is reported by step 6, not as missing glue.
 
 {{% expand "Show diagram" %}}
 ```
@@ -235,9 +235,9 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes delegation-side IPv4/IPv6 checks before child-side IPv4/IPv6 checks. Gonemaster: performs child-side family checks first, then delegation-side family checks.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
-  - Upstream: sets `NO_IPV4_NS_CHILD` and `NO_IPV4_NS_DEL` to `WARNING`, and `NO_IPV6_NS_CHILD` and `NO_IPV6_NS_DEL` to `NOTICE` in the released test plan, `WARNING` on the development branch since [zonemaster#1533](https://github.com/zonemaster/zonemaster/pull/1533), which also quotes RFC 10001 section 4.1 as the objective. Gonemaster: all four at `ERROR`, the level of the one-server `NOT_ENOUGH_*` tags, since zero servers in a family violates the same RFC 10001 section 4.1 MUST.
-  - Upstream: only counts NS names with at least one address in aggregate, so a single in-domain name missing its glue is absorbed into the count and never flagged. Gonemaster: additionally flags each such name with `IN_DOMAIN_GLUE_MISSING`, and each name whose glue lacks a family the child serves with `IN_DOMAIN_GLUE_MISSING_IPV4` or `IN_DOMAIN_GLUE_MISSING_IPV6`.
-  - Upstream: counts NS names per family and names no NS name that resolves in one family only. Gonemaster: flags each such name with `NS_NAME_NO_IPV4_ADDR` or `NS_NAME_NO_IPV6_ADDR`.
+  - Upstream: the released test plan sets `NO_IPV4_NS_CHILD` and `NO_IPV4_NS_DEL` to `WARNING` and `NO_IPV6_NS_CHILD` and `NO_IPV6_NS_DEL` to `NOTICE`. The development branch raises the IPv6 pair to `WARNING` and quotes RFC 10001 section 4.1 as the objective ([zonemaster#1533](https://github.com/zonemaster/zonemaster/pull/1533)). Gonemaster: all four at `ERROR`, the level of the one-server `NOT_ENOUGH_*` tags, since zero servers in a family violates the same RFC 10001 section 4.1 MUST.
+  - Upstream: only counts NS names with at least one address in aggregate, so a single in-domain name missing its glue is absorbed into the count and never flagged. Gonemaster: also flags each such name with `IN_DOMAIN_GLUE_MISSING`, and each name whose glue lacks a family the child serves with `IN_DOMAIN_GLUE_MISSING_IPV4` or `IN_DOMAIN_GLUE_MISSING_IPV6`.
+  - Upstream: counts NS names per family and does not report the individual names that resolve in one family only. Gonemaster: flags each such name with `NS_NAME_NO_IPV4_ADDR` or `NS_NAME_NO_IPV6_ADDR`.
 - Potential upstream report:
   - `yes` (feature proposal: per-name in-domain glue presence)
   - Severity reported as [zonemaster#1529](https://github.com/zonemaster/zonemaster/issues/1529); the remaining difference is tracked as `DIV-DEL01-IPV6-SEVERITY` in [known-behavior-divergences.md](../../known-behavior-divergences.md).
@@ -249,7 +249,7 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 - An IPv4-mapped address (`::ffff:0:0/96`) in an AAAA record counts as IPv4 in every step: the nameserver views unmap it, and step 7 unmaps glue items the same way. A name whose only AAAA is mapped counts as IPv4-only. NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`) and IPv4-compatible (`::/96`) addresses count as IPv6 here; Address01 reports all four forms as `A01_IPV4_EMBEDDED_IPV6_ADDR`.
 - The glue checks use the raw parent referral (`DelegationNameservers`), not `GlueNameservers`, so a name resolvable only via the recursor still counts as missing glue.
 - When the parent answers with AA instead of a referral, `DelegationNameservers` fills the addresses through the recursor, so the glue checks there see the name's address records rather than referral glue.
-- An in-domain name with no record of a family anywhere gets `NS_NAME_NO_IPV4_ADDR` or `NS_NAME_NO_IPV6_ADDR` and no per-family glue tag: there is no record to glue.
+- An in-domain name with no record of a family anywhere gets `NS_NAME_NO_IPV4_ADDR` or `NS_NAME_NO_IPV6_ADDR` and no per-family glue tag.
 - A child that does not answer for an in-domain name gives no child-side evidence, so no per-family glue tag fires for it.
 - Consistency05 reports a family the child serves beyond the glue in the aggregate `EXTRA_ADDRESS_CHILD`; the per-family glue tags name the same defect per NS name. Glue covering both families while the child lacks one is Consistency05's `IN_DOMAIN_ADDR_MISMATCH`, not a finding of this testcase.
 - Not-in-domain NS names are out of scope for the glue checks; their resolvability is covered by other testcases.

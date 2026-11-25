@@ -145,7 +145,7 @@ After classification, emit in fixed order:
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not define a strict order for category tag emission. Gonemaster: emits `A01_GLOBALLY_REACHABLE_ADDR`/`A01_NO_GLOBALLY_REACHABLE_ADDR` before other category tags.
   - Upstream: does not require a specific `servers` presentation order. Gonemaster: deduplicates and lexicographically sorts `servers` values before emission.
-  - Upstream: classifies every address by the special-purpose registries alone, so `64:ff9b::/96` (registered as globally reachable) and `::/96` (no registry entry) count as globally reachable, while `::ffff:0:0/96` and `64:ff9b:1::/48` count as not globally reachable. Gonemaster: claims all four for `A01_IPV4_EMBEDDED_IPV6_ADDR` before the registry lookup (RFC 10001 section 4.1).
+  - Upstream: classifies every address by the special-purpose registries alone, so `64:ff9b::/96` (registered as globally reachable) and `::/96` (no registry entry) count as globally reachable, while `::ffff:0:0/96` and `64:ff9b:1::/48` count as not globally reachable. Gonemaster: reports all four as `A01_IPV4_EMBEDDED_IPV6_ADDR` and checks them before the registry lookup (RFC 10001 section 4.1).
 - Potential upstream report:
   - `yes` (feature proposal: IPv4-embedded nameserver addresses per RFC 10001 section 4.1; not filed)
 

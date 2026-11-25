@@ -2310,6 +2310,10 @@ msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "Všechny testované jmenné servery v {servers} jsou globálně dostupné."
 
+msgctxt "ADDRESS:A01_IPV4_EMBEDDED_IPV6_ADDR"
+msgid "IPv6 address(es) with an embedded IPv4 address (IPv4-mapped, IPv4-compatible or NAT64): \"{servers}\"."
+msgstr "IPv6 adresa/adresy s vloženou IPv4 adresou (IPv4-mapovaná, IPv4-kompatibilní nebo NAT64): \"{servers}\"."
+
 msgctxt "ADDRESS:A01_LOCAL_USE_ADDR"
 msgid "IP address(es) intended for local use on network or service provider level: \"{servers}\"."
 msgstr "IP adresa/adresy určené pro lokální použití na úrovni sítě nebo poskytovatele služeb: \"{servers}\"."
@@ -2646,6 +2650,14 @@ msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING"
 msgid "In-domain nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
 msgstr "Jmenný server {ns} v rámci domény nemá GLUE adresní záznam (A nebo AAAA) v odkazu z nadřazené zóny."
 
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING_IPV4"
+msgid "In-domain nameserver {ns} has an IPv4 address in the zone but no IPv4 glue address record (A) in the parent referral."
+msgstr "Jmenný server {ns} v rámci domény má v zóně IPv4 adresu, ale v odkazu z nadřazené zóny nemá GLUE adresní záznam pro IPv4 (A)."
+
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING_IPV6"
+msgid "In-domain nameserver {ns} has an IPv6 address in the zone but no IPv6 glue address record (AAAA) in the parent referral."
+msgstr "Jmenný server {ns} v rámci domény má v zóně IPv6 adresu, ale v odkazu z nadřazené zóny nemá GLUE adresní záznam pro IPv6 (AAAA)."
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "Odpověď jmenného serveru {ns}/{address} není autoritativní na {proto} portu 53."
@@ -2705,6 +2717,14 @@ msgstr "Delegace neuvádí žádný jmenný server, který by se překládal na 
 msgctxt "DELEGATION:NS_IS_CNAME"
 msgid "Nameserver {ns} RR points to CNAME."
 msgstr "NS záznam jmenného serveru {ns} ukazuje na CNAME."
+
+msgctxt "DELEGATION:NS_NAME_NO_IPV4_ADDR"
+msgid "Nameserver {ns} resolves to IPv6 addresses only."
+msgstr "Jmenný server {ns} se překládá pouze na IPv6 adresy."
+
+msgctxt "DELEGATION:NS_NAME_NO_IPV6_ADDR"
+msgid "Nameserver {ns} resolves to IPv4 addresses only."
+msgstr "Jmenný server {ns} se překládá pouze na IPv4 adresy."
 
 msgctxt "DELEGATION:NO_NS_CNAME"
 msgid "No nameserver points to CNAME alias."

@@ -62,6 +62,10 @@ msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "Tous les serveurs de noms testés dans {servers} sont globalement joignables."
 
+msgctxt "ADDRESS:A01_IPV4_EMBEDDED_IPV6_ADDR"
+msgid "IPv6 address(es) with an embedded IPv4 address (IPv4-mapped, IPv4-compatible or NAT64): \"{servers}\"."
+msgstr "Adresse(s) IPv6 contenant une adresse IPv4 intégrée (mappée IPv4, compatible IPv4 ou NAT64) : \"{servers}\"."
+
 msgctxt "ADDRESS:A01_LOCAL_USE_ADDR"
 msgid ""
 "IP address(es) intended for local use on network or service provider level: "
@@ -2983,6 +2987,14 @@ msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING"
 msgid "In-domain nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
 msgstr "Le serveur de noms \"in-domain\" {ns} n'a aucun enregistrement de colle (A ou AAAA) dans la délégation de la zone parente."
 
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING_IPV4"
+msgid "In-domain nameserver {ns} has an IPv4 address in the zone but no IPv4 glue address record (A) in the parent referral."
+msgstr "Le serveur de noms \"in-domain\" {ns} a une adresse IPv4 dans la zone mais aucun enregistrement de colle IPv4 (A) dans la délégation de la zone parente."
+
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING_IPV6"
+msgid "In-domain nameserver {ns} has an IPv6 address in the zone but no IPv6 glue address record (AAAA) in the parent referral."
+msgstr "Le serveur de noms \"in-domain\" {ns} a une adresse IPv6 dans la zone mais aucun enregistrement de colle IPv6 (AAAA) dans la délégation de la zone parente."
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr ""
@@ -3101,6 +3113,14 @@ msgid "Nameserver {ns} RR points to CNAME."
 msgstr ""
 "L'enregistrement pour le serveur de noms {ns} pointe sur un alias "
 "(CNAME)."
+
+msgctxt "DELEGATION:NS_NAME_NO_IPV4_ADDR"
+msgid "Nameserver {ns} resolves to IPv6 addresses only."
+msgstr "Le serveur de noms {ns} ne se résout qu'en adresses IPv6."
+
+msgctxt "DELEGATION:NS_NAME_NO_IPV6_ADDR"
+msgid "Nameserver {ns} resolves to IPv4 addresses only."
+msgstr "Le serveur de noms {ns} ne se résout qu'en adresses IPv4."
 
 msgctxt "DELEGATION:NO_NS_CNAME"
 msgid "No nameserver points to CNAME alias."

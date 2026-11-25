@@ -26,8 +26,8 @@ _Do not edit by hand - regenerate with the command above._
 | `EXTRA_NAME_CHILD` | `NOTICE` | [delegation07](../tests/delegation/delegation07.md) | yes |
 | `EXTRA_NAME_PARENT` | `ERROR` | [delegation07](../tests/delegation/delegation07.md) | yes |
 | `IN_DOMAIN_GLUE_MISSING` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |
-| `IN_DOMAIN_GLUE_MISSING_IPV4` | `WARNING` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `IN_DOMAIN_GLUE_MISSING_IPV6` | `WARNING` | [delegation01](../tests/delegation/delegation01.md) | **no** |
+| `IN_DOMAIN_GLUE_MISSING_IPV4` | `WARNING` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `IN_DOMAIN_GLUE_MISSING_IPV6` | `WARNING` | [delegation01](../tests/delegation/delegation01.md) | yes |
 | `IPV4_DISABLED` | `DEBUG2` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
 | `IPV6_DISABLED` | `DEBUG2` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
 | `IS_NOT_AUTHORITATIVE` | `WARNING` | [delegation04](../tests/delegation/delegation04.md) | yes |
@@ -46,8 +46,8 @@ _Do not edit by hand - regenerate with the command above._
 | `NO_NS_CNAME` | `INFO` | [delegation05](../tests/delegation/delegation05.md) | yes |
 | `NO_RESPONSE` | `DEBUG` | [delegation05](../tests/delegation/delegation05.md) | yes |
 | `NS_IS_CNAME` | `ERROR` | [delegation05](../tests/delegation/delegation05.md) | yes |
-| `NS_NAME_NO_IPV4_ADDR` | `NOTICE` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NS_NAME_NO_IPV6_ADDR` | `NOTICE` | [delegation01](../tests/delegation/delegation01.md) | **no** |
+| `NS_NAME_NO_IPV4_ADDR` | `NOTICE` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NS_NAME_NO_IPV6_ADDR` | `NOTICE` | [delegation01](../tests/delegation/delegation01.md) | yes |
 | `REFERRAL_SIZE_LARGE` | `NOTICE` | [delegation03](../tests/delegation/delegation03.md) | yes |
 | `REFERRAL_SIZE_OK` | `INFO` | [delegation03](../tests/delegation/delegation03.md) | yes |
 | `REFERRAL_SIZE_TOO_LARGE` | `WARNING` | [delegation03](../tests/delegation/delegation03.md) | yes |
@@ -61,13 +61,4 @@ _Do not edit by hand - regenerate with the command above._
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
-
-These tags have no `DELEGATION:<TAG>` `msgctxt` entry in any `.po` file.
-They will render as the raw tag name in translated output.
-
-- `IN_DOMAIN_GLUE_MISSING_IPV4`
-- `IN_DOMAIN_GLUE_MISSING_IPV6`
-- `NS_NAME_NO_IPV4_ADDR`
-- `NS_NAME_NO_IPV6_ADDR`
-
+All tags have i18n coverage and no stale entries found.

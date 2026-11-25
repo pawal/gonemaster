@@ -2590,6 +2590,14 @@ msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING"
 msgid "In-domain nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
 msgstr "El servidor de nombres dependiente (in-domain) {ns} no tiene ningún registro glue de dirección (A o AAAA) en la delegación de la zona padre."
 
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING_IPV4"
+msgid "In-domain nameserver {ns} has an IPv4 address in the zone but no IPv4 glue address record (A) in the parent referral."
+msgstr "El servidor de nombres dependiente (in-domain) {ns} tiene una dirección IPv4 en la zona, pero ningún registro glue de dirección IPv4 (A) en la delegación de la zona padre."
+
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING_IPV6"
+msgid "In-domain nameserver {ns} has an IPv6 address in the zone but no IPv6 glue address record (AAAA) in the parent referral."
+msgstr "El servidor de nombres dependiente (in-domain) {ns} tiene una dirección IPv6 en la zona, pero ningún registro glue de dirección IPv6 (AAAA) en la delegación de la zona padre."
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr ""
@@ -2703,6 +2711,14 @@ msgstr ""
 msgctxt "DELEGATION:NS_IS_CNAME"
 msgid "Nameserver {ns} RR points to CNAME."
 msgstr "El servidor de nombres {ns} apunta a un alias CNAME."
+
+msgctxt "DELEGATION:NS_NAME_NO_IPV4_ADDR"
+msgid "Nameserver {ns} resolves to IPv6 addresses only."
+msgstr "El servidor de nombres {ns} solo resuelve a direcciones IPv6."
+
+msgctxt "DELEGATION:NS_NAME_NO_IPV6_ADDR"
+msgid "Nameserver {ns} resolves to IPv4 addresses only."
+msgstr "El servidor de nombres {ns} solo resuelve a direcciones IPv4."
 
 msgctxt "DELEGATION:NO_NS_CNAME"
 msgid "No nameserver points to CNAME alias."
@@ -4207,6 +4223,10 @@ msgstr "Dirección(es) IP destinadas a propósitos de documentación: \"{servers
 msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "Todos los servidores de nombres probados en {servers} son accesibles globalmente."
+
+msgctxt "ADDRESS:A01_IPV4_EMBEDDED_IPV6_ADDR"
+msgid "IPv6 address(es) with an embedded IPv4 address (IPv4-mapped, IPv4-compatible or NAT64): \"{servers}\"."
+msgstr "Dirección(es) IPv6 con una dirección IPv4 incrustada (mapeada a IPv4, compatible con IPv4 o NAT64): \"{servers}\"."
 
 msgctxt "ADDRESS:A01_LOCAL_USE_ADDR"
 msgid "IP address(es) intended for local use on network or service provider level: \"{servers}\"."

@@ -857,6 +857,14 @@ msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING"
 msgid "In-domain nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
 msgstr "in-domain ネームサーバー {ns} には、親ゾーンの委任にグルーアドレスレコード (A または AAAA) がありません。"
 
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING_IPV4"
+msgid "In-domain nameserver {ns} has an IPv4 address in the zone but no IPv4 glue address record (A) in the parent referral."
+msgstr "in-domain ネームサーバー {ns} はゾーン内に IPv4 アドレスがありますが、親ゾーンの委任に IPv4 のグルーアドレスレコード (A) がありません。"
+
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING_IPV6"
+msgid "In-domain nameserver {ns} has an IPv6 address in the zone but no IPv6 glue address record (AAAA) in the parent referral."
+msgstr "in-domain ネームサーバー {ns} はゾーン内に IPv6 アドレスがありますが、親ゾーンの委任に IPv6 のグルーアドレスレコード (AAAA) がありません。"
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "ネームサーバー {ns}/{address} の {proto}/53 での応答は権威応答ではありません。"
@@ -959,6 +967,14 @@ msgctxt "DELEGATION:NS_IS_CNAME"
 msgid "Nameserver {ns} RR points to CNAME."
 msgstr "ネームサーバー {ns} の RR が CNAME を指しています。"
 
+msgctxt "DELEGATION:NS_NAME_NO_IPV4_ADDR"
+msgid "Nameserver {ns} resolves to IPv6 addresses only."
+msgstr "ネームサーバー {ns} は IPv6 アドレスにのみ解決されます。"
+
+msgctxt "DELEGATION:NS_NAME_NO_IPV6_ADDR"
+msgid "Nameserver {ns} resolves to IPv4 addresses only."
+msgstr "ネームサーバー {ns} は IPv4 アドレスにのみ解決されます。"
+
 msgctxt "DELEGATION:NO_NS_CNAME"
 msgid "No nameserver points to CNAME alias."
 msgstr "CNAME エイリアスを指すネームサーバーはありません。"
@@ -1043,6 +1059,10 @@ msgstr "ドキュメント用途として予約された IP アドレス: \"{ser
 msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "テストされた全ネームサーバー ({servers}) はグローバルに到達可能です。"
+
+msgctxt "ADDRESS:A01_IPV4_EMBEDDED_IPV6_ADDR"
+msgid "IPv6 address(es) with an embedded IPv4 address (IPv4-mapped, IPv4-compatible or NAT64): \"{servers}\"."
+msgstr "IPv4 アドレスを埋め込んだ IPv6 アドレス (IPv4 マップド、IPv4 互換、または NAT64): \"{servers}\"。"
 
 msgctxt "ADDRESS:A01_LOCAL_USE_ADDR"
 msgid ""

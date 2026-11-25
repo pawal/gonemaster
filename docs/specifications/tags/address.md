@@ -14,7 +14,7 @@ _Do not edit by hand - regenerate with the command above._
 | `A01_ADDR_NOT_GLOBALLY_REACHABLE` | `ERROR` | [address01](../tests/address/address01.md) | yes |
 | `A01_DOCUMENTATION_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | yes |
 | `A01_GLOBALLY_REACHABLE_ADDR` | `INFO` | [address01](../tests/address/address01.md) | yes |
-| `A01_IPV4_EMBEDDED_IPV6_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | **no** |
+| `A01_IPV4_EMBEDDED_IPV6_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | yes |
 | `A01_LOCAL_USE_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | yes |
 | `A01_NO_GLOBALLY_REACHABLE_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | yes |
 | `A01_NO_NAME_SERVERS_FOUND` | `CRITICAL` | [address01](../tests/address/address01.md) | yes |
@@ -31,10 +31,4 @@ _Do not edit by hand - regenerate with the command above._
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
-
-These tags have no `ADDRESS:<TAG>` `msgctxt` entry in any `.po` file.
-They will render as the raw tag name in translated output.
-
-- `A01_IPV4_EMBEDDED_IPV6_ADDR`
-
+All tags have i18n coverage and no stale entries found.

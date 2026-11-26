@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/hints"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -89,7 +90,7 @@ func (r *Recursor) AddFakeAddresses(domain string, data map[string][]string) err
 	}
 
 	for name, ips := range data {
-		name = strings.ToLower(name)
+		name = dnsname.New(name).StringLower()
 		if _, ok := r.fakeAddresses[domain][name]; !ok {
 			r.fakeAddresses[domain][name] = []netip.Addr{}
 		}
@@ -120,11 +121,7 @@ func (r *Recursor) HasFakeAddresses(domain string) bool {
 // GetFakeAddresses returns fake addresses for a domain and nameserver name.
 func (r *Recursor) GetFakeAddresses(domain string, nsname string) []netip.Addr {
 	domain = strings.ToLower(domain)
-	if nsname == "" {
-		nsname = ""
-	}
-
-	nsname = strings.ToLower(nsname)
+	nsname = dnsname.New(nsname).StringLower()
 	if r.fakeAddresses[domain] == nil {
 		return nil
 	}

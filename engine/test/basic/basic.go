@@ -636,38 +636,12 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	unexpectedRcode := map[string]string{}
 	authResponseSOA := map[string]bool{}
 
-	if len(nsServers) == 0 {
-		foundIP := map[string]bool{}
-		glueAddrs, err := z.GlueAddresses(ctx)
-		if err != nil {
-			return results, err
-		}
-
-		for _, nsName := range nsNames {
-			key := strings.ToLower(nsName.String())
-			foundIP[key] = false
-			for _, rr := range glueAddrs {
-				ownerName := dnsname.New(rr.Header().Name)
-				owner := strings.ToLower(ownerName.String())
-				if owner != key {
-					continue
-				}
-				if addr, ok := addrFromRR(rr); ok {
-					nsObj, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.Recursor().Client())
-					if err != nil {
-						continue
-					}
-					nsServers = append(nsServers, nsObj)
-					foundIP[key] = true
-				}
-			}
-		}
-
-		for key, ok := range foundIP {
-			if !ok {
-				nsCantResolve[key] = true
-			}
-		}
+	nsServers, unresolved, err := withGlueFallback(ctx, z, nsNames, nsServers)
+	if err != nil {
+		return results, err
+	}
+	for _, name := range unresolved {
+		nsCantResolve[name] = true
 	}
 
 	type nsOutcome struct {
@@ -784,29 +758,29 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 
-		for ns := range nsBroken {
+		for _, ns := range slices.Sorted(maps.Keys(nsBroken)) {
 			if err := appendLog(ctx, &results, testcase, "B02_NS_BROKEN", withEndpointKeyArgs(ns, nil)); err != nil {
 				return results, err
 			}
 		}
-		for ns := range nsNotAuth {
+		for _, ns := range slices.Sorted(maps.Keys(nsNotAuth)) {
 			if err := appendLog(ctx, &results, testcase, "B02_NS_NOT_AUTH", withEndpointKeyArgs(ns, nil)); err != nil {
 				return results, err
 			}
 		}
-		for nsName := range nsCantResolve {
+		for _, nsName := range slices.Sorted(maps.Keys(nsCantResolve)) {
 			if err := appendLog(ctx, &results, testcase, "B02_NS_NO_IP_ADDR", map[string]any{"ns": nsName}); err != nil {
 				return results, err
 			}
 		}
-		for ns := range nsNoResponse {
+		for _, ns := range slices.Sorted(maps.Keys(nsNoResponse)) {
 			if err := appendLog(ctx, &results, testcase, "B02_NS_NO_RESPONSE", withEndpointKeyArgs(ns, nil)); err != nil {
 				return results, err
 			}
 		}
-		for ns, rcode := range unexpectedRcode {
+		for _, ns := range slices.Sorted(maps.Keys(unexpectedRcode)) {
 			if err := appendLog(ctx, &results, testcase, "B02_UNEXPECTED_RCODE", withEndpointKeyArgs(ns, map[string]any{
-				"rcode": rcode,
+				"rcode": unexpectedRcode[ns],
 			})); err != nil {
 				return results, err
 			}
@@ -814,6 +788,53 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// withGlueFallback adds the referral glue of every NS name the lookup left without a server, and returns the names still without one.
+func withGlueFallback(ctx context.Context, z *zone.Zone, names []dnsname.Name, servers []nameserver.Nameserver) ([]nameserver.Nameserver, []string, error) {
+	served := map[string]bool{}
+	for _, ns := range servers {
+		served[strings.ToLower(ns.Name.String())] = true
+	}
+	var missing []dnsname.Name
+	for _, name := range names {
+		if !served[strings.ToLower(name.String())] {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
+		return servers, nil, nil
+	}
+	glue, err := z.GlueAddresses(ctx)
+	if err != nil && ctx.Err() != nil {
+		return nil, nil, err
+	}
+	var unresolved []string
+	for _, name := range missing {
+		key := strings.ToLower(name.String())
+		var addrs []netip.Addr
+		for _, rr := range glue {
+			owner := dnsname.New(rr.Header().Name)
+			if strings.EqualFold(owner.String(), key) {
+				if addr, ok := addrFromRR(rr); ok {
+					addrs = append(addrs, addr)
+				}
+			}
+		}
+		added := false
+		for _, addr := range nameserver.CapAddresses(ctx, key, addrs) {
+			ns, err := nameserver.NewWithContext(ctx, name.String(), addr.String(), z.Recursor().Client())
+			if err != nil {
+				continue
+			}
+			servers = append(servers, ns)
+			added = true
+		}
+		if !added {
+			unresolved = append(unresolved, key)
+		}
+	}
+	return servers, unresolved, nil
 }
 
 // Basic03 runs the BASIC03 test case.

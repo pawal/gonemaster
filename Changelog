@@ -22,6 +22,10 @@ All notable changes to all gonemaster components will be documented in this file
 - basic01: nameservers named only in the NS answer of a zone of the walk are probed
 - basic01: a referral without the AA bit that holds a CNAME for the child counts as an answer without a delegation
 - basic01: an SOA answer with a second SOA record fails the zone check
+- basic02: an NS name whose lookup gives no address is probed at the address its referral glue holds
+- basic02: every NS name left without an address is reported with `B02_NS_NO_IP_ADDR`, also when other names resolve
+- basic02: the detail tags after `B02_NO_WORKING_NS` are sorted by nameserver name and address
+- engine: the root zone's delegation takes its addresses from the bundled root hints
 
 ## [v1.7.29] - 2026-11-26
 

@@ -23,12 +23,12 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Load delegation NS names with [`z.GlueNames`](../../nameserver-resolution.md#gluenames) and delegation NS address objects with [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
 3. If no NS names exist, emit `B02_NO_DELEGATION`, then emit `TEST_CASE_END` and return.
-4. If NS names exist but address objects are empty, attempt to populate from glue addresses and mark unresolved names as `nsCantResolve`.
+4. For every NS name without an address object, take the address records the parent's referral holds for that name (`z.GlueAddresses`), cut at `addresses_per_ns`; mark a name left without an address as `nsCantResolve`.
 5. Probe each nameserver (parallelized) with SOA query to child zone:
    - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) for query type `SOA`.
    - Classify each response as no response, unexpected rcode, not authoritative, broken answer, or authoritative SOA answer.
 6. If at least one authoritative SOA response exists, emit `B02_AUTH_RESPONSE_SOA`.
-7. Otherwise emit `B02_NO_WORKING_NS`, then emit detailed categories:
+7. Otherwise emit `B02_NO_WORKING_NS`, then emit detailed categories in this order, each sorted by nameserver name and address (`B02_NS_NO_IP_ADDR` by name):
    - `B02_NS_BROKEN`
    - `B02_NS_NOT_AUTH`
    - `B02_NS_NO_IP_ADDR`
@@ -43,10 +43,10 @@ Status: Final
 load z.GlueNames (NS names) + GlueNameservers (NS addresses)
  +- no NS names                       -> B02_NO_DELEGATION (domain)
  |                                       emit TEST_CASE_END and return
- +- NS names present, GlueNameservers empty -> fall back to z.GlueAddresses
- |    +- per name, add nameserver for each matching glue addr
- |    +- names with no resolved addr  -> mark nsCantResolve[name]
  +- otherwise                         -> use GlueNameservers addresses
+      +- per NS name without an address -> add nameserver for each glue addr of that name
+                                          (z.GlueAddresses, cut at addresses_per_ns)
+      +- name still without an address  -> mark nsCantResolve[name]
 
 For each nameserver (parallel; fan-out = resolver.defaults.parallel):
 
@@ -71,7 +71,8 @@ For each nameserver (parallel; fan-out = resolver.defaults.parallel):
 authResponseSOA non-empty
  +- yes  -> B02_AUTH_RESPONSE_SOA (domain, servers)
  +- no   -> B02_NO_WORKING_NS (domain)
-            then emit one tag per non-empty failure category:
+            then, in this order, one tag per member of each non-empty category,
+            sorted by name and address:
               nsBroken          -> B02_NS_BROKEN        (per ns)
               nsNotAuth         -> B02_NS_NOT_AUTH      (per ns)
               nsCantResolve     -> B02_NS_NO_IP_ADDR    (per nsname)
@@ -154,11 +155,14 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: summary focuses on B02-class outcome tags. Gonemaster: also emits explicit transport debug tags (`IPV4_*`, `IPV6_*`) during SOA probes.
   - Upstream: does not describe probe execution ordering details. Gonemaster: executes probes in parallel but keeps deterministic result ordering by task index.
+  - Upstream (step 3.2): an in-bailiwick NS name takes its addresses from the referral glue, any other name from a recursive lookup. Gonemaster: looks up every name recursively and takes the referral glue only for a name the lookup leaves without an address, so when the glue and the child's address records differ, the child's addresses are probed (`DIV-B02-ADDRESS-SOURCE`).
+  - Upstream: `B02_NS_NO_IP_ADDR` carries `nsname`. Gonemaster: carries `ns`.
+  - Upstream: follows every NS name and address. Gonemaster: cuts the NS names of the delegation at 32 and the addresses of one name at 16, and a run queries at most 512 addresses; a cut logs `LIMIT_REACHED`.
 - Potential upstream report:
   - `no`
 
 ## Edge Cases And Limitations
-- If [`z.GlueNames`](../../nameserver-resolution.md#gluenames) returns names but [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) has no resolved addresses, unresolved names are classified via `B02_NS_NO_IP_ADDR`.
+- An NS name that neither [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) nor the referral glue gives an address is classified via `B02_NS_NO_IP_ADDR`, whether or not other names resolve; like the other detail tags it is emitted only beside `B02_NO_WORKING_NS`.
 - If all probes are skipped due transport disable, testcase can still end in `B02_NO_WORKING_NS`.
 - Detailed error tags are emitted only when `B02_NO_WORKING_NS` is emitted.
-- Output ordering is deterministic after parallel execution because runner output is merged in task index order.
+- Output ordering is deterministic: probe entries are merged in task index order, and detail tags are sorted by nameserver name and address.

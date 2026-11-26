@@ -90,6 +90,40 @@ func TestAddFakeAddressesDedupAndRemove(t *testing.T) {
 	}
 }
 
+// A name is found with or without its trailing dot, whichever form stored it.
+func TestFakeAddressesTrailingDot(t *testing.T) {
+	tests := []struct{ name, stored, asked string }{
+		{"stored with dot", "A.ROOT.", "a.root"},
+		{"asked with dot", "a.root", "A.ROOT."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &Recursor{}
+			if err := r.AddFakeAddresses(".", map[string][]string{tt.stored: {"192.0.2.1"}}); err != nil {
+				t.Fatalf("add fake addresses: %v", err)
+			}
+			if got, want := r.GetFakeAddresses(".", tt.asked), []netip.Addr{netip.MustParseAddr("192.0.2.1")}; !slices.Equal(got, want) {
+				t.Fatalf("addresses = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+// Every bundled root hint is found under the name a zone gives it.
+func TestNewHintsByZoneName(t *testing.T) {
+	r, err := New()
+	if err != nil {
+		t.Fatalf("new recursor: %v", err)
+	}
+	for _, letter := range "abcdefghijklm" {
+		name := dnsname.New(string(letter) + ".root-servers.net.").String()
+		addrs := r.GetFakeAddresses(".", name)
+		if len(addrs) != 2 || addrs[0].Is4() == addrs[1].Is4() {
+			t.Fatalf("%s: %v, want one IPv4 and one IPv6 address", name, addrs)
+		}
+	}
+}
+
 func TestRootServersSorted(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 

@@ -288,6 +288,29 @@ func TestBasic02DetailTagsSorted(t *testing.T) {
 	}
 }
 
+// The root zone is probed at its hint addresses, stored with a trailing dot, while the NS answer carries no glue.
+func TestBasic02RootHintsWithTrailingDot(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := tctest.Recursor(t, map[string]map[string][]string{".": {
+		"a.root.": {"192.0.2.1"},
+		"b.root.": {"192.0.2.2"},
+	}})
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", rootZone(replies{}.handler(), "a.root", "b.root"))
+	tctest.NSOn(t, ctx, r, "b.root", "192.0.2.2", rootZone(replies{}.handler(), "a.root", "b.root"))
+
+	entries, err := Basic02(ctx, tctest.Zone(t, ".", r))
+	if err != nil {
+		t.Fatalf("basic02: %v", err)
+	}
+
+	tctest.RequireNoTag(t, entries, "B02_NO_WORKING_NS", "B02_NS_NO_IP_ADDR")
+	auth := tctest.RequireTag(t, entries, "B02_AUTH_RESPONSE_SOA")
+	if got, want := tctest.ServerEndpoints(t, auth.Args), []string{"a.root/192.0.2.1", "b.root/192.0.2.2"}; !slices.Equal(got, want) {
+		t.Fatalf("servers = %v, want %v", got, want)
+	}
+}
+
 // The lookup of ns1.example fails while ns.other resolves, so only ns1.example takes its address from the referral glue.
 func TestBasic02GlueForUnresolvedName(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)

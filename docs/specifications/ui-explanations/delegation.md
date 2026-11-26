@@ -4,7 +4,7 @@
 
 Description:
 
-A domain should be served by at least two authoritative name servers so it stays reachable if one of them has a problem. Fewer than two is a resilience risk: when the single server has any outage the domain effectively disappears from the internet.
+A domain should be served by at least two authoritative name servers so it stays reachable if one of them has a problem. Fewer than two is a resilience risk: when the single server has any outage the domain effectively disappears from the internet. It also needs at least two nameservers reachable over IPv4 and two over IPv6, so that clients with only IPv4 or only IPv6 can still reach it.
 
 ## Testcase delegation02
 
@@ -105,6 +105,38 @@ Header: No IPv4 nameservers in zone
 Description:
 
 Your zone itself does not list any nameserver reachable over IPv4. The delegation and the zone should agree on which address families are available; a mismatch here will confuse some resolvers.
+
+## Tag NO_IPV6_NS_DEL
+
+Header: No IPv6 nameservers in delegation
+
+Description:
+
+The parent zone's delegation for your domain does not reach any nameserver over IPv6. Clients on IPv6-only networks cannot resolve your domain from the delegation alone. A domain needs at least two nameservers reachable over IPv6 as well as two over IPv4 (RFC 10001).
+
+## Tag NO_IPV6_NS_CHILD
+
+Header: No IPv6 nameservers in zone
+
+Description:
+
+Your zone itself does not list any nameserver reachable over IPv6. Clients on IPv6-only networks cannot reach the nameservers your zone lists. A domain needs at least two nameservers reachable over IPv6 as well as two over IPv4 (RFC 10001).
+
+## Tag NS_NAME_NO_IPV4_ADDR
+
+Header: Nameserver has no IPv4 address
+
+Description:
+
+This nameserver name has IPv6 addresses but no IPv4 address (no A record). A resolver that uses only IPv4 gets no address for it and has to try another nameserver, which slows down its lookups. Give every nameserver name both an A and an AAAA record.
+
+## Tag NS_NAME_NO_IPV6_ADDR
+
+Header: Nameserver has no IPv6 address
+
+Description:
+
+This nameserver name has IPv4 addresses but no IPv6 address. A resolver that uses only IPv6 gets no address for it and has to try another nameserver, which slows down its lookups. Give every nameserver name both an A and an AAAA record.
 
 ## Tag CHILD_NS_SAME_IP
 
@@ -209,3 +241,19 @@ Header: Nameserver inside the zone is missing its glue
 Description:
 
 One of your nameservers has a name inside your own domain (for example ns1.example.com serving example.com), but the parent zone's referral does not include its IP address as glue. This is a chicken-and-egg failure: to look up the nameserver's address a resolver must first ask that very nameserver, which it cannot reach without the address. The parent must publish the glue address for every in-domain nameserver, or the delegation is unresolvable.
+
+## Tag IN_DOMAIN_GLUE_MISSING_IPV4
+
+Header: In-domain nameserver lacks IPv4 glue
+
+Description:
+
+One of your nameservers has a name inside your own domain and an IPv4 address in your zone, but the parent zone's referral has no IPv4 glue for it. Resolvers that use only IPv4 cannot look up this nameserver and must rely on your other nameservers. The parent should publish both the IPv4 and the IPv6 address as glue.
+
+## Tag IN_DOMAIN_GLUE_MISSING_IPV6
+
+Header: In-domain nameserver lacks IPv6 glue
+
+Description:
+
+One of your nameservers has a name inside your own domain and an IPv6 address in your zone, but the parent zone's referral has no IPv6 glue for it. Resolvers that use only IPv6 cannot look up this nameserver and must rely on your other nameservers. The parent should publish both the IPv4 and the IPv6 address as glue.

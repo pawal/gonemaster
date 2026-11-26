@@ -58,6 +58,14 @@ Description:
 
 The check could not find any IP addresses for the nameservers listed in the delegation. Without addresses there is nothing for resolvers to connect to, so the domain is effectively unreachable regardless of what the delegation record says.
 
+## Tag A01_IPV4_EMBEDDED_IPV6_ADDR
+
+Header: Nameserver uses IPv4-embedded IPv6 address
+
+Description:
+
+A nameserver is listed with an IPv6 address that only wraps an IPv4 address, such as an IPv4-mapped address (`::ffff:192.0.2.1`) or a NAT64 address (`64:ff9b::/96`). Such an address does not reach the nameserver over native IPv6, and nameservers must not use one (RFC 10001). List the nameserver's native IPv6 address instead.
+
 ## Tag NO_RESPONSE_PTR_QUERY
 
 Header: No response to reverse DNS query

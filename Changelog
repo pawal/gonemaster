@@ -4,10 +4,21 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- delegation01: `IN_DOMAIN_GLUE_MISSING_IPV4` and `IN_DOMAIN_GLUE_MISSING_IPV6` for glue missing one address family
+- delegation01: `NS_NAME_NO_IPV4_ADDR` and `NS_NAME_NO_IPV6_ADDR` for a nameserver name that resolves to one address family only; a database-stored scoring config needs zero-point entries for both
+- address01: `A01_IPV4_EMBEDDED_IPV6_ADDR` for IPv4-mapped, IPv4-compatible and NAT64 addresses
+
+### Changed
+
+- delegation01: `NO_IPV4_NS_*` and `NO_IPV6_NS_*` are ERROR (RFC 10001 section 4.1)
+
 ### Fixed
 
 - nameserver17: each nameserver gets its own Client Cookie (RFC 9018 section 3)
 - nameserver17: a BADCOOKIE round-trip reply without a well-formed fresh cookie emits `N17_COOKIE_SELF_REJECT` instead of `N17_COOKIE_ROUNDTRIP_OK`
+- address01: an IPv4-mapped AAAA record of an in-domain nameserver gets one finding
 
 ### Security
 

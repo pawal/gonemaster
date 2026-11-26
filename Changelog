@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- basic01: a zone is found when a nameserver above its parent returns NXDOMAIN for an empty non-terminal and still refers to the parent zone
+
 ## [v1.7.29] - 2026-11-26
 
 ### Added

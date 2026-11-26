@@ -5,7 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"net"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -1052,6 +1054,140 @@ func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected exactly one B01_PARENT_NXDOMAIN_HIDES_DELEGATION entry, got %d", count)
+	}
+}
+
+// An ancestor denies a name above the parent's delegation and still refers to the parent.
+func TestBasic01AncestorNXDomainHidesParentDelegation(t *testing.T) {
+	tests := []struct {
+		name            string
+		zone            string
+		parentDenies    string
+		wantQueryNames  []string
+		wantNS          []string
+		wantAncestorLog []string
+		wantParentLog   []string
+	}{
+		{
+			name:           "ancestor denies",
+			zone:           "child.parent.mid.example",
+			wantQueryNames: []string{"mid.example"},
+			wantNS:         []string{"ns1.example"},
+			wantAncestorLog: []string{
+				"example SOA", "example NS", "mid.example SOA", "child.parent.mid.example SOA",
+			},
+			wantParentLog: []string{
+				"parent.mid.example SOA", "parent.mid.example NS", "child.parent.mid.example SOA",
+			},
+		},
+		{
+			name:           "ancestor and parent deny",
+			zone:           "child.im.parent.mid.example",
+			parentDenies:   "im.parent.mid.example",
+			wantQueryNames: []string{"mid.example", "im.parent.mid.example"},
+			wantNS:         []string{"ns1.example", "ns1.parent.mid.example"},
+			wantAncestorLog: []string{
+				"example SOA", "example NS", "mid.example SOA", "child.im.parent.mid.example SOA",
+			},
+			wantParentLog: []string{
+				"parent.mid.example SOA", "parent.mid.example NS", "im.parent.mid.example SOA", "child.im.parent.mid.example SOA",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, _, _ := testhelpers.Context(t)
+
+			r := tctest.Recursor(t, map[string]map[string][]string{
+				".": {"a.root": {"192.0.2.1"}},
+			})
+
+			var mu sync.Mutex
+			logs := map[string][]string{}
+			record := func(server string, q tctest.Query) (string, string) {
+				name, kind := strings.ToLower(q.Name), strings.ToUpper(q.Type)
+				if kind == "SOA" || kind == "NS" {
+					mu.Lock()
+					logs[server] = append(logs[server], name+" "+kind)
+					mu.Unlock()
+				}
+				return name, kind
+			}
+
+			tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+				name, kind := record("root", q)
+				switch {
+				case name == "." && kind == "SOA":
+					return soaPacket(".", "a.root", "hostmaster.root")
+				case name == "." && kind == "NS":
+					return nsPacketMulti(".", "a.root")
+				case name == "example" && kind == "SOA":
+					return referralPacketMulti("example", []nsEntry{
+						{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+					})
+				}
+				return packet.Packet{}
+			})
+
+			tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+				name, kind := record("ancestor", q)
+				switch {
+				case name == "example" && kind == "SOA":
+					return soaPacket("example", "ns1.example", "hostmaster.example")
+				case name == "example" && kind == "NS":
+					return nsPacketMulti("example", "ns1.example")
+				case name == "mid.example" && kind == "SOA":
+					return nxdomainAAPacket()
+				case name == tt.zone && kind == "SOA":
+					return referralPacketMulti("parent.mid.example", []nsEntry{
+						{name: "ns1.parent.mid.example", addr: net.IPv4(192, 0, 2, 54)},
+					})
+				}
+				return packet.Packet{}
+			})
+
+			tctest.NSOn(t, ctx, r, "ns1.parent.mid.example", "192.0.2.54", func(q tctest.Query) packet.Packet {
+				name, kind := record("parent", q)
+				switch {
+				case name == "parent.mid.example" && kind == "SOA":
+					return soaPacket("parent.mid.example", "ns1.parent.mid.example", "hostmaster.example")
+				case name == "parent.mid.example" && kind == "NS":
+					return nsPacketMulti("parent.mid.example", "ns1.parent.mid.example")
+				case name == tt.parentDenies && kind == "SOA":
+					return nxdomainAAPacket()
+				case name == tt.zone && kind == "SOA":
+					return referralPacketMulti(tt.zone, []nsEntry{
+						{name: "ns.child.example", addr: net.IPv4(192, 0, 2, 55)},
+					})
+				}
+				return packet.Packet{}
+			})
+
+			entries, err := Basic01(ctx, tctest.Zone(t, tt.zone, r))
+			if err != nil {
+				t.Fatalf("basic01: %v", err)
+			}
+
+			tctest.RequireTags(t, entries, "B01_PARENT_FOUND", "B01_CHILD_FOUND")
+			tctest.RequireNoTag(t, entries, "B01_NO_CHILD", "B01_INCONSISTENT_DELEGATION", "B01_PARENT_UNDETERMINED", "B01_SERVER_ZONE_ERROR")
+			tctest.RequireArg(t, tctest.RequireTag(t, entries, "B01_PARENT_FOUND"), "domain", "parent.mid.example")
+
+			if got := tctest.ArgValues(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION", "query_name"); !slices.Equal(got, tt.wantQueryNames) {
+				t.Errorf("query_name = %v, want %v", got, tt.wantQueryNames)
+			}
+			if got := tctest.ArgValues(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION", "ns"); !slices.Equal(got, tt.wantNS) {
+				t.Errorf("ns = %v, want %v", got, tt.wantNS)
+			}
+			if want := []string{". SOA", ". NS", "example SOA"}; !slices.Equal(logs["root"], want) {
+				t.Errorf("root queries = %v, want %v", logs["root"], want)
+			}
+			if !slices.Equal(logs["ancestor"], tt.wantAncestorLog) {
+				t.Errorf("ancestor queries = %v, want %v", logs["ancestor"], tt.wantAncestorLog)
+			}
+			if !slices.Equal(logs["parent"], tt.wantParentLog) {
+				t.Errorf("parent queries = %v, want %v", logs["parent"], tt.wantParentLog)
+			}
+		})
 	}
 }
 

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Tests :: Gonemaster</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/index.html</link><description>This directory contains canonical testcase specifications for gonemaster.
+Each testcase spec MUST be based on current implementation behavior and SHOULD start from docs/specifications/templates/testcase-spec-template.md.
+Nameserver Resolution Vocabulary Specs refer to several distinct views of the nameservers that serve a zone. These are not interchangeable; testcases pick the view that matches what is actually being verified.
+See Nameserver Resolution Reference for the canonical description of each function, with signatures and source locations. Testcase spec files link symbol mentions back to that page.</description><generator>Hugo</generator><language>en-us</language><atom:link href="https://pawal.codeberg.page/gonemaster/specifications/tests/index.xml" rel="self" type="application/rss+xml"/><item><title>Address</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/address/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/address/index.html</guid><description>ADDRESS01Name server address must be globally routable
+ADDRESS02Reverse DNS entry exists for name server IP address
+ADDRESS03Reverse DNS entry matches name server name</description></item><item><title>Basic</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/basic/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/basic/index.html</guid><description>BASIC01The domain must have a parent domain
+BASIC02The domain must have at least one working name server
+BASIC03The Broken but functional test</description></item><item><title>Connectivity</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/connectivity/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/connectivity/index.html</guid><description>CONNECTIVITY01UDP connectivity
+CONNECTIVITY02TCP connectivity
+CONNECTIVITY03AS diversity
+CONNECTIVITY04IP prefix diversity
+CONNECTIVITY05UDP answer delivery</description></item><item><title>Consistency</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/consistency/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/consistency/index.html</guid><description>CONSISTENCY01SOA serial number consistency
+CONSISTENCY02SOA RNAME consistency
+CONSISTENCY03SOA timers consistency
+CONSISTENCY04Name server NS consistency
+CONSISTENCY05Consistency between glue and authoritative data
+CONSISTENCY06SOA MNAME consistency</description></item><item><title>Delegation</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/delegation/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/delegation/index.html</guid><description>DELEGATION01Minimum number of name servers
+DELEGATION02Name servers must have distinct IP addresses
+DELEGATION03No truncation of referrals
+DELEGATION04Name server is authoritative
+DELEGATION05Name server must not point at CNAME alias
+DELEGATION06Existence of SOA
+DELEGATION07Parent glue name records present in child</description></item><item><title>DNSSEC</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/dnssec/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/dnssec/index.html</guid><description>DNSSEC01Legal values for the DS hash digest algorithm
+DNSSEC02DS must match a valid DNSKEY in the child zone
+DNSSEC03Verify NSEC3 parameters
+DNSSEC04Check for too short or too long RRSIG lifetimes
+DNSSEC05Check for invalid DNSKEY algorithms
+DNSSEC06Verify DNSSEC additional processing
+DNSSEC07DNSSEC signed zone and DS in parent for signed zone
+DNSSEC08Valid RRSIG for DNSKEY
+DNSSEC09RRSIG(SOA) must be valid and created by a valid DNSKEY</description></item><item><title>Nameserver</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/nameserver/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/nameserver/index.html</guid><description>NAMESERVER01A name server should not be a recursor
+NAMESERVER02Test of EDNS0 support
+NAMESERVER03Test availability of zone transfer (AXFR)
+NAMESERVER04Same source address
+NAMESERVER05Behaviour against AAAA query
+NAMESERVER06NS can be resolved
+NAMESERVER07To check whether authoritative name servers return an upward referral
+NAMESERVER08Testing QNAME case insensitivity
+NAMESERVER09Testing QNAME case sensitivity
+NAMESERVER10Behaviour against unsupported EDNS version
+NAMESERVER11Behaviour against unknown EDNS option codes</description></item><item><title>Syntax</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/syntax/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/syntax/index.html</guid><description>SYNTAX01No illegal characters in the domain name
+SYNTAX02No hyphen at the start or end of the domain name
+SYNTAX03No double hyphen in position 3 and 4 of the domain name
+SYNTAX04The NS name must have a valid domain/hostname
+SYNTAX05Misuse of '@' character in the SOA RNAME field
+SYNTAX06No illegal characters in the SOA RNAME field
+SYNTAX07No illegal characters in the SOA MNAME field</description></item><item><title>Zone</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/zone/index.html</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pawal.codeberg.page/gonemaster/specifications/tests/zone/index.html</guid><description>ZONE01Fully qualified master nameserver in SOA
+ZONE02SOA 'refresh' minimum value
+ZONE03SOA 'retry' lower than 'refresh'
+ZONE04SOA 'retry' at least 1 hour
+ZONE05SOA 'expire' minimum value
+ZONE06SOA 'minimum' maximum value
+ZONE07SOA master is not an alias
+ZONE08MX is not an alias
+ZONE09MX record present
+ZONE10No multiple SOA records
+ZONE11SPF policy at zone apex
+ZONE12CSYNC RR at zone apex</description></item></channel></rss>

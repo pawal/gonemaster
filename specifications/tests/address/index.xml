@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Address :: Gonemaster</title><link>https://pawal.codeberg.page/gonemaster/specifications/tests/address/index.html</link><description>ADDRESS01Name server address must be globally routable
+ADDRESS02Reverse DNS entry exists for name server IP address
+ADDRESS03Reverse DNS entry matches name server name</description><generator>Hugo</generator><language>en-us</language><atom:link href="https://pawal.codeberg.page/gonemaster/specifications/tests/address/index.xml" rel="self" type="application/rss+xml"/></channel></rss>

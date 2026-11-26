@@ -164,8 +164,8 @@ msgid "The parent zone cannot be found."
 msgstr "De bovenliggende zone kan niet worden gevonden."
 
 msgctxt "BASIC:B01_PARENT_NXDOMAIN_HIDES_DELEGATION"
-msgid "Parent nameserver \"{ns}/{address}\" returns NXDOMAIN for \"{query_name}\" but also has a delegation for \"{domain_child}\". This violates RFC 8020. The zone is still testable through the delegation, but the parent operator should fix this."
-msgstr "Bovenliggende naamserver \"{ns}/{address}\" retourneert NXDOMAIN voor \"{query_name}\", maar heeft ook een delegatie voor \"{domain_child}\". Dit is in strijd met RFC 8020. De zone is nog steeds testbaar via de delegatie, maar de beheerder van de bovenliggende zone zou dit moeten oplossen."
+msgid "Nameserver \"{ns}/{address}\" returns NXDOMAIN for \"{query_name}\" but answers a query for \"{domain_child}\" with a referral. This violates RFC 8020. The zone is still tested through the referral, but the operator of the nameserver should fix this."
+msgstr "Naamserver \"{ns}/{address}\" retourneert NXDOMAIN voor \"{query_name}\", maar beantwoordt een query voor \"{domain_child}\" met een verwijzing (referral). Dit is in strijd met RFC 8020. De zone wordt nog steeds getest via de verwijzing, maar de beheerder van de naamserver zou dit moeten oplossen."
 
 msgctxt "BASIC:B01_PARENT_UNDETERMINED"
 msgid "The parent zone cannot be determined on name servers \"{servers}\"."
@@ -176,8 +176,8 @@ msgid "This is a test of the root zone which has no parent zone."
 msgstr "Dit is een test van de rootzone, die geen bovenliggende zone heeft."
 
 msgctxt "BASIC:B01_SERVER_ZONE_ERROR"
-msgid "Unexpected response on query for \"{query_name}\" with query type \"{query_type}\" to \"{ns}/{address}\"."
-msgstr "Onverwacht antwoord op de query voor \"{query_name}\" met querytype \"{query_type}\" naar \"{ns}/{address}\"."
+msgid "Unexpected response on query for \"{query_name}\" with query type \"{query_type}\" to \"{ns}/{address}\" ({reason})."
+msgstr "Onverwacht antwoord op de query voor \"{query_name}\" met querytype \"{query_type}\" naar \"{ns}/{address}\" ({reason})."
 
 msgctxt "BASIC:B02_AUTH_RESPONSE_SOA"
 msgid "Authoritative answer on SOA query for \"{domain}\" is returned by name servers \"{servers}\"."
@@ -2325,10 +2325,6 @@ msgstr "Geen van de IP-adressen van de naamservers is vermeld als wereldwijd ber
 msgctxt "ADDRESS:A01_NO_NAME_SERVERS_FOUND"
 msgid "No name servers found."
 msgstr "Geen naamservers gevonden."
-
-msgctxt "BASIC:B01_CHILD_NOT_EXIST"
-msgid "The zone \"{domain}\" does not exist as a zone."
-msgstr "De zone \"{domain}\" bestaat niet als zone."
 
 msgctxt "DNSSEC:DS01_DS_ALGO_OK"
 msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {servers}."

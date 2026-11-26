@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -297,9 +298,18 @@ func TestBasic01RootZoneError(t *testing.T) {
 		name          string
 		root          replies
 		wantQueryType string
+		wantReason    string
+		wantRcode     string
 	}{
-		{"SOA fails", replies{". SOA": rcode(dns.RcodeServerFailure)}, "SOA"},
-		{"NS fails", replies{". SOA": soa(".", "a.root"), ". NS": rcode(dns.RcodeServerFailure)}, "NS"},
+		{"SOA SERVFAIL", replies{". SOA": rcode(dns.RcodeServerFailure)}, "SOA", "rcode", "SERVFAIL"},
+		{"SOA NXDOMAIN", replies{". SOA": nxdomainAAPacket}, "SOA", "rcode", "NXDOMAIN"},
+		{"SOA without AA", replies{". SOA": rcode(dns.RcodeSuccess)}, "SOA", "not_authoritative", "NOERROR"},
+		{"no SOA record", replies{". SOA": emptyAnswerPacket}, "SOA", "soa_records", "NOERROR"},
+		{"second SOA record of another owner", replies{". SOA": func() packet.Packet {
+			return tctest.Response(tctest.Answers(tctest.SOARR("."), tctest.SOARR("example")))
+		}}, "SOA", "soa_records", "NOERROR"},
+		{"NS SERVFAIL", replies{". SOA": soa(".", "a.root"), ". NS": rcode(dns.RcodeServerFailure)}, "NS", "rcode", "SERVFAIL"},
+		{"NS of another owner", replies{". SOA": soa(".", "a.root"), ". NS": func() packet.Packet { return nsPacketMulti("example", "a.root") }}, "NS", "ns_records", "NOERROR"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -320,6 +330,8 @@ func TestBasic01RootZoneError(t *testing.T) {
 			tctest.RequireArg(t, zoneError, "address", "192.0.2.1")
 			tctest.RequireArg(t, zoneError, "query_name", ".")
 			tctest.RequireArg(t, zoneError, "query_type", tt.wantQueryType)
+			tctest.RequireArg(t, zoneError, "reason", tt.wantReason)
+			tctest.RequireArg(t, zoneError, "rcode", tt.wantRcode)
 			noChild := tctest.RequireTag(t, entries, "B01_NO_CHILD")
 			tctest.RequireArg(t, noChild, "domain_child", "example")
 			tctest.RequireArg(t, noChild, "domain_super", ".")
@@ -327,19 +339,22 @@ func TestBasic01RootZoneError(t *testing.T) {
 	}
 }
 
-// The parent's only server gives an unusable answer for mid.example, above the child.
+// The parent's only server proves example, then gives an unusable answer for mid.example above the child.
 func TestBasic01IntermediateNameError(t *testing.T) {
 	tests := []struct {
 		name          string
 		mid           replies
 		wantQueryType string
+		wantReason    string
+		wantRcode     string
 	}{
-		{"SERVFAIL", replies{"mid.example SOA": rcode(dns.RcodeServerFailure)}, "SOA"},
-		{"REFUSED", replies{"mid.example SOA": rcode(dns.RcodeRefused)}, "SOA"},
-		{"NXDOMAIN without AA", replies{"mid.example SOA": rcode(dns.RcodeNameError)}, "SOA"},
-		{"NOERROR without AA", replies{"mid.example SOA": rcode(dns.RcodeSuccess)}, "SOA"},
-		{"no answer", replies{}, "SOA"},
-		{"SOA answered and NS fails", replies{"mid.example SOA": soa("mid.example", "ns1.example"), "mid.example NS": rcode(dns.RcodeServerFailure)}, "NS"},
+		{"SERVFAIL", replies{"mid.example SOA": rcode(dns.RcodeServerFailure)}, "SOA", "rcode", "SERVFAIL"},
+		{"REFUSED", replies{"mid.example SOA": rcode(dns.RcodeRefused)}, "SOA", "rcode", "REFUSED"},
+		{"NXDOMAIN without AA", replies{"mid.example SOA": rcode(dns.RcodeNameError)}, "SOA", "not_authoritative", "NXDOMAIN"},
+		{"NOERROR without AA", replies{"mid.example SOA": rcode(dns.RcodeSuccess)}, "SOA", "not_authoritative", "NOERROR"},
+		{"referral upwards", replies{"mid.example SOA": referral("example", ns1Example)}, "SOA", "referral", "NOERROR"},
+		{"no answer", replies{}, "SOA", "no_response", ""},
+		{"SOA answered and NS fails", replies{"mid.example SOA": soa("mid.example", "ns1.example"), "mid.example NS": rcode(dns.RcodeServerFailure)}, "NS", "rcode", "SERVFAIL"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -363,10 +378,220 @@ func TestBasic01IntermediateNameError(t *testing.T) {
 			tctest.RequireArg(t, zoneError, "ns", "ns1.example")
 			tctest.RequireArg(t, zoneError, "query_name", "mid.example")
 			tctest.RequireArg(t, zoneError, "query_type", tt.wantQueryType)
+			tctest.RequireArg(t, zoneError, "reason", tt.wantReason)
+			if got, _ := zoneError.Args["rcode"].(string); got != tt.wantRcode {
+				t.Fatalf("rcode = %q, want %q", got, tt.wantRcode)
+			}
 			noChild := tctest.RequireTag(t, entries, "B01_NO_CHILD")
 			tctest.RequireArg(t, noChild, "domain_child", "child.mid.example")
-			tctest.RequireArg(t, noChild, "domain_super", "mid.example")
+			tctest.RequireArg(t, noChild, "domain_super", "example")
 		})
+	}
+}
+
+// A walk that gets no answer for the child suggests the deepest zone it reached, proved or only referred to.
+func TestBasic01NoChildSuggestsDeepestZoneReached(t *testing.T) {
+	tests := []struct {
+		name      string
+		example   tctest.Handler
+		zoneError string
+		wantSuper string
+	}{
+		{
+			name: "deepest zone proved",
+			example: apex("example", apex("sub.example", replies{
+				"mid.sub.example SOA": rcode(dns.RcodeServerFailure),
+			}.handler(), "ns1.example"), "ns1.example"),
+			zoneError: "mid.sub.example",
+			wantSuper: "sub.example",
+		},
+		{
+			name:      "deepest zone referred, its server lame",
+			example:   replies{"example SOA": rcode(dns.RcodeRefused)}.handler(),
+			zoneError: "example",
+			wantSuper: "example",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, _, _ := testhelpers.Context(t)
+
+			r := serveRoots(t, ctx, func(string) tctest.Handler {
+				return replies{"example SOA": referral("example", ns1Example)}.handler()
+			}, "a.root")
+			tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", tt.example)
+
+			entries := basic01Entries(t, ctx, "child.mid.sub.example", r)
+
+			tctest.RequireTags(t, entries, "B01_PARENT_NOT_FOUND")
+			tctest.RequireNoTag(t, entries, "B01_PARENT_FOUND", "B01_CHILD_FOUND")
+			if got := tctest.ArgValues(entries, "B01_SERVER_ZONE_ERROR", "query_name"); !slices.Equal(got, []string{tt.zoneError}) {
+				t.Fatalf("zone error query names = %v, want [%s]", got, tt.zoneError)
+			}
+			noChild := tctest.RequireTag(t, entries, "B01_NO_CHILD")
+			tctest.RequireArg(t, noChild, "domain_child", "child.mid.sub.example")
+			tctest.RequireArg(t, noChild, "domain_super", tt.wantSuper)
+		})
+	}
+}
+
+// ns2.example is named only in the NS answer of example, not in the referral to it.
+func TestBasic01ProbesServersOfTheZoneNSAnswer(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := serveRoots(t, ctx, func(string) tctest.Handler {
+		return replies{"example SOA": referral("example", ns1Example)}.handler()
+	}, "a.root")
+	apexNS := func() packet.Packet {
+		return tctest.Response(tctest.Answers(tctest.NSRRs("example", "ns1.example", "ns2.example")...),
+			tctest.Additional(tctest.ARR("ns1.example", "192.0.2.53"), tctest.ARR("ns2.example", "192.0.2.54")))
+	}
+	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", replies{
+		"example SOA":       soa("example", "ns1.example"),
+		"example NS":        apexNS,
+		"child.example SOA": referral("child.example", nsEntry{name: "ns.child.example", addr: net.IPv4(192, 0, 2, 55)}),
+	}.handler())
+	var asked atomic.Int32
+	tctest.NSOn(t, ctx, r, "ns2.example", "192.0.2.54", func(q tctest.Query) packet.Packet {
+		asked.Add(1)
+		return replies{
+			"example SOA":       soa("example", "ns1.example"),
+			"example NS":        apexNS,
+			"child.example SOA": nxdomainAAPacket,
+		}.handler()(q)
+	})
+
+	entries := basic01Entries(t, ctx, "child.example", r)
+
+	if got := asked.Load(); got != 3 {
+		t.Fatalf("ns2.example was asked %d times, want 3", got)
+	}
+	parent := tctest.RequireTag(t, entries, "B01_PARENT_FOUND")
+	if got, want := tctest.ServerEndpoints(t, parent.Args), []string{"ns1.example/192.0.2.53", "ns2.example/192.0.2.54"}; !slices.Equal(got, want) {
+		t.Fatalf("parent servers = %v, want %v", got, want)
+	}
+	tctest.RequireTags(t, entries, "B01_CHILD_FOUND")
+	inconsistent := tctest.RequireTag(t, entries, "B01_INCONSISTENT_DELEGATION")
+	if got, want := tctest.ServerEndpoints(t, inconsistent.Args), []string{"ns2.example/192.0.2.54"}; !slices.Equal(got, want) {
+		t.Fatalf("inconsistent servers = %v, want %v", got, want)
+	}
+}
+
+// A probe referral queues mid.sub.example before sub.example, whose server names a second server for it.
+func TestBasic01WalksShallowestZoneFirst(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	nsA := nsEntry{name: "ns-a.example", addr: net.IPv4(192, 0, 2, 60)}
+	nsB := nsEntry{name: "ns-b.example", addr: net.IPv4(192, 0, 2, 61)}
+	nsSub := nsEntry{name: "ns.sub.example", addr: net.IPv4(192, 0, 2, 62)}
+	r := serveRoots(t, ctx, func(string) tctest.Handler {
+		return replies{"example SOA": referral("example", ns1Example, ns2Example)}.handler()
+	}, "a.root")
+	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", apex("example", replies{
+		"sub.example SOA":           nxdomainAAPacket,
+		"child.mid.sub.example SOA": referral("mid.sub.example", nsA),
+	}.handler(), "ns1.example", "ns2.example"))
+	tctest.NSOn(t, ctx, r, "ns2.example", "192.0.2.54", apex("example", replies{
+		"sub.example SOA": referral("sub.example", nsSub),
+	}.handler(), "ns1.example", "ns2.example"))
+	tctest.NSOn(t, ctx, r, nsSub.name, nsSub.addr.String(), apex("sub.example", replies{
+		"mid.sub.example SOA": referral("mid.sub.example", nsA, nsB),
+	}.handler(), nsSub.name))
+	child := referral("child.mid.sub.example", nsEntry{name: "ns.child.example", addr: net.IPv4(192, 0, 2, 55)})
+	tctest.NSOn(t, ctx, r, nsA.name, nsA.addr.String(), apex("mid.sub.example", replies{"child.mid.sub.example SOA": child}.handler(), nsA.name, nsB.name))
+	tctest.NSOn(t, ctx, r, nsB.name, nsB.addr.String(), apex("mid.sub.example", replies{"child.mid.sub.example SOA": nxdomainAAPacket}.handler(), nsA.name, nsB.name))
+
+	entries := basic01Entries(t, ctx, "child.mid.sub.example", r)
+
+	tctest.RequireArg(t, tctest.RequireTag(t, entries, "B01_PARENT_FOUND"), "domain", "mid.sub.example")
+	inconsistent := tctest.RequireTag(t, entries, "B01_INCONSISTENT_DELEGATION")
+	if got, want := tctest.ServerEndpoints(t, inconsistent.Args), []string{"ns-b.example/192.0.2.61"}; !slices.Equal(got, want) {
+		t.Fatalf("inconsistent servers = %v, want %v", got, want)
+	}
+	tctest.RequireNoTag(t, entries, "LOOP_PROTECTION", "B01_PARENT_UNDETERMINED")
+}
+
+// A referral without the AA bit holding a CNAME for the child is an answer without a delegation.
+func TestBasic01CNAMEWithReferral(t *testing.T) {
+	cnameReferral := func(extra ...dns.RR) func() packet.Packet {
+		return func() packet.Packet {
+			answers := append([]dns.RR{tctest.CNAMERR("example", "x.other")}, extra...)
+			return tctest.Response(tctest.NotAuthoritative(), tctest.Answers(answers...), tctest.Authority(tctest.NSRR("other", "ns.other")))
+		}
+	}
+	tests := []struct {
+		name       string
+		bRoot      func() packet.Packet
+		wantAnswer bool
+	}{
+		{"CNAME only", cnameReferral(), true},
+		{"CNAME with its RRSIG", cnameReferral(tctest.RRSIGRR("example", dns.TypeCNAME)), true},
+		{"CNAME beside an A record", cnameReferral(tctest.ARR("example", "192.0.2.9")), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, _, _ := testhelpers.Context(t)
+
+			r := serveRoots(t, ctx, func(root string) tctest.Handler {
+				if root == "a.root" {
+					return replies{"example SOA": referral("example", ns1Example)}.handler()
+				}
+				return replies{"example SOA": tt.bRoot}.handler()
+			}, "a.root", "b.root")
+
+			entries := basic01Entries(t, ctx, "example", r)
+
+			tctest.RequireTags(t, entries, "B01_CHILD_FOUND")
+			if !tt.wantAnswer {
+				tctest.RequireNoTag(t, entries, "B01_INCONSISTENT_DELEGATION")
+				zoneError := tctest.RequireTag(t, entries, "B01_SERVER_ZONE_ERROR")
+				tctest.RequireArg(t, zoneError, "ns", "b.root")
+				tctest.RequireArg(t, zoneError, "reason", "not_authoritative")
+				return
+			}
+			tctest.RequireNoTag(t, entries, "B01_SERVER_ZONE_ERROR")
+			inconsistent := tctest.RequireTag(t, entries, "B01_INCONSISTENT_DELEGATION")
+			if got, want := tctest.ServerEndpoints(t, inconsistent.Args), []string{"b.root/192.0.2.2"}; !slices.Equal(got, want) {
+				t.Fatalf("servers = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+// A walk past its visit bound logs LOOP_PROTECTION and reports what it gathered.
+func TestBasic01WalkVisitBound(t *testing.T) {
+	if got := walkVisitLimit(2); got != 6 {
+		t.Fatalf("walkVisitLimit(2) = %d, want 6", got)
+	}
+	tctest.Stub(t, &walkVisitLimit, func(int) int { return 1 })
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := serveRoots(t, ctx, func(string) tctest.Handler {
+		return replies{"example SOA": referral("example", ns1Example)}.handler()
+	}, "a.root")
+	var asked atomic.Int32
+	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		asked.Add(1)
+		return apex("example", replies{
+			"child.example SOA": referral("child.example", nsEntry{name: "ns.child.example", addr: net.IPv4(192, 0, 2, 55)}),
+		}.handler(), "ns1.example")(q)
+	})
+
+	entries := basic01Entries(t, ctx, "child.example", r)
+
+	guard := tctest.RequireTag(t, entries, "LOOP_PROTECTION")
+	tctest.RequireArg(t, guard, "caller", "basic.Basic01")
+	tctest.RequireArg(t, guard, "child_zone_name", "child.example")
+	tctest.RequireArg(t, guard, "zone_name", "example")
+	tctest.RequireArg(t, guard, "intermediate_query_name", "example")
+	if got := asked.Load(); got != 0 {
+		t.Fatalf("ns1.example was asked %d times, want 0", got)
+	}
+	tctest.RequireTags(t, entries, "B01_PARENT_NOT_FOUND")
+	tctest.RequireNoTag(t, entries, "B01_CHILD_FOUND")
+	tctest.RequireArg(t, tctest.RequireTag(t, entries, "B01_NO_CHILD"), "domain_super", "example")
+	if last := entries[len(entries)-1].Tag; last != "TEST_CASE_END" {
+		t.Fatalf("last entry = %s, want TEST_CASE_END", last)
 	}
 }
 

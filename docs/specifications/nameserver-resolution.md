@@ -29,6 +29,11 @@ func GlueNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 Equivalent to `z.Glue(ctx)` with a nil-zone guard. Returns an error if
 `z` is nil; otherwise propagates errors from the underlying zone lookup.
 
+The names come from `GlueNames`. The recursor resolves each name's A
+and AAAA records from the root. For the root zone the addresses come
+from the bundled root hints, and in an undelegated test from the
+supplied data.
+
 Source: `engine/nsdiscovery/nsdiscovery.go`.
 
 ## GlueNames

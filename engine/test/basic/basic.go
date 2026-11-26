@@ -15,6 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/cnamelog"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
@@ -218,6 +219,66 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	zoneLabels := z.Name.Labels()
 	// Below a TLD the roots are not the parent: one root that refers onwards is enough.
 	onePath := len(zoneLabels) >= 2
+
+	// queueReferral queues the servers a referral names for the zone at cut.
+	queueReferral := func(cut dnsname.Name, resp packet.Packet) {
+		rrsNSBis := map[string][]netip.Addr{}
+		for _, rr := range resp.GetRecordsForName("NS", cut, "authority") {
+			nsRR, ok := rr.(*dns.NS)
+			if !ok {
+				continue
+			}
+			nsNameObj := dnsname.New(nsRR.Ns)
+			nsName := strings.ToLower(nsNameObj.String())
+			rrsNSBis[nsName] = []netip.Addr{}
+		}
+		for _, rr := range append(resp.GetRecords("A", "additional"), resp.GetRecords("AAAA", "additional")...) {
+			ownerName := dnsname.New(rr.Header().Name)
+			owner := strings.ToLower(ownerName.String())
+			if _, ok := rrsNSBis[owner]; ok {
+				if addr, ok := addrFromRR(rr); ok {
+					rrsNSBis[owner] = append(rrsNSBis[owner], addr)
+				}
+			}
+		}
+		nameserver.CapNSMap(ctx, strings.ToLower(cut.String()), rrsNSBis)
+
+		for nsName, addrs := range rrsNSBis {
+			if len(addrs) == 0 {
+				for _, qtype := range []string{"A", "AAAA"} {
+					resp, err := rec.Recurse(ctx, nsName, qtype, "IN")
+					if err != nil {
+						cnamelog.Log(ctx, &results, moduleName, testcase, err)
+						continue
+					}
+					if resp.Msg == nil || resp.Rcode() != "NOERROR" {
+						continue
+					}
+					for _, rr := range resp.GetRecordsForName(qtype, dnsname.New(nsName)) {
+						if addr, ok := addrFromRR(rr); ok {
+							addrs = append(addrs, addr)
+						}
+					}
+				}
+			}
+
+			for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
+				if handledServers[cut.String()] != nil && handledServers[cut.String()][addr.String()] {
+					continue
+				}
+				nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
+				if err != nil {
+					continue
+				}
+				allServers[cut.String()] = append(allServers[cut.String()], nsObj)
+				if !allLabels[cut.String()] {
+					remainingLabels = append(remainingLabels, cut.String())
+					allLabels[cut.String()] = true
+				}
+			}
+			rrsNSBis[nsName] = addrs
+		}
+	}
 
 	for len(remainingLabels) > 0 {
 		zoneName := remainingLabels[0]
@@ -442,11 +503,17 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				} else if pSOA.Rcode() == "NXDOMAIN" && pSOA.AA() {
 					if !strings.EqualFold(intermediate.String(), z.Name.String()) {
 						pChild, probeErr := ns.Query(ctx, z.Name.String(), "SOA")
-						if probeErr == nil && pChild.Msg != nil &&
-							pChild.IsRedirect() &&
-							len(pChild.GetRecordsForName("NS", z.Name, "authority")) > 0 {
-							addNS(parentFound, loopZoneName, ns.String())
-							addNS(delegationFound, loopZoneName, ns.String())
+						cut, referred := dnsname.Name{}, false
+						if probeErr == nil && pChild.Msg != nil && pChild.IsRedirect() {
+							cut, referred = referralCut(pChild, dnsname.New(loopZoneName), z.Name)
+						}
+						if referred {
+							if strings.EqualFold(cut.String(), z.Name.String()) {
+								addNS(parentFound, loopZoneName, ns.String())
+								addNS(delegationFound, loopZoneName, ns.String())
+							} else {
+								queueReferral(cut, pChild)
+							}
 							if nxdomainHidesDelegation[loopZoneName] == nil {
 								nxdomainHidesDelegation[loopZoneName] = map[string]string{}
 							}
@@ -466,62 +533,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						addNS(parentFound, loopZoneName, ns.String())
 						addNS(delegationFound, loopZoneName, ns.String())
 					} else {
-						rrsNSBis := map[string][]netip.Addr{}
-						for _, rr := range pSOA.GetRecordsForName("NS", intermediate, "authority") {
-							nsRR, ok := rr.(*dns.NS)
-							if !ok {
-								continue
-							}
-							nsNameObj := dnsname.New(nsRR.Ns)
-							nsName := strings.ToLower(nsNameObj.String())
-							rrsNSBis[nsName] = []netip.Addr{}
-						}
-						for _, rr := range append(pSOA.GetRecords("A", "additional"), pSOA.GetRecords("AAAA", "additional")...) {
-							ownerName := dnsname.New(rr.Header().Name)
-							owner := strings.ToLower(ownerName.String())
-							if _, ok := rrsNSBis[owner]; ok {
-								if addr, ok := addrFromRR(rr); ok {
-									rrsNSBis[owner] = append(rrsNSBis[owner], addr)
-								}
-							}
-						}
-						nameserver.CapNSMap(ctx, strings.ToLower(intermediate.String()), rrsNSBis)
-
-						for nsName, addrs := range rrsNSBis {
-							if len(addrs) == 0 {
-								for _, qtype := range []string{"A", "AAAA"} {
-									resp, err := rec.Recurse(ctx, nsName, qtype, "IN")
-									if err != nil {
-										cnamelog.Log(ctx, &results, moduleName, testcase, err)
-										continue
-									}
-									if resp.Msg == nil || resp.Rcode() != "NOERROR" {
-										continue
-									}
-									for _, rr := range resp.GetRecordsForName(qtype, dnsname.New(nsName)) {
-										if addr, ok := addrFromRR(rr); ok {
-											addrs = append(addrs, addr)
-										}
-									}
-								}
-							}
-
-							for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
-								if handledServers[intermediate.String()] != nil && handledServers[intermediate.String()][addr.String()] {
-									continue
-								}
-								nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
-								if err != nil {
-									continue
-								}
-								allServers[intermediate.String()] = append(allServers[intermediate.String()], nsObj)
-								if !allLabels[intermediate.String()] {
-									remainingLabels = append(remainingLabels, intermediate.String())
-									allLabels[intermediate.String()] = true
-								}
-							}
-							rrsNSBis[nsName] = addrs
-						}
+						queueReferral(intermediate, pSOA)
 					}
 				} else if pSOA.Rcode() == "NOERROR" && pSOA.AA() {
 					if !strings.EqualFold(intermediate.String(), z.Name.String()) {
@@ -1128,6 +1140,20 @@ func splitNameserverEndpoint(endpoint string) (string, string) {
 		return trimmed, ""
 	}
 	return strings.TrimSpace(trimmed[:sep]), strings.TrimSpace(trimmed[sep+1:])
+}
+
+// referralCut returns the zone cut a referral names: child or an ancestor of it below zone.
+func referralCut(resp packet.Packet, zone dnsname.Name, child dnsname.Name) (dnsname.Name, bool) {
+	childLabels := child.Labels()
+	for _, rr := range resp.GetRecords("NS", "authority") {
+		owner := dnsname.New(rr.Header().Name)
+		n := len(owner.Labels())
+		if n <= len(zone.Labels()) || n > len(childLabels) || !owner.IsInBailiwick(child) || !zone.IsInBailiwick(owner) {
+			continue
+		}
+		return dnsname.NewFromLabels(childLabels[len(childLabels)-n:]), true
+	}
+	return dnsname.Name{}, false
 }
 
 func markHandled(handled map[string]map[string]bool, zoneName string, addr string) bool {

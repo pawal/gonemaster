@@ -57,7 +57,6 @@
             "A_QUERY_NO_RESPONSES": "INFO",
             "B01_CHILD_IS_ALIAS": "NOTICE",
             "B01_CHILD_FOUND": "INFO",
-            "B01_CHILD_NOT_EXIST": "INFO",
             "B01_INCONSISTENT_ALIAS": "ERROR",
             "B01_INCONSISTENT_DELEGATION": "ERROR",
             "B01_NO_CHILD": "ERROR",

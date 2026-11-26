@@ -106,7 +106,6 @@ func IsDNAMEAlias(results []*logger.Entry) bool {
 func Metadata() map[string][]string {
 	return map[string][]string{
 		"basic01": {
-			"B01_CHILD_NOT_EXIST",
 			"B01_CHILD_IS_ALIAS",
 			"B01_CHILD_FOUND",
 			"B01_INCONSISTENT_ALIAS",
@@ -201,10 +200,17 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	aaNXDomain := map[string]map[string]bool{}
 	aaSOA := map[string]map[string]bool{}
 	aaCNAME := map[string]map[string]bool{}
-	cnameWithReferral := map[string]map[string]bool{}
 	aaDname := map[string]map[string]map[string]bool{}
 	aaNodata := map[string]map[string]bool{}
+	cnameWithReferral := map[string]map[string]bool{}
 	nxdomainHidesDelegation := map[string]map[string]string{}
+	// deepestZone is the deepest zone the walk was referred to or proved.
+	deepestZone := ""
+	reach := func(name string) {
+		if deepestZone == "" || len(dnsname.New(name).Labels()) > len(dnsname.New(deepestZone).Labels()) {
+			deepestZone = name
+		}
+	}
 
 	root, err := rec.RootServers(ctx)
 	if err != nil {
@@ -214,16 +220,21 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	allServers := map[string][]nameserver.Nameserver{
 		".": root,
 	}
+	queued := map[string]map[string]bool{}
+	for _, ns := range root {
+		markHandled(queued, ".", ns.Address.String())
+	}
 	allLabels := map[string]bool{".": true}
 	remainingLabels := []string{"."}
 	zoneLabels := z.Name.Labels()
 	// Below a TLD the roots are not the parent: one root that refers onwards is enough.
 	onePath := len(zoneLabels) >= 2
 
-	// queueReferral queues the servers a referral names for the zone at cut.
-	queueReferral := func(cut dnsname.Name, resp packet.Packet) {
+	// queueServers queues the servers nsRRs name for the zone at cut, with the glue resp carries.
+	queueServers := func(cut dnsname.Name, nsRRs []dns.RR, resp packet.Packet) {
+		reach(strings.ToLower(cut.String()))
 		rrsNSBis := map[string][]netip.Addr{}
-		for _, rr := range resp.GetRecordsForName("NS", cut, "authority") {
+		for _, rr := range nsRRs {
 			nsRR, ok := rr.(*dns.NS)
 			if !ok {
 				continue
@@ -263,7 +274,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 
 			for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
-				if handledServers[cut.String()] != nil && handledServers[cut.String()][addr.String()] {
+				if handledServers[cut.String()][addr.String()] || markHandled(queued, cut.String(), addr.String()) {
 					continue
 				}
 				nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
@@ -280,18 +291,33 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	// Each zone of the walk is the child or an ancestor of it, visited once per root path.
+	visits, maxVisits := 0, walkVisitLimit(len(zoneLabels))
 	for len(remainingLabels) > 0 {
+		// The shallowest zone goes first, so no later referral adds servers to a zone already walked.
+		slices.SortStableFunc(remainingLabels, func(a, b string) int {
+			return len(dnsname.New(a).Labels()) - len(dnsname.New(b).Labels())
+		})
 		zoneName := remainingLabels[0]
 		remainingLabels = remainingLabels[1:]
-		remainingServers := append([]nameserver.Nameserver{}, allServers[zoneName]...)
-
+		if visits++; visits > maxVisits {
+			if err := appendLog(ctx, &results, testcase, "LOOP_PROTECTION", map[string]any{
+				"caller":                  "basic.Basic01",
+				"child_zone_name":         z.Name.String(),
+				"zone_name":               zoneName,
+				"intermediate_query_name": zoneName,
+			}); err != nil {
+				return results, err
+			}
+			break
+		}
+		// Servers the zone's own NS answers name join the list and are probed in this pass.
 	serverLoop:
-		for len(remainingServers) > 0 {
+		for i := 0; i < len(allServers[zoneName]); i++ {
 			if onePath && zoneName == "." && (len(remainingLabels) > 0 || len(parentFound) > 0) {
 				break
 			}
-			ns := remainingServers[0]
-			remainingServers = remainingServers[1:]
+			ns := allServers[zoneName][i]
 			addr := ns.Address.String()
 
 			if markHandled(handledServers, zoneName, addr) {
@@ -310,11 +336,8 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 
 			pSOA, err := ns.Query(ctx, zoneName, "SOA")
-			if err != nil || pSOA.Msg == nil || pSOA.Rcode() != "NOERROR" || !pSOA.AA() || len(pSOA.GetRecordsForName("SOA", dnsname.New(zoneName), "answer")) != 1 {
-				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
-					"query_name": zoneName,
-					"query_type": "SOA",
-				})); err != nil {
+			if err != nil || pSOA.Msg == nil || pSOA.Rcode() != "NOERROR" || !pSOA.AA() || len(pSOA.GetRecords("SOA", "answer")) != 1 || len(pSOA.GetRecordsForName("SOA", dnsname.New(zoneName), "answer")) != 1 {
+				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", zoneErrorArgs(ns, zoneName, "SOA", pSOA, err)); err != nil {
 					return results, err
 				}
 				continue serverLoop
@@ -322,91 +345,21 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 			pNS, err := ns.Query(ctx, zoneName, "NS")
 			if err != nil || pNS.Msg == nil || pNS.Rcode() != "NOERROR" || !pNS.AA() || len(pNS.GetRecords("NS", "answer")) == 0 || len(pNS.GetRecords("NS", "answer")) != len(pNS.GetRecordsForName("NS", dnsname.New(zoneName), "answer")) {
-				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
-					"query_name": zoneName,
-					"query_type": "NS",
-				})); err != nil {
+				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", zoneErrorArgs(ns, zoneName, "NS", pNS, err)); err != nil {
 					return results, err
 				}
 				continue serverLoop
 			}
 
-			rrsNS := map[string][]netip.Addr{}
-			for _, rr := range pNS.GetRecordsForName("NS", dnsname.New(zoneName), "answer") {
-				nsRR, ok := rr.(*dns.NS)
-				if !ok {
-					continue
-				}
-				nsNameObj := dnsname.New(nsRR.Ns)
-				nsName := strings.ToLower(nsNameObj.String())
-				rrsNS[nsName] = []netip.Addr{}
-			}
-			for _, rr := range append(pNS.GetRecords("A", "additional"), pNS.GetRecords("AAAA", "additional")...) {
-				ownerName := dnsname.New(rr.Header().Name)
-				owner := strings.ToLower(ownerName.String())
-				if _, ok := rrsNS[owner]; ok {
-					if addr, ok := addrFromRR(rr); ok {
-						rrsNS[owner] = append(rrsNS[owner], addr)
-					}
-				}
-			}
-			nameserver.CapNSMap(ctx, zoneName, rrsNS)
-			if onePath && zoneName == "." {
-				// The hints list the roots; their names are only resolved on the full walk.
-				clear(rrsNS)
-			}
-
-			for nsName, addrs := range rrsNS {
-				if len(addrs) == 0 {
-					for _, qtype := range []string{"A", "AAAA"} {
-						resp, err := rec.Recurse(ctx, nsName, qtype, "IN")
-						if err != nil {
-							cnamelog.Log(ctx, &results, moduleName, testcase, err)
-							continue
-						}
-						if resp.Msg == nil || resp.Rcode() != "NOERROR" {
-							continue
-						}
-						for _, rr := range resp.GetRecordsForName(qtype, dnsname.New(nsName)) {
-							if addr, ok := addrFromRR(rr); ok {
-								addrs = append(addrs, addr)
-							}
-						}
-					}
-				}
-
-				for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
-					if handledServers[zoneName] != nil && handledServers[zoneName][addr.String()] {
-						continue
-					}
-					nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
-					if err != nil {
-						continue
-					}
-					allServers[zoneName] = append(allServers[zoneName], nsObj)
-					if !allLabels[zoneName] {
-						remainingLabels = append(remainingLabels, zoneName)
-						allLabels[zoneName] = true
-					}
-				}
-				rrsNS[nsName] = addrs
+			reach(strings.ToLower(zoneName))
+			// The hints list the roots; their names are only resolved on the full walk.
+			if !onePath || zoneName != "." {
+				queueServers(dnsname.New(zoneName), pNS.GetRecordsForName("NS", dnsname.New(zoneName), "answer"), pNS)
 			}
 
 			intermediate := dnsname.New(zoneName)
 			loopZoneName := strings.ToLower(intermediate.String())
-			loopCount := 0
 			for {
-				loopCount++
-				if loopCount >= 1000 {
-					_, _ = util.LoggerFromContext(ctx).Add("LOOP_PROTECTION", map[string]any{
-						"caller":                  "basic.Basic01",
-						"child_zone_name":         z.Name.String(),
-						"zone_name":               loopZoneName,
-						"intermediate_query_name": intermediate.String(),
-					}, moduleName, testcase)
-					return appendTestCaseEnd(ctx, results, testcase)
-				}
-
 				if len(intermediate.Labels()) >= len(zoneLabels) {
 					break
 				}
@@ -415,10 +368,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				pSOA, err = ns.Query(ctx, intermediate.String(), "SOA")
 				if err != nil || pSOA.Msg == nil {
-					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
-						"query_name": intermediate.String(),
-						"query_type": "SOA",
-					})); err != nil {
+					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", zoneErrorArgs(ns, intermediate.String(), "SOA", pSOA, err)); err != nil {
 						return results, err
 					}
 					continue serverLoop
@@ -431,71 +381,13 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					} else {
 						pNS, err = ns.Query(ctx, intermediate.String(), "NS")
 						if err != nil || pNS.Msg == nil || pNS.Rcode() != "NOERROR" || !pNS.AA() || len(pNS.GetRecords("NS", "answer")) == 0 || len(pNS.GetRecords("NS", "answer")) != len(pNS.GetRecordsForName("NS", intermediate, "answer")) {
-							if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
-								"query_name": intermediate.String(),
-								"query_type": "NS",
-							})); err != nil {
+							if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", zoneErrorArgs(ns, intermediate.String(), "NS", pNS, err)); err != nil {
 								return results, err
 							}
 							continue serverLoop
 						}
 
-						rrsNSBis := map[string][]netip.Addr{}
-						for _, rr := range pNS.GetRecordsForName("NS", intermediate, "answer") {
-							nsRR, ok := rr.(*dns.NS)
-							if !ok {
-								continue
-							}
-							nsNameObj := dnsname.New(nsRR.Ns)
-							nsName := strings.ToLower(nsNameObj.String())
-							rrsNSBis[nsName] = []netip.Addr{}
-						}
-						for _, rr := range append(pNS.GetRecords("A", "additional"), pNS.GetRecords("AAAA", "additional")...) {
-							ownerName := dnsname.New(rr.Header().Name)
-							owner := strings.ToLower(ownerName.String())
-							if _, ok := rrsNSBis[owner]; ok {
-								if addr, ok := addrFromRR(rr); ok {
-									rrsNSBis[owner] = append(rrsNSBis[owner], addr)
-								}
-							}
-						}
-						nameserver.CapNSMap(ctx, strings.ToLower(intermediate.String()), rrsNSBis)
-
-						for nsName, addrs := range rrsNSBis {
-							if len(addrs) == 0 {
-								for _, qtype := range []string{"A", "AAAA"} {
-									resp, err := rec.Recurse(ctx, nsName, qtype, "IN")
-									if err != nil {
-										cnamelog.Log(ctx, &results, moduleName, testcase, err)
-										continue
-									}
-									if resp.Msg == nil || resp.Rcode() != "NOERROR" {
-										continue
-									}
-									for _, rr := range resp.GetRecordsForName(qtype, dnsname.New(nsName)) {
-										if addr, ok := addrFromRR(rr); ok {
-											addrs = append(addrs, addr)
-										}
-									}
-								}
-							}
-
-							for _, addr := range nameserver.CapAddresses(ctx, nsName, addrs) {
-								if handledServers[intermediate.String()] != nil && handledServers[intermediate.String()][addr.String()] {
-									continue
-								}
-								nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
-								if err != nil {
-									continue
-								}
-								allServers[intermediate.String()] = append(allServers[intermediate.String()], nsObj)
-								if !allLabels[intermediate.String()] {
-									remainingLabels = append(remainingLabels, intermediate.String())
-									allLabels[intermediate.String()] = true
-								}
-							}
-							rrsNSBis[nsName] = addrs
-						}
+						queueServers(intermediate, pNS.GetRecordsForName("NS", intermediate, "answer"), pNS)
 
 						loopZoneName = strings.ToLower(intermediate.String())
 						continue
@@ -512,7 +404,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								addNS(parentFound, loopZoneName, ns.String())
 								addNS(delegationFound, loopZoneName, ns.String())
 							} else {
-								queueReferral(cut, pChild)
+								queueServers(cut, pChild.GetRecordsForName("NS", cut, "authority"), pChild)
 							}
 							if nxdomainHidesDelegation[loopZoneName] == nil {
 								nxdomainHidesDelegation[loopZoneName] = map[string]string{}
@@ -533,7 +425,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						addNS(parentFound, loopZoneName, ns.String())
 						addNS(delegationFound, loopZoneName, ns.String())
 					} else {
-						queueReferral(intermediate, pSOA)
+						queueServers(intermediate, pSOA.GetRecordsForName("NS", intermediate, "authority"), pSOA)
 					}
 				} else if pSOA.Rcode() == "NOERROR" && pSOA.AA() {
 					if !strings.EqualFold(intermediate.String(), z.Name.String()) {
@@ -561,14 +453,11 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							addNS(aaNodata, loopZoneName, ns.String())
 						}
 					}
-				} else if pSOA.IsRedirect() && len(pSOA.GetRecordsForName("CNAME", z.Name, "answer")) > 0 {
+				} else if cnameReferral(pSOA, z.Name) {
 					addNS(parentFound, loopZoneName, ns.String())
 					addNS(cnameWithReferral, loopZoneName, ns.String())
 				} else {
-					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
-						"query_name": intermediate.String(),
-						"query_type": "SOA",
-					})); err != nil {
+					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", zoneErrorArgs(ns, intermediate.String(), "SOA", pSOA, nil)); err != nil {
 						return results, err
 					}
 				}
@@ -668,26 +557,21 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(delegationFound) == 0 && len(aaSOA) == 0 && len(aaDname) == 0 {
-		if rec.HasFakeAddresses(z.Name.String()) {
-			if err := appendLog(ctx, &results, testcase, "B01_CHILD_NOT_EXIST", map[string]any{
-				"domain": z.Name.String(),
-			}); err != nil {
-				return results, err
+		next, _ := z.Name.NextHigher()
+		super := next.String()
+		if len(parentFound) == 0 && deepestZone != "" {
+			super = deepestZone
+		}
+		if len(parentFound) == 1 {
+			for parent := range parentFound {
+				super = parent
 			}
-		} else {
-			next, _ := z.Name.NextHigher()
-			super := next.String()
-			if len(parentFound) == 1 {
-				for parent := range parentFound {
-					super = parent
-				}
-			}
-			if err := appendLog(ctx, &results, testcase, "B01_NO_CHILD", map[string]any{
-				"domain_child": z.Name.String(),
-				"domain_super": super,
-			}); err != nil {
-				return results, err
-			}
+		}
+		if err := appendLog(ctx, &results, testcase, "B01_NO_CHILD", map[string]any{
+			"domain_child": z.Name.String(),
+			"domain_super": super,
+		}); err != nil {
+			return results, err
 		}
 	}
 
@@ -1154,6 +1038,49 @@ func referralCut(resp packet.Packet, zone dnsname.Name, child dnsname.Name) (dns
 		return dnsname.NewFromLabels(childLabels[len(childLabels)-n:]), true
 	}
 	return dnsname.Name{}, false
+}
+
+// walkVisitLimit bounds the zone visits of a Basic01 walk for a child of labels labels.
+var walkVisitLimit = func(labels int) int { return 2 * (labels + 1) }
+
+// cnameReferral reports a referral whose answer section holds a CNAME owned by child and no record but CNAME and RRSIG.
+func cnameReferral(resp packet.Packet, child dnsname.Name) bool {
+	if resp.Msg == nil || resp.Rcode() != "NOERROR" || resp.AA() || len(resp.GetRecords("NS", "authority")) == 0 || len(resp.GetRecordsForName("CNAME", child, "answer")) == 0 {
+		return false
+	}
+	for _, rr := range resp.Msg.Answer {
+		switch rr.(type) {
+		case *dns.CNAME, *dns.RRSIG:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// zoneErrorArgs builds the B01_SERVER_ZONE_ERROR args, with the reason the response fails and its RCODE.
+func zoneErrorArgs(ns nameserver.Nameserver, name string, qtype string, resp packet.Packet, err error) map[string]any {
+	args := withNameserverArgs(ns, map[string]any{"query_name": name, "query_type": qtype})
+	if err != nil || resp.Msg == nil {
+		args["reason"] = "no_response"
+		return args
+	}
+	switch {
+	case resp.Rcode() != "NOERROR" && resp.Rcode() != "NXDOMAIN":
+		args["reason"] = "rcode"
+	case !resp.AA() && resp.Type() == "referral":
+		args["reason"] = "referral"
+	case !resp.AA():
+		args["reason"] = "not_authoritative"
+	case resp.Rcode() == "NXDOMAIN":
+		args["reason"] = "rcode"
+	case qtype == "SOA":
+		args["reason"] = "soa_records"
+	default:
+		args["reason"] = "ns_records"
+	}
+	args["rcode"] = resp.Rcode()
+	return args
 }
 
 func markHandled(handled map[string]map[string]bool, zoneName string, addr string) bool {

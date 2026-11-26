@@ -9,8 +9,8 @@
   ],
   "summary": {
     "file_count": 148,
-    "log_call_count": 774,
-    "unique_tag_count": 559,
+    "log_call_count": 773,
+    "unique_tag_count": 558,
     "unique_key_count": 93,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
@@ -651,7 +651,7 @@
         {
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
-          "line": 401,
+          "line": 304,
           "shape": "string"
         }
       ]
@@ -787,7 +787,7 @@
         {
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
-          "line": 401,
+          "line": 304,
           "shape": "string"
         }
       ]
@@ -982,7 +982,6 @@
     "domain": {
       "tags": [
         "B01_CHILD_FOUND",
-        "B01_CHILD_NOT_EXIST",
         "B01_INCONSISTENT_ALIAS",
         "B02_AUTH_RESPONSE_SOA",
         "B02_NO_DELEGATION",
@@ -1039,18 +1038,18 @@
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 50,
+      "occurrences": 49,
       "samples": [
         {
           "tag": "B01_CHILD_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 174,
+          "line": 173,
           "shape": "string"
         },
         {
           "tag": "B01_CHILD_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 189,
+          "line": 188,
           "shape": "string"
         },
         {
@@ -1111,37 +1110,37 @@
         {
           "tag": "B01_CHILD_IS_ALIAS",
           "file": "engine/test/basic/basic.go",
-          "line": 705,
+          "line": 589,
           "shape": "string"
         },
         {
           "tag": "B01_INCONSISTENT_DELEGATION",
           "file": "engine/test/basic/basic.go",
-          "line": 663,
+          "line": 552,
           "shape": "string"
         },
         {
           "tag": "B01_NO_CHILD",
           "file": "engine/test/basic/basic.go",
-          "line": 685,
+          "line": 570,
           "shape": "string"
         },
         {
           "tag": "B01_PARENT_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 594,
+          "line": 483,
           "shape": "string"
         },
         {
           "tag": "B01_PARENT_NXDOMAIN_HIDES_DELEGATION",
           "file": "engine/test/basic/basic.go",
-          "line": 625,
+          "line": 514,
           "shape": "string"
         },
         {
           "tag": "B01_PARENT_UNDETERMINED",
           "file": "engine/test/basic/basic.go",
-          "line": 605,
+          "line": 494,
           "shape": "string"
         }
       ]
@@ -1161,7 +1160,7 @@
         {
           "tag": "B01_NO_CHILD",
           "file": "engine/test/basic/basic.go",
-          "line": 685,
+          "line": 570,
           "shape": "unknown"
         }
       ]
@@ -1185,31 +1184,31 @@
         {
           "tag": "B01_CHILD_IS_ALIAS",
           "file": "engine/test/basic/basic.go",
-          "line": 705,
+          "line": 589,
           "shape": "unknown"
         },
         {
           "tag": "B01_INCONSISTENT_DELEGATION",
           "file": "engine/test/basic/basic.go",
-          "line": 663,
+          "line": 552,
           "shape": "unknown"
         },
         {
           "tag": "B01_PARENT_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 594,
+          "line": 483,
           "shape": "unknown"
         },
         {
           "tag": "B01_PARENT_NXDOMAIN_HIDES_DELEGATION",
           "file": "engine/test/basic/basic.go",
-          "line": 625,
+          "line": 514,
           "shape": "unknown"
         },
         {
           "tag": "B01_PARENT_UNDETERMINED",
           "file": "engine/test/basic/basic.go",
-          "line": 605,
+          "line": 494,
           "shape": "unknown"
         }
       ]
@@ -1625,7 +1624,7 @@
         "LOOP_PROTECTION"
       ],
       "shapes": [
-        "string"
+        "unknown"
       ],
       "producer_files": [
         "engine/test/basic/basic.go"
@@ -1635,8 +1634,8 @@
         {
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
-          "line": 401,
-          "shape": "string"
+          "line": 304,
+          "shape": "unknown"
         }
       ]
     },
@@ -2343,7 +2342,7 @@
         {
           "tag": "B02_NS_NO_IP_ADDR",
           "file": "engine/test/basic/basic.go",
-          "line": 914,
+          "line": 798,
           "shape": "unknown"
         },
         {
@@ -3485,7 +3484,7 @@
         {
           "tag": "TEST_CASE_END",
           "file": "engine/test/basic/basic.go",
-          "line": 1039,
+          "line": 923,
           "shape": "unknown"
         },
         {
@@ -3509,19 +3508,19 @@
         {
           "tag": "TEST_CASE_START",
           "file": "engine/test/basic/basic.go",
-          "line": 169,
+          "line": 168,
           "shape": "string"
         },
         {
           "tag": "TEST_CASE_START",
           "file": "engine/test/basic/basic.go",
-          "line": 726,
+          "line": 610,
           "shape": "string"
         },
         {
           "tag": "TEST_CASE_START",
           "file": "engine/test/basic/basic.go",
-          "line": 940,
+          "line": 824,
           "shape": "string"
         }
       ]
@@ -3744,7 +3743,7 @@
         {
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
-          "line": 401,
+          "line": 304,
           "shape": "unknown"
         }
       ]
@@ -3796,55 +3795,55 @@
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 314,
-      "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tzoneName,\n\t\"query_type\":\t\"SOA\",\n})"
+      "line": 340,
+      "args_expr": "zoneErrorArgs(ns, zoneName, \"SOA\", pSOA, err)"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 325,
-      "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tzoneName,\n\t\"query_type\":\t\"NS\",\n})"
+      "line": 348,
+      "args_expr": "zoneErrorArgs(ns, zoneName, \"NS\", pNS, err)"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 418,
-      "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tintermediate.String(),\n\t\"query_type\":\t\"SOA\",\n})"
+      "line": 371,
+      "args_expr": "zoneErrorArgs(ns, intermediate.String(), \"SOA\", pSOA, err)"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 434,
-      "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tintermediate.String(),\n\t\"query_type\":\t\"NS\",\n})"
+      "line": 384,
+      "args_expr": "zoneErrorArgs(ns, intermediate.String(), \"NS\", pNS, err)"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 568,
-      "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tintermediate.String(),\n\t\"query_type\":\t\"SOA\",\n})"
+      "line": 460,
+      "args_expr": "zoneErrorArgs(ns, intermediate.String(), \"SOA\", pSOA, nil)"
     },
     {
       "tag": "B02_NS_BROKEN",
       "file": "engine/test/basic/basic.go",
-      "line": 904,
+      "line": 788,
       "args_expr": "withEndpointKeyArgs(ns, nil)"
     },
     {
       "tag": "B02_NS_NOT_AUTH",
       "file": "engine/test/basic/basic.go",
-      "line": 909,
+      "line": 793,
       "args_expr": "withEndpointKeyArgs(ns, nil)"
     },
     {
       "tag": "B02_NS_NO_RESPONSE",
       "file": "engine/test/basic/basic.go",
-      "line": 919,
+      "line": 803,
       "args_expr": "withEndpointKeyArgs(ns, nil)"
     },
     {
       "tag": "B02_UNEXPECTED_RCODE",
       "file": "engine/test/basic/basic.go",
-      "line": 924,
+      "line": 808,
       "args_expr": "withEndpointKeyArgs(ns, map[string]any{\n\t\"rcode\": rcode,\n})"
     },
     {
@@ -3910,7 +3909,7 @@
     {
       "tag": "HAS_A_RECORDS",
       "file": "engine/test/basic/basic.go",
-      "line": 997,
+      "line": 881,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"domain\": queryName,\n})"
     },
     {
@@ -3922,19 +3921,19 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 816,
+      "line": 700,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"SOA\"})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 971,
+      "line": 855,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"A\"})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 1057,
+      "line": 941,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3988,19 +3987,19 @@
     {
       "tag": "IPV4_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 830,
+      "line": 714,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"SOA\"})"
     },
     {
       "tag": "IPV4_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 984,
+      "line": 868,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"A\"})"
     },
     {
       "tag": "IPV4_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 1081,
+      "line": 965,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -4012,19 +4011,19 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 808,
+      "line": 692,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"SOA\"})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 964,
+      "line": 848,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"A\"})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 1067,
+      "line": 951,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -4078,19 +4077,19 @@
     {
       "tag": "IPV6_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 825,
+      "line": 709,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"SOA\"})"
     },
     {
       "tag": "IPV6_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 979,
+      "line": 863,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"A\"})"
     },
     {
       "tag": "IPV6_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 1090,
+      "line": 974,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -4132,7 +4131,7 @@
     {
       "tag": "NO_A_RECORDS",
       "file": "engine/test/basic/basic.go",
-      "line": 1003,
+      "line": 887,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"domain\": queryName,\n})"
     },
     {

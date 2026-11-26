@@ -6,6 +6,7 @@ import (
 	"net"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 
@@ -182,67 +183,162 @@ func TestBasic02ParallelQueries(t *testing.T) {
 	})
 }
 
-func TestBasic02UnexpectedRcode(t *testing.T) {
-	ctx, _, _ := testhelpers.Context(t)
-
-	r := tctest.Recursor(t, map[string]map[string][]string{
-		".": {
-			"a.root": {"192.0.2.1"},
-		},
-	})
-
-	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		name := strings.ToLower(q.Name)
-		kind := strings.ToUpper(q.Type)
-		switch {
-		case name == "." && kind == "NS":
-			return nsPacket(".", "a.root")
-		case name == "." && kind == "SOA":
-			return rcodePacket(dns.RcodeServerFailure)
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	z := tctest.Zone(t, ".", r)
-
-	entries, err := Basic02(ctx, z)
-	if err != nil {
-		t.Fatalf("basic02: %v", err)
+// The root zone has no working server; each case yields its detail tags in order.
+func TestBasic02NoWorkingNS(t *testing.T) {
+	rootNS := func(names ...string) func() packet.Packet {
+		return func() packet.Packet { return nsPacketMulti(".", names...) }
 	}
-	tctest.RequireTags(t, entries, "B02_NO_WORKING_NS", "B02_UNEXPECTED_RCODE")
+	tests := []struct {
+		name        string
+		root        replies
+		ipv6Root    bool
+		wantDetails []string
+	}{
+		{"SERVFAIL", replies{". NS": rootNS("a.root"), ". SOA": rcode(dns.RcodeServerFailure)}, false,
+			[]string{"B02_UNEXPECTED_RCODE a.root/192.0.2.1 SERVFAIL"}},
+		{"not authoritative", replies{". NS": rootNS("a.root"), ". SOA": rcode(dns.RcodeSuccess)}, false,
+			[]string{"B02_NS_NOT_AUTH a.root/192.0.2.1"}},
+		{"no SOA record", replies{". NS": rootNS("a.root"), ". SOA": emptyAnswerPacket}, false,
+			[]string{"B02_NS_BROKEN a.root/192.0.2.1"}},
+		{"no response", replies{". NS": rootNS("a.root")}, false,
+			[]string{"B02_NS_NO_RESPONSE a.root/192.0.2.1"}},
+		{"name without an address", replies{". NS": rootNS("b.root")}, false,
+			[]string{"B02_NS_NO_IP_ADDR b.root"}},
+		{"name without an address beside a failing one", replies{". NS": rootNS("a.root", "b.root"), ". SOA": rcode(dns.RcodeServerFailure)}, false,
+			[]string{"B02_NS_NO_IP_ADDR b.root", "B02_UNEXPECTED_RCODE a.root/192.0.2.1 SERVFAIL"}},
+		{"IPv6 server with IPv6 disabled", replies{". NS": rootNS("a.root", "b.root"), ". SOA": rcode(dns.RcodeServerFailure)}, true,
+			[]string{"B02_UNEXPECTED_RCODE a.root/192.0.2.1 SERVFAIL"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, prof, _ := testhelpers.Context(t)
+			prof.Net.IPv6 = false
+
+			roots := map[string][]string{"a.root": {"192.0.2.1"}}
+			if tt.ipv6Root {
+				roots["b.root"] = []string{"2001:db8::2"}
+			}
+			r := tctest.Recursor(t, map[string]map[string][]string{".": roots})
+			for name, addrs := range roots {
+				tctest.NSOn(t, ctx, r, name, addrs[0], tt.root.handler())
+			}
+
+			entries, err := Basic02(ctx, tctest.Zone(t, ".", r))
+			if err != nil {
+				t.Fatalf("basic02: %v", err)
+			}
+
+			tctest.RequireNoTag(t, entries, "B02_AUTH_RESPONSE_SOA")
+			tctest.RequireArg(t, tctest.RequireTag(t, entries, "B02_NO_WORKING_NS"), "domain", ".")
+			var details []string
+			for _, entry := range entries {
+				if !strings.HasPrefix(entry.Tag, "B02_") || entry.Tag == "B02_NO_WORKING_NS" {
+					continue
+				}
+				if _, ok := entry.Args["nsname"]; ok {
+					t.Fatalf("legacy key nsname in %s", entry.Tag)
+				}
+				detail := entry.Tag + " " + entry.Args["ns"].(string)
+				if address, ok := entry.Args["address"].(string); ok {
+					detail += "/" + address
+				}
+				if rcode, ok := entry.Args["rcode"].(string); ok {
+					detail += " " + rcode
+				}
+				details = append(details, detail)
+			}
+			if !slices.Equal(details, tt.wantDetails) {
+				t.Fatalf("details = %q, want %q", details, tt.wantDetails)
+			}
+			if tt.ipv6Root {
+				tctest.RequireArg(t, tctest.RequireTag(t, entries, "IPV6_DISABLED"), "ns", "b.root")
+			}
+		})
+	}
 }
 
-func TestBasic02NoIPAddress(t *testing.T) {
-	ctx, _, _ := testhelpers.Context(t)
+// Eight broken servers are reported in name order whatever order the probes finish in.
+func TestBasic02DetailTagsSorted(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Resolver.Defaults.Parallel = 8
 
-	r := tctest.Recursor(t, map[string]map[string][]string{
-		".": {
-			"a.root": {"192.0.2.1"},
-		},
-	})
+	var names, want []string
+	roots := map[string][]string{}
+	for i := 1; i <= 8; i++ {
+		name := fmt.Sprintf("r%d.root", i)
+		names = append(names, name)
+		roots[name] = []string{fmt.Sprintf("192.0.2.%d", i)}
+		want = append(want, name)
+	}
+	r := tctest.Recursor(t, map[string]map[string][]string{".": roots})
+	for _, name := range names {
+		tctest.NSOn(t, ctx, r, name, roots[name][0], replies{
+			". NS":  func() packet.Packet { return nsPacketMulti(".", names...) },
+			". SOA": emptyAnswerPacket,
+		}.handler())
+	}
 
-	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		name := strings.ToLower(q.Name)
-		kind := strings.ToUpper(q.Type)
-		if name == "." && kind == "NS" {
-			return nsPacket(".", "b.root")
-		}
-		return packet.Packet{}
-	})
-
-	z := tctest.Zone(t, ".", r)
-
-	entries, err := Basic02(ctx, z)
+	entries, err := Basic02(ctx, tctest.Zone(t, ".", r))
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
-	entry := tctest.RequireTag(t, entries, "B02_NS_NO_IP_ADDR")
-	if ns, _ := entry.Args["ns"].(string); ns != "b.root" {
-		t.Fatalf("expected ns=b.root in B02_NS_NO_IP_ADDR, got %#v", entry.Args["ns"])
+
+	if got := tctest.ArgValues(entries, "B02_NS_BROKEN", "ns"); !slices.Equal(got, want) {
+		t.Fatalf("B02_NS_BROKEN order = %v, want %v", got, want)
 	}
-	if _, ok := entry.Args["nsname"]; ok {
-		t.Fatalf("did not expect legacy nsname key in args")
+}
+
+// The lookup of ns1.example fails while ns.other resolves, so only ns1.example takes its address from the referral glue.
+func TestBasic02GlueForUnresolvedName(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	nsOther := nsEntry{name: "ns.other", addr: net.IPv4(192, 0, 2, 70)}
+	delegation := func() packet.Packet {
+		return tctest.Response(tctest.NotAuthoritative(),
+			tctest.Authority(tctest.NSRR("example", "ns1.example"), tctest.NSRR("example", "ns.other")),
+			tctest.Additional(tctest.ARR("ns1.example", "192.0.2.53")))
+	}
+	var mu sync.Mutex
+	parentNS := 0
+	r := serveRoots(t, ctx, func(string) tctest.Handler {
+		next := replies{
+			"example SOA":   delegation,
+			"example NS":    delegation,
+			"ns.other A":    referral("other", nsOther),
+			"ns.other AAAA": referral("other", nsOther),
+		}.handler()
+		return func(q tctest.Query) packet.Packet {
+			if queryKey(q) == "example NS" {
+				mu.Lock()
+				parentNS++
+				mu.Unlock()
+			}
+			return next(q)
+		}
+	}, "a.root")
+	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", apex("example", replies{
+		"ns1.example A": emptyAnswerPacket,
+	}.handler(), "ns1.example", "ns.other"))
+	tctest.NSOn(t, ctx, r, "ns.other", "192.0.2.70", apex("other", replies{
+		"example SOA": rcode(dns.RcodeServerFailure),
+		"ns.other A":  func() packet.Packet { return aPacket("ns.other", nsOther.addr) },
+	}.handler(), "ns.other"))
+
+	entries, err := Basic02(ctx, tctest.Zone(t, "example", r))
+	if err != nil {
+		t.Fatalf("basic02: %v", err)
+	}
+
+	tctest.RequireNoTag(t, entries, "B02_NO_WORKING_NS", "B02_NS_NO_IP_ADDR")
+	if got, want := tctest.ArgValues(entries, "IPV4_ENABLED", "ns"), []string{"ns.other", "ns1.example"}; !slices.Equal(got, want) {
+		t.Fatalf("probe order = %v, want %v", got, want)
+	}
+	auth := tctest.RequireTag(t, entries, "B02_AUTH_RESPONSE_SOA")
+	if got, want := tctest.ServerEndpoints(t, auth.Args), []string{"ns1.example/192.0.2.53"}; !slices.Equal(got, want) {
+		t.Fatalf("servers = %v, want %v", got, want)
+	}
+	if parentNS != 1 {
+		t.Fatalf("the parent was asked example NS %d times, want 1", parentNS)
 	}
 }
 

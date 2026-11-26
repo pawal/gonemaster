@@ -2,6 +2,27 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- basic01: `B01_SERVER_ZONE_ERROR` carries `reason` and `rcode`
+- ui-public: explanation for `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`
+
+### Changed
+
+- basic01: `B01_CHILD_NOT_EXIST` is removed; it was never emitted
+- basic01: `LOOP_PROTECTION` ends a walk past 2 × (labels of the child + 1) zone visits
+- basic01: the `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` message names the referral, not a parent delegation
+
+### Fixed
+
+- basic01: a zone is found when a nameserver above its parent returns NXDOMAIN for an empty non-terminal and still refers to the parent zone
+- basic01: `B01_NO_CHILD` names the deepest zone the walk reached as `domain_super` when it finds no parent
+- basic01: nameservers named only in the NS answer of a zone of the walk are probed
+- basic01: a referral without the AA bit that holds a CNAME for the child counts as an answer without a delegation
+- basic01: an SOA answer with a second SOA record fails the zone check
+
 ## [v1.7.29] - 2026-11-26
 
 ### Added

@@ -50,6 +50,14 @@ Description:
 
 The check walked down from the root servers but could not identify a parent zone that delegates your domain. This usually means the walk was interrupted by missing or inconsistent answers from upper-level nameservers, or that the domain's own parent is misconfigured so its delegation cannot be found reliably.
 
+## Tag B01_PARENT_NXDOMAIN_HIDES_DELEGATION
+
+Header: Server denies a name above your domain
+
+Description:
+
+A nameserver on the path to your domain says that a name between its own zone and your domain does not exist (NXDOMAIN), but it still answers queries for your domain with a referral. Under RFC 8020 an NXDOMAIN answer means nothing exists below that name, so resolvers that follow the RFC stop there and cannot reach your domain, while other resolvers reach it. The test found your domain through the referral and continues. The operator of that nameserver needs to fix its answer for the empty name in between.
+
 ## Tag B01_PARENT_UNDETERMINED
 
 Header: Multiple possible parent zones

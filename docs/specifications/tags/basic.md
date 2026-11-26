@@ -14,7 +14,6 @@ _Do not edit by hand - regenerate with the command above._
 | `A_QUERY_NO_RESPONSES` | `INFO` | [basic03](../tests/basic/basic03.md) | yes |
 | `B01_CHILD_FOUND` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_CHILD_IS_ALIAS` | `NOTICE` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_CHILD_NOT_EXIST` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_INCONSISTENT_ALIAS` | `ERROR` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_INCONSISTENT_DELEGATION` | `ERROR` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_NO_CHILD` | `ERROR` | [basic01](../tests/basic/basic01.md) | yes |

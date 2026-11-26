@@ -164,8 +164,8 @@ msgid "The parent zone cannot be found."
 msgstr "Nadřazenou zónu nelze nalézt."
 
 msgctxt "BASIC:B01_PARENT_NXDOMAIN_HIDES_DELEGATION"
-msgid "Parent nameserver \"{ns}/{address}\" returns NXDOMAIN for \"{query_name}\" but also has a delegation for \"{domain_child}\". This violates RFC 8020. The zone is still testable through the delegation, but the parent operator should fix this."
-msgstr "Jmenný server nadřazené zóny \"{ns}/{address}\" vrací NXDOMAIN pro \"{query_name}\", ale zároveň má delegaci pro \"{domain_child}\". To je v rozporu s RFC 8020. Zóna je stále testovatelná prostřednictvím delegace, ale operátor nadřazené zóny by to měl opravit."
+msgid "Nameserver \"{ns}/{address}\" returns NXDOMAIN for \"{query_name}\" but answers a query for \"{domain_child}\" with a referral. This violates RFC 8020. The zone is still tested through the referral, but the operator of the nameserver should fix this."
+msgstr "Jmenný server \"{ns}/{address}\" vrací NXDOMAIN pro \"{query_name}\", ale na dotaz pro \"{domain_child}\" odpovídá odkazem (referral). To je v rozporu s RFC 8020. Zóna se přesto testuje prostřednictvím tohoto odkazu, ale operátor jmenného serveru by to měl opravit."
 
 msgctxt "BASIC:B01_PARENT_UNDETERMINED"
 msgid "The parent zone cannot be determined on name servers \"{servers}\"."
@@ -176,8 +176,8 @@ msgid "This is a test of the root zone which has no parent zone."
 msgstr "Toto je test kořenové zóny, která nemá nadřazenou zónu."
 
 msgctxt "BASIC:B01_SERVER_ZONE_ERROR"
-msgid "Unexpected response on query for \"{query_name}\" with query type \"{query_type}\" to \"{ns}/{address}\"."
-msgstr "Neočekávaná odpověď na dotaz pro \"{query_name}\" s typem dotazu \"{query_type}\" na \"{ns}/{address}\"."
+msgid "Unexpected response on query for \"{query_name}\" with query type \"{query_type}\" to \"{ns}/{address}\" ({reason})."
+msgstr "Neočekávaná odpověď na dotaz pro \"{query_name}\" s typem dotazu \"{query_type}\" na \"{ns}/{address}\" ({reason})."
 
 msgctxt "BASIC:B02_AUTH_RESPONSE_SOA"
 msgid "Authoritative answer on SOA query for \"{domain}\" is returned by name servers \"{servers}\"."
@@ -2325,10 +2325,6 @@ msgstr "Žádná z IP adres jmenných serverů není uvedena jako globálně dos
 msgctxt "ADDRESS:A01_NO_NAME_SERVERS_FOUND"
 msgid "No name servers found."
 msgstr "Nebyly nalezeny žádné jmenné servery."
-
-msgctxt "BASIC:B01_CHILD_NOT_EXIST"
-msgid "The zone \"{domain}\" does not exist as a zone."
-msgstr "Zóna \"{domain}\" neexistuje jako zóna."
 
 msgctxt "DNSSEC:DS01_DS_ALGO_OK"
 msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {servers}."

@@ -72,7 +72,7 @@ name; the query trace applies that full set to nameserver and query names.
 
 | Key | Type | Meaning | Notes |
 | --- | --- | --- | --- |
-| `reason` | `string` | Why an RRSIG does not verify, on the tags of a signature that does not verify. | `labels`: the Labels field exceeds the owner's label count (RFC 4035 section 5.3.1), or the owner rebuilt from it (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name and differs from the owner. `signature`: any other failure. On a tag outside DNSSEC, such as `IPV6_AUTO_DISABLED`, free text. |
+| `reason` | `string` | Why a check fails: on the tags of a signature that does not verify, why the RRSIG does not verify; on `B01_SERVER_ZONE_ERROR`, the first requirement the response fails. | Signature tags: `labels`, the Labels field exceeds the owner's label count (RFC 4035 section 5.3.1), or the owner rebuilt from it (RFC 4035 section 5.3.2) is not at or below the Signer's Name, or is the Signer's Name and differs from the owner; `signature`, any other failure. `B01_SERVER_ZONE_ERROR`: `no_response`, `rcode`, `referral`, `not_authoritative`, `soa_records`, `ns_records`, defined in [basic01](tests/basic/basic01.md). On a tag outside DNSSEC and Basic, such as `IPV6_AUTO_DISABLED`, free text. |
 
 ## Denial Of Existence Keys
 

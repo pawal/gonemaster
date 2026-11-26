@@ -25,19 +25,21 @@ Status: Final
 4. Start from root servers and iteratively probe with SOA/NS (and DNAME when needed), extending the intermediate name toward the child.
    - For a child below a TLD (two or more labels) the root servers are not the parent, so the root level is walked until one root server refers onwards or answers for the child itself, and the root NS names in the `NS` answers of the probed root servers are not resolved. A root server that fails is reported and the next one is tried.
    - If the walk then ends without a parent or without child evidence (no delegation, authoritative SOA or DNAME), it continues with the remaining root servers and re-queues every zone they add servers to, so the outcome is the one a walk through every root server gives.
+   - Every zone of the walk is the child or an ancestor of it. The shallowest queued zone is walked first, so a referral never adds nameservers to a zone already walked. A zone is walked through every nameserver the referrals to it name and every nameserver its own `NS` answers name.
+   - Each zone is visited at most once per root path. A visit beyond 2 × (labels of the child + 1) emits `LOOP_PROTECTION` and ends the walk; steps 6 to 9 then run on the observations gathered so far.
 5. For each probed nameserver address:
    - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) per rrtype (`SOA`, `NS`, `DNAME`) and skip queries on disabled transports.
-   - Emit `B01_SERVER_ZONE_ERROR` when response requirements fail.
-   - On `NXDOMAIN`+AA at an intermediate name (not the child itself), additionally probe SOA for the child name on the same nameserver. If that probe returns a referral with NS records for the child, the nameserver is contradicting itself (it denies an ancestor name but still has a deeper delegation, violating RFC 8020 section 3.1). The probe-confirmed referral counts as a valid delegation observation (added to `delegationFound`), and the offending `(parent NS, intermediate name)` pair is recorded for the diagnostic tag. The NS is not added to `aaNXDomain` in this case.
+   - Emit `B01_SERVER_ZONE_ERROR` when response requirements fail, with `reason` naming the first requirement the response fails and `rcode` holding its RCODE.
+   - On `NXDOMAIN`+AA at an intermediate name (not the child itself), additionally probe SOA for the child name on the same nameserver. If that probe returns a referral whose NS records are owned by the child or by an ancestor of the child below the zone being walked, the nameserver is contradicting itself (it denies an ancestor name but still has a deeper delegation, violating RFC 8020 section 3.1). A referral for the child counts as a valid delegation observation (added to `delegationFound`). A referral for an ancestor of the child queues the nameservers it names, and the walk continues at that zone cut; the nameserver is not recorded as a parent. In both cases the offending `(NS, intermediate name)` pair is recorded for the diagnostic tag and the NS is not added to `aaNXDomain`.
 6. Collect parent/delegation observations and emit:
    - `B01_PARENT_FOUND` for discovered parents.
    - `B01_PARENT_UNDETERMINED` when multiple parent candidates exist.
    - `B01_PARENT_NOT_FOUND` when none exists.
-   - `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` for each parent NS that returned NXDOMAIN at an intermediate name but also has a delegation at the child.
+   - `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` for each NS that returned NXDOMAIN at an intermediate name but also has a delegation at the child or at an ancestor of the child below that name's zone.
 7. Emit child/delegation status:
    - `B01_CHILD_FOUND` when delegation or authoritative SOA evidence exists (including delegations recovered via the NXDOMAIN-contradiction probe).
    - `B01_INCONSISTENT_DELEGATION` for inconsistent parent-side results.
-   - `B01_NO_CHILD` (normal mode) or `B01_CHILD_NOT_EXIST` (fake-address mode) when child evidence is absent. `domain_super` is the parent zone when exactly one was found, otherwise the next-higher name.
+   - `B01_NO_CHILD` when child evidence is absent. `domain_super` is the parent zone when exactly one was found; when none was found, the deepest zone the walk was referred to or proved; in every other case the next-higher name.
 8. Emit alias findings:
    - `B01_CHILD_IS_ALIAS` per detected DNAME target.
    - `B01_INCONSISTENT_ALIAS` when multiple alias targets are found.
@@ -62,8 +64,9 @@ z.Name
 
 {{% expand "Show diagram" %}}
 ```
-For each remaining label (BFS from "." down toward child):
-   for each NS at that label:
+For each remaining label, shallowest first (from "." down toward child):
+   +- zone visits > 2 * (labels of child + 1)   -> LOOP_PROTECTION, end the walk
+   for each NS listed for that label, including NS appended during the pass:
      +- label is "." on the one root path (child has two or more labels)
         AND (a deeper label is queued OR parentFound non-empty)
                                                    -> stop probing root servers
@@ -73,19 +76,17 @@ For each remaining label (BFS from "." down toward child):
                                                      |
                                                      v
         query SOA at zoneName
-         +- error / no Msg / RCODE != NOERROR / !AA / !=1 SOA at name
-              -> B01_SERVER_ZONE_ERROR (query_type=SOA), skip ns
+         +- error / no Msg / RCODE != NOERROR / !AA / !=1 SOA in answer / SOA owner != name
+              -> B01_SERVER_ZONE_ERROR (query_type=SOA, reason, rcode), skip ns
         query NS  at zoneName
          +- error / no Msg / RCODE != NOERROR / !AA / no NS / NS owner != name
-              -> B01_SERVER_ZONE_ERROR (query_type=NS),  skip ns
+              -> B01_SERVER_ZONE_ERROR (query_type=NS, reason, rcode),  skip ns
          +- success
               -> extract NS names + A/AAAA glue (recurse to resolve missing glue),
-                 enqueue new (label, ns) pairs
+                 append servers not yet listed for zoneName to its list, probed in this pass
               -> at "." on the one root path: drop the NS names, resolve nothing
 
    inner: prepend labels of child name to intermediate (parent walk)
-     +- loopCount >= 1000   -> LOOP_PROTECTION (with caller, zone, intermediate),
-                              emit TEST_CASE_END and return
      +- intermediate has all labels of child  -> stop inner loop
 
      query SOA at intermediate
@@ -101,6 +102,9 @@ For each remaining label (BFS from "." down toward child):
       |         +- referral with NS for child -> parentFound, delegationFound,
       |         |                                nxdomainHidesDelegation
       |         |                                (NOT aaNXDomain)
+      |         +- referral with NS for an ancestor of child below the walked zone
+      |         |                             -> enqueue its NS, nxdomainHidesDelegation
+      |         |                                (NOT parentFound, NOT aaNXDomain)
       |         +- otherwise                  -> parentFound, aaNXDomain
       +- IsRedirect with NS in authority for intermediate
       |    +- intermediate == child          -> parentFound, delegationFound
@@ -109,8 +113,9 @@ For each remaining label (BFS from "." down toward child):
       |    +- CNAME in answer for child      -> parentFound, aaCNAME
       |    +- DNAME query: AA+NOERROR+1 DNAME-> parentFound, aaDname[target]
       |    +- otherwise                      -> parentFound, aaNodata
-      +- IsRedirect with CNAME in answer     -> parentFound, cnameWithReferral
-      +- any other shape                     -> B01_SERVER_ZONE_ERROR (query_type=SOA)
+      +- !AA + NOERROR + NS in authority, answer only CNAME (and RRSIG) with a CNAME for child
+      |                                      -> parentFound, cnameWithReferral
+      +- any other shape                     -> B01_SERVER_ZONE_ERROR (query_type=SOA, reason, rcode)
 
    label queue empty on the one root path
    AND (parentFound empty OR delegationFound, aaSOA and aaDname all empty)
@@ -129,7 +134,7 @@ For each remaining label (BFS from "." down toward child):
        len(parentFound) > 1                -> B01_PARENT_UNDETERMINED (merged ns set)
      parentFound empty                     -> B01_PARENT_NOT_FOUND
      nxdomainHidesDelegation non-empty:
-       per offending parent NS             -> B01_PARENT_NXDOMAIN_HIDES_DELEGATION
+       per offending NS                    -> B01_PARENT_NXDOMAIN_HIDES_DELEGATION
                                               (ns, address, query_name, domain_child)
 
 2. Child
@@ -140,10 +145,11 @@ For each remaining label (BFS from "." down toward child):
             / aaNodata / aaDname:
               -> B01_INCONSISTENT_DELEGATION (domain_parent, domain_child, servers)
      delegationFound empty AND aaSOA empty AND aaDname empty
-       +- fake-addresses                   -> B01_CHILD_NOT_EXIST (domain)
-       +- otherwise                        -> B01_NO_CHILD (domain_child, domain_super)
-                                              domain_super: the one parentFound zone,
-                                              else z.Name.NextHigher()
+       -> B01_NO_CHILD (domain_child, domain_super)
+          domain_super: one parentFound zone -> that zone
+                        no parentFound zone  -> the deepest zone the walk was
+                                                referred to or proved, if any
+                        otherwise            -> z.Name.NextHigher()
 
 3. Alias
      aaDname non-empty:
@@ -157,7 +163,6 @@ For each remaining label (BFS from "." down toward child):
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `B01_CHILD_NOT_EXIST` | No delegation/SOA evidence exists and child is in fake-address mode. |
 | `B01_CHILD_IS_ALIAS` | Child is identified as alias via DNAME evidence. |
 | `B01_CHILD_FOUND` | Child existence is confirmed (root, undelegated, delegation, or authoritative SOA path). |
 | `B01_INCONSISTENT_ALIAS` | More than one DNAME target was observed for child aliasing. |
@@ -166,7 +171,7 @@ For each remaining label (BFS from "." down toward child):
 | `B01_PARENT_DISREGARDED` | Fake-address (undelegated) mode is active, so parent search is skipped. |
 | `B01_PARENT_FOUND` | At least one parent zone candidate is identified. |
 | `B01_PARENT_NOT_FOUND` | No parent zone candidate was identified from any probed nameserver response. |
-| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | A parent nameserver returned authoritative NXDOMAIN for an intermediate empty non-terminal but also has a delegation at the child name. The contradiction violates RFC 8020 section 3.1. The zone is still tested via the directly-observed delegation. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | A nameserver on the path to the child returned authoritative NXDOMAIN for an intermediate empty non-terminal but also has a delegation at the child name or at an ancestor of it. The contradiction violates RFC 8020 section 3.1. The zone is still tested through the referral. |
 | `B01_PARENT_UNDETERMINED` | Multiple parent zone candidates were identified. |
 | `B01_ROOT_HAS_NO_PARENT` | Child zone is root (`.`). |
 | `B01_SERVER_ZONE_ERROR` | SOA/NS response validation fails for a probed server/query name. |
@@ -177,14 +182,13 @@ For each remaining label (BFS from "." down toward child):
 | `IPV4_ENABLED` | IPv4 transport is enabled for queried rrtype. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for queried rrtype. |
 | `IPV6_ENABLED` | IPv6 transport is enabled for queried rrtype. |
-| `LOOP_PROTECTION` | Internal traversal loop protection threshold is hit. |
+| `LOOP_PROTECTION` | The walk visits more zones than 2 × (labels of the child + 1). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `B01_CHILD_NOT_EXIST` | `domain` | `string` | Child zone name. |
 | `B01_CHILD_IS_ALIAS` | `domain_child` | `string` | Child zone name. |
 | `B01_CHILD_IS_ALIAS` | `domain_target` | `string` | Alias target name from DNAME. |
 | `B01_CHILD_IS_ALIAS` | `servers` | `array<object>` | Structured nameserver list that returned the result. |
@@ -194,21 +198,23 @@ For each remaining label (BFS from "." down toward child):
 | `B01_INCONSISTENT_DELEGATION` | `domain_child` | `string` | Child zone name. |
 | `B01_INCONSISTENT_DELEGATION` | `servers` | `array<object>` | Structured nameserver list tied to inconsistency. |
 | `B01_NO_CHILD` | `domain_child` | `string` | Child zone name. |
-| `B01_NO_CHILD` | `domain_super` | `string` | Zone suggested for testing: the parent zone when exactly one was found, otherwise the next-higher name. |
+| `B01_NO_CHILD` | `domain_super` | `string` | Zone suggested for testing: the parent zone when exactly one was found; when none was found, the deepest zone the walk was referred to or proved; in every other case the next-higher name. |
 | `B01_PARENT_DISREGARDED` | `-` | `-` | No arguments. |
 | `B01_PARENT_FOUND` | `domain` | `string` | Parent zone name candidate. |
 | `B01_PARENT_FOUND` | `servers` | `array<object>` | Structured nameserver list returning parent evidence. |
 | `B01_PARENT_NOT_FOUND` | `-` | `-` | No arguments. |
 | `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `query_name` | `string` | Intermediate name where the parent returned NXDOMAIN. |
-| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `domain_child` | `string` | Child zone name that the same parent NS will delegate. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `query_name` | `string` | Intermediate name where the nameserver returned NXDOMAIN. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `domain_child` | `string` | Child zone name; the same NS refers a query for it to the child or to an ancestor of the child. |
 | `B01_PARENT_UNDETERMINED` | `servers` | `array<object>` | Structured nameserver list across competing parents. |
 | `B01_ROOT_HAS_NO_PARENT` | `-` | `-` | No arguments. |
 | `B01_SERVER_ZONE_ERROR` | `query_name` | `string` | Queried owner name that failed validation. |
 | `B01_SERVER_ZONE_ERROR` | `query_type` | `string` | Queried rrtype (`SOA` or `NS`). |
 | `B01_SERVER_ZONE_ERROR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `B01_SERVER_ZONE_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `B01_SERVER_ZONE_ERROR` | `reason` | `string` | First requirement the response fails: `no_response` (no response, or one that cannot be read), `rcode` (an RCODE other than `NOERROR`, or an authoritative `NXDOMAIN` for a zone of the walk), `referral` (a referral without the AA bit, naming no NS for the queried name), `not_authoritative` (any other response without the AA bit), `soa_records` (not exactly one SOA record in the answer section, or one of another owner), `ns_records` (no NS record, or an NS record of another owner). |
+| `B01_SERVER_ZONE_ERROR` | `rcode` | `string` | RCODE mnemonic of the response; absent when `reason` is `no_response`. |
 | `CNAME_CHAIN_TOO_LONG` | `query_name` | `string` | The qname whose CNAME chain exceeded the depth bound. |
 | `CNAME_TARGET_UNRESOLVED` | `query_name` | `string` | The qname whose CNAME target could not be resolved. |
 | `CNAME_TARGET_UNRESOLVED` | `cname_target` | `string` | The last attempted CNAME target. |
@@ -227,15 +233,14 @@ For each remaining label (BFS from "." down toward child):
 | `IPV6_ENABLED` | `query_type` | `string` | Query type sent over enabled transport. |
 | `LOOP_PROTECTION` | `caller` | `string` | Internal caller name that hit loop protection. |
 | `LOOP_PROTECTION` | `child_zone_name` | `string` | Child zone name under test. |
-| `LOOP_PROTECTION` | `zone_name` | `string` | Current loop zone name state. |
-| `LOOP_PROTECTION` | `intermediate_query_name` | `string` | Intermediate query name at stop point. |
+| `LOOP_PROTECTION` | `zone_name` | `string` | Zone the walk was about to visit. |
+| `LOOP_PROTECTION` | `intermediate_query_name` | `string` | Name of the next query, the apex of `zone_name`. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Basic01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Basic01`). |
 
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `B01_CHILD_NOT_EXIST` | `INFO` | Default from `share/profile.json`. |
 | `B01_CHILD_IS_ALIAS` | `NOTICE` | Default from `share/profile.json`. |
 | `B01_CHILD_FOUND` | `INFO` | Default from `share/profile.json`. |
 | `B01_INCONSISTENT_ALIAS` | `ERROR` | Default from `share/profile.json`. |
@@ -260,18 +265,23 @@ For each remaining label (BFS from "." down toward child):
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json`. |
 
 ## Differences From Upstream
+- Upstream reference: `docs/public/specifications/tests/Basic-TP/basic01.md` (develop, 2026-11-23), and the open specification change zonemaster#1488.
 - Differences (Upstream vs Gonemaster):
-  - Upstream: documents `B01_NO_CHILD` for the non-existing-child outcome. Gonemaster: also emits `B01_CHILD_NOT_EXIST` in fake-address mode.
-  - Upstream: testcase summary does not list transport debug tags or `LOOP_PROTECTION`. Gonemaster: emits `IPV4_*`, `IPV6_*`, and `LOOP_PROTECTION`.
+  - Upstream: the summary lists no transport, CNAME or loop-protection tags. Gonemaster: emits `IPV4_*`, `IPV6_*`, `CNAME_*` for the address lookup of an NS name, and `LOOP_PROTECTION`.
   - Upstream: probes every root server for every child. Gonemaster: for a child below a TLD, follows one working root server and walks the others only when that path finds no parent or no child, so `B01_SERVER_ZONE_ERROR` is reported only for root servers that were probed.
-  - Upstream: no diagnostic for parent nameservers that violate RFC 8020 by returning NXDOMAIN at an intermediate empty non-terminal while still delegating a deeper child; the child is treated as nonexistent. Gonemaster: emits `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`, treats the directly-observed referral at the child as legitimate delegation evidence, emits `B01_CHILD_FOUND`, and lets the rest of the test suite run.
+  - Upstream: `B01_SERVER_ZONE_ERROR` carries the query and the nameserver. Gonemaster: adds `reason` and `rcode`.
+  - Upstream: no diagnostic for parent nameservers that violate RFC 8020 by returning NXDOMAIN at an intermediate empty non-terminal while still delegating a deeper child; the child is treated as nonexistent. Gonemaster: emits `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`, treats the directly-observed referral as delegation evidence, emits `B01_CHILD_FOUND`, and lets the rest of the test suite run. zonemaster#1488 adds `B01_UNEXPECTED_NXDOMAIN` for the same fault (`DIV-B01-RFC8020-NXDOMAIN`).
+  - Upstream (step 9.2): one `B01_INCONSISTENT_DELEGATION` with the combined server set. Gonemaster: one per parent zone that has servers answering without a delegation.
+  - Upstream (step 10): `domain_super` is the child with its first label removed. Gonemaster: the parent zone when exactly one was found, otherwise the deepest zone the walk reached, otherwise the next-higher name (`DIV-B01-DOMAIN-SUPER`).
+  - Upstream (step 10): `B01_NO_CHILD` is emitted whenever neither a delegation nor an authoritative SOA was found, beside `B01_CHILD_IS_ALIAS` for a DNAME. Gonemaster: emits no `B01_NO_CHILD` when a DNAME was found (`DIV-B01-DNAME-NO-CHILD`).
+  - Upstream: follows every NS name and address. Gonemaster: cuts the NS names of one response at 32 and the addresses of one name at 16, and a run queries at most 512 addresses; a cut logs `LIMIT_REACHED`.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - Upstream expected behavior: Child-not-exist path is described with `B01_NO_CHILD` only, and summary does not include transport or loop-protection tags.
-  - Gonemaster observed behavior: `B01_CHILD_NOT_EXIST`, `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`, transport tags, and `LOOP_PROTECTION` are possible emissions.
-  - evidence: `engine/test/basic/basic.go` (`Basic01`, `ipDisabledMessage`, `ipEnabledMessage`).
-  - report status: `not filed`
+  - Upstream expected behavior: a child below an empty non-terminal for which a parent nameserver returns an authoritative NXDOMAIN is reported as nonexistent.
+  - Gonemaster observed behavior: the child is found through the referral the same nameserver returns for it, and `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` names the nameserver.
+  - evidence: `engine/test/basic/basic01_test.go` (`TestBasic01IntermediateNXDomain`, `TestBasic01AncestorNXDomainHidesParentDelegation`).
+  - report status: `filed` (zonemaster#1484, opened and closed upstream; specification change in zonemaster#1488, open)
 
 ## Implementation Notes
 
@@ -279,15 +289,14 @@ The following behaviors are implementation choices, not mandated by RFC 1034 or 
 
 - **Traversal strategy**: The testcase probes iteratively from root servers using SOA, NS, and DNAME queries, extending the intermediate name toward the child zone at each step.  The DNS protocol specifies the resolution model but does not define how a testcase tool should walk the hierarchy.
 - **One root path below a TLD**: Every root server is probed only when the roots are the parent (a TLD child) or when one root path finds nothing.  Root server faults are a root or TLD issue, not one the owner of a deeper zone can act on.
-- **Sorted `servers` arguments**: Nameserver lists passed in tag arguments are sorted before joining with `;`.  Deterministic ordering simplifies reproducible output but is not a protocol requirement.
-- **Loop protection threshold**: Traversal stops at a fixed internal limit and emits `LOOP_PROTECTION`.  No DNS standard defines a specific iteration bound; the limit is a defensive implementation choice.
+- **Sorted `servers` arguments**: Nameserver lists in tag arguments are sorted by name and address. Deterministic ordering makes output reproducible and is not a protocol requirement.
+- **Loop protection threshold**: The walk stops after 2 × (labels of the child + 1) zone visits and emits `LOOP_PROTECTION`. A correct walk stays within that bound; the guard protects against a queueing fault. No DNS standard defines the bound.
 - **Fan-out bounds**: At each zone of the walk, the NS names of one NS response and the addresses of each name are cut after the bounds `ns_names_per_zone` (32) and `addresses_per_ns` (16) of [Fan-out Limits](../../nameserver-resolution.md#fan-out-limits), in sorted order; a cut logs `LIMIT_REACHED`. RFC 1034 section 5.3.3 requires the work to be bounded and names no value.
 
 ## Edge Cases And Limitations
 - A missing recursor causes testcase execution error before completion.
-- Loop-protection fallback is defensive; when triggered it logs `LOOP_PROTECTION` and terminates the testcase early.
+- When `LOOP_PROTECTION` ends the walk, the outcome rests on the zones visited before it; a child the walk did not reach is reported with `B01_NO_CHILD`.
 - A zone of the walk with more than 32 NS names in one response, or an NS name with more than 16 addresses, is walked through the first names and addresses in sorted order only; servers past the cut are neither probed nor reported.
-- Child existence outcomes differ between normal and fake-address modes (`B01_NO_CHILD` vs `B01_CHILD_NOT_EXIST`).
-- `domain_super` is the closest enclosing zone the walk proved, not a name derived from the child. Below a missing intermediate name, and for a reverse name under `ip6.arpa` (RFC 3596 section 2.5), the next-higher name is not a zone.
-- When a parent nameserver returns authoritative NXDOMAIN at an intermediate empty non-terminal (RFC 8020 violation) but also has a delegation at the child, the per-label SOA walk would normally stop on that NS without ever reaching the child. Basic01 issues one extra SOA probe at the child name; if that probe returns a referral, the directly-observed delegation is treated as valid evidence (added to `delegationFound`, so `B01_CHILD_FOUND` fires and downstream test cases run against the real child nameservers), and `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` is emitted to flag the contradiction. Ordinary recursive resolvers reach the data the same way because they typically query only the child name and follow the referral directly.
-- Nameserver list argument order is deterministic because lists are sorted before join.
+- With fake addresses the walk does not run, so child existence is not judged here: the testcase emits `B01_CHILD_FOUND` and `B01_PARENT_DISREGARDED` only.
+- With one parent, or with none, `domain_super` is the closest enclosing zone the walk reached, not a name derived from the child. Below a missing intermediate name, below an intermediate name a nameserver fails to answer for, and for a reverse name under `ip6.arpa` (RFC 3596 section 2.5), the next-higher name is not a zone. With several parent candidates `domain_super` is the next-higher name.
+- When a parent nameserver returns authoritative NXDOMAIN at an intermediate empty non-terminal (RFC 8020 violation) but also has a delegation at the child, the per-label SOA walk would normally stop on that NS without ever reaching the child. Basic01 issues one extra SOA probe at the child name; if that probe returns a referral for the child, the directly-observed delegation is treated as valid evidence (added to `delegationFound`, so `B01_CHILD_FOUND` fires and downstream test cases run against the real child nameservers), and `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` is emitted to flag the contradiction. If the probe returns a referral for a zone between the walked zone and the child, the walk continues at that zone's nameservers and the same tag is emitted; no further query is sent to the contradicting nameserver. Ordinary recursive resolvers reach the data the same way because they typically query only the child name and follow the referral directly.

@@ -12,6 +12,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Changed
 
+- ui-public: the home page describes the checker and has a descriptive title
 - build: the Nix package runs every Go test package, not only the five binaries
 - basic01: `B01_CHILD_NOT_EXIST` is removed; it was never emitted
 - basic01: `LOOP_PROTECTION` ends a walk past 2 × (labels of the child + 1) zone visits

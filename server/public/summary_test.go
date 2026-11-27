@@ -278,8 +278,8 @@ func TestHomePageIsIndexableAndKeepsHreflang(t *testing.T) {
 	if !strings.Contains(body, `hreflang="en"`) {
 		t.Error("home page lost its hreflang alternates")
 	}
-	if !strings.Contains(body, "<title>Gonemaster</title>") {
-		t.Error("home page title is not Gonemaster")
+	if !strings.Contains(body, "<title>Gonemaster: free DNS health check and DNSSEC test</title>") {
+		t.Error("home page lost its descriptive title")
 	}
 	if !strings.Contains(body, genericMarker) {
 		t.Error("home page lost the generic noscript body")
@@ -290,36 +290,42 @@ func TestHomePageIsIndexableAndKeepsHreflang(t *testing.T) {
 // it is still a lie.
 func TestHomePageLocalizesFromLangParam(t *testing.T) {
 	tests := []struct {
-		name     string
-		path     string
-		wantLang string
-		wantURL  string
-		wantText string
+		name      string
+		path      string
+		wantLang  string
+		wantURL   string
+		wantText  string
+		wantTitle string
 	}{
 		{
 			name: "no lang is the x-default page in English", path: "/",
 			wantLang: "en", wantURL: "http://example.com/public/",
-			wantText: "Test your DNS zone configuration",
+			wantText:  "Free DNS health check for any domain",
+			wantTitle: "Gonemaster: free DNS health check and DNSSEC test",
 		},
 		{
 			name: "swedish", path: "/?lang=sv",
 			wantLang: "sv", wantURL: "http://example.com/public/?lang=sv",
-			wantText: "Testa din DNS-zonkonfiguration",
+			wantText:  "Gratis DNS-hälsokontroll för alla domäner",
+			wantTitle: "Gonemaster: gratis DNS-hälsokontroll och DNSSEC-test",
 		},
 		{
 			name: "japanese", path: "/?lang=ja",
 			wantLang: "ja", wantURL: "http://example.com/public/?lang=ja",
-			wantText: "DNS ゾーン設定をテストします",
+			wantText:  "あらゆるドメインに使える無料の DNS ヘルスチェック",
+			wantTitle: "Gonemaster: 無料の DNS ヘルスチェックと DNSSEC テスト",
 		},
 		{
 			name: "region tag narrows to the base locale", path: "/?lang=de-AT",
 			wantLang: "de", wantURL: "http://example.com/public/?lang=de",
-			wantText: "Prüfen Sie Ihre DNS-Zonenkonfiguration",
+			wantText:  "Kostenloser DNS-Check für jede Domain",
+			wantTitle: "Gonemaster: kostenloser DNS-Check und DNSSEC-Test",
 		},
 		{
 			name: "unshipped lang falls back to the default page", path: "/?lang=zz",
 			wantLang: "en", wantURL: "http://example.com/public/",
-			wantText: "Test your DNS zone configuration",
+			wantText:  "Free DNS health check for any domain",
+			wantTitle: "Gonemaster: free DNS health check and DNSSEC test",
 		},
 	}
 	for _, tt := range tests {
@@ -330,6 +336,9 @@ func TestHomePageLocalizesFromLangParam(t *testing.T) {
 			}
 			if !strings.Contains(body, tt.wantText) {
 				t.Errorf("description is not in %s", tt.wantLang)
+			}
+			if !strings.Contains(body, "<title>"+tt.wantTitle+"</title>") {
+				t.Errorf("title is not %q", tt.wantTitle)
 			}
 			if !strings.Contains(body, `<link rel="canonical" href="`+tt.wantURL+`" />`) {
 				t.Errorf("canonical is not %q", tt.wantURL)
@@ -578,7 +587,7 @@ func TestEmbeddedIndexHasEveryHook(t *testing.T) {
 	}
 }
 
-// The Go copies of the three catalog templates must match the shipped JSON, or
+// The Go copies of the catalog templates must match the shipped JSON, or
 // the tab title and the rendered page disagree.
 func TestSummaryStringsMatchCatalogs(t *testing.T) {
 	for locale, want := range summaryText {
@@ -597,6 +606,7 @@ func TestSummaryStringsMatchCatalogs(t *testing.T) {
 		}{
 			{"pub.doc_title_grade", want.titleGrade},
 			{"pub.doc_title_result", want.titleResult},
+			{"pub.doc_title_home", want.homeTitle},
 			{"pub.result_heading", want.heading},
 		} {
 			if catalog[pair.key] != pair.got {

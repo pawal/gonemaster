@@ -105,6 +105,7 @@ type summaryStrings struct {
 	issues          string
 	tested          string
 	more            string
+	homeTitle       string
 	homeDescription string
 }
 
@@ -113,73 +114,85 @@ var summaryText = map[string]summaryStrings{
 		titleGrade: "{domain} - grade {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Results for {domain}", gradeClause: "Grade {grade}, score {score}/100.",
 		issues: "Issues", tested: "Tested", more: "and {n} more",
-		homeDescription: "Test your DNS zone configuration with Gonemaster - a free online DNS health checker.",
+		homeTitle:       "Gonemaster: free DNS health check and DNSSEC test",
+		homeDescription: "Free DNS health check for any domain: tests delegation, DNSSEC, connectivity, nameserver behavior and zone consistency on every authoritative nameserver.",
 	},
 	"sv": {
 		titleGrade: "{domain} - betyg {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultat för {domain}", gradeClause: "Betyg {grade}, poäng {score}/100.",
 		issues: "Problem", tested: "Testad", more: "och {n} fler",
-		homeDescription: "Testa din DNS-zonkonfiguration med Gonemaster - en fri DNS-hälsokontroll på webben.",
+		homeTitle:       "Gonemaster: gratis DNS-hälsokontroll och DNSSEC-test",
+		homeDescription: "Gratis DNS-hälsokontroll för alla domäner: testar delegering, DNSSEC, anslutning, namnserverbeteende och zonkonsekvens på varje auktoritativ namnserver.",
 	},
 	"da": {
 		titleGrade: "{domain} - karakter {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultater for {domain}", gradeClause: "Karakter {grade}, point {score}/100.",
 		issues: "Problemer", tested: "Testet", more: "og {n} flere",
-		homeDescription: "Test din DNS-zonekonfiguration med Gonemaster - et frit DNS-helbredstjek på nettet.",
+		homeTitle:       "Gonemaster: gratis DNS-helbredstjek og DNSSEC-test",
+		homeDescription: "Gratis DNS-helbredstjek for alle domæner: tester delegering, DNSSEC, forbindelse, navneserveradfærd og zonekonsistens på hver autoritativ navneserver.",
 	},
 	"nb": {
 		titleGrade: "{domain} - karakter {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultater for {domain}", gradeClause: "Karakter {grade}, poeng {score}/100.",
 		issues: "Problemer", tested: "Testet", more: "og {n} flere",
-		homeDescription: "Test DNS-sonekonfigurasjonen din med Gonemaster - en fri DNS-helsesjekk på nettet.",
+		homeTitle:       "Gonemaster: gratis DNS-helsesjekk og DNSSEC-test",
+		homeDescription: "Gratis DNS-helsesjekk for alle domener: tester delegering, DNSSEC, tilkobling, navnetjeneratferd og sonekonsistens på hver autoritativ navnetjener.",
 	},
 	"de": {
 		titleGrade: "{domain} - Note {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Ergebnisse für {domain}", gradeClause: "Note {grade}, Punktzahl {score}/100.",
 		issues: "Probleme", tested: "Getestet", more: "und {n} weitere",
-		homeDescription: "Prüfen Sie Ihre DNS-Zonenkonfiguration mit Gonemaster - eine freie DNS-Statusprüfung im Web.",
+		homeTitle:       "Gonemaster: kostenloser DNS-Check und DNSSEC-Test",
+		homeDescription: "Kostenloser DNS-Check für jede Domain: testet Delegation, DNSSEC, Konnektivität, Nameserver-Verhalten und Zonenkonsistenz auf jedem autoritativen Nameserver.",
 	},
 	"nl": {
 		titleGrade: "{domain} - cijfer {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultaten voor {domain}", gradeClause: "Cijfer {grade}, score {score}/100.",
 		issues: "Problemen", tested: "Getest", more: "en nog {n}",
-		homeDescription: "Test je DNS-zoneconfiguratie met Gonemaster - een vrije DNS-gezondheidscontrole op het web.",
+		homeTitle:       "Gonemaster: gratis DNS-gezondheidscontrole en DNSSEC-test",
+		homeDescription: "Gratis DNS-gezondheidscontrole voor elk domein: test delegatie, DNSSEC, connectiviteit, naamservergedrag en zoneconsistentie op elke autoritatieve naamserver.",
 	},
 	"fr": {
 		titleGrade: "{domain} - note {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Résultats pour {domain}", gradeClause: "Note {grade}, score {score}/100.",
 		issues: "Problèmes", tested: "Testé", more: "et {n} de plus",
-		homeDescription: "Testez la configuration de votre zone DNS avec Gonemaster - un contrôle de santé DNS libre en ligne.",
+		homeTitle:       "Gonemaster : contrôle de santé DNS et test DNSSEC gratuits",
+		homeDescription: "Contrôle de santé DNS gratuit pour tout domaine : teste la délégation, DNSSEC, la connectivité, le comportement des serveurs de noms et la cohérence de zone sur chaque serveur de noms faisant autorité.",
 	},
 	"es": {
 		titleGrade: "{domain} - nota {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultados para {domain}", gradeClause: "Nota {grade}, puntuación {score}/100.",
 		issues: "Problemas", tested: "Probado", more: "y {n} más",
-		homeDescription: "Compruebe la configuración de su zona DNS con Gonemaster - una verificación de salud DNS libre en línea.",
+		homeTitle:       "Gonemaster: verificación de salud DNS y prueba DNSSEC gratuitas",
+		homeDescription: "Verificación de salud DNS gratuita para cualquier dominio: prueba la delegación, DNSSEC, la conectividad, el comportamiento de los servidores de nombres y la coherencia de zona en cada servidor de nombres autoritativo.",
 	},
 	"fi": {
 		titleGrade: "{domain} - arvosana {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Tulokset verkkotunnukselle {domain}", gradeClause: "Arvosana {grade}, pisteet {score}/100.",
 		issues: "Ongelmat", tested: "Testattu", more: "ja {n} muuta",
-		homeDescription: "Testaa DNS-vyöhykkeesi asetukset Gonemasterilla - vapaa DNS-kuntotarkistus verkossa.",
+		homeTitle:       "Gonemaster: ilmainen DNS-kuntotarkistus ja DNSSEC-testi",
+		homeDescription: "Ilmainen DNS-kuntotarkistus mille tahansa verkkotunnukselle: testaa delegoinnin, DNSSEC:n, yhteydet, nimipalvelimen toiminnan ja vyöhykkeen yhtenäisyyden jokaisella auktoritatiivisella nimipalvelimella.",
 	},
 	"cs": {
 		titleGrade: "{domain} - známka {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Výsledky pro {domain}", gradeClause: "Známka {grade}, skóre {score}/100.",
 		issues: "Problémy", tested: "Otestováno", more: "a {n} dalších",
-		homeDescription: "Otestujte konfiguraci své DNS zóny pomocí Gonemasteru - volná kontrola zdraví DNS na webu.",
+		homeTitle:       "Gonemaster: bezplatná kontrola zdraví DNS a test DNSSEC",
+		homeDescription: "Bezplatná kontrola zdraví DNS pro jakoukoli doménu: testuje delegaci, DNSSEC, konektivitu, chování jmenných serverů a konzistenci zóny na každém autoritativním jmenném serveru.",
 	},
 	"sl": {
 		titleGrade: "{domain} - ocena {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Rezultati za {domain}", gradeClause: "Ocena {grade}, točke {score}/100.",
 		issues: "Težave", tested: "Preizkušeno", more: "in {n} več",
-		homeDescription: "Preizkusite nastavitve svoje cone DNS z Gonemastrom - prosta preveritev zdravja DNS na spletu.",
+		homeTitle:       "Gonemaster: brezplačna preveritev zdravja DNS in test DNSSEC",
+		homeDescription: "Brezplačna preveritev zdravja DNS za katero koli domeno: preizkusi delegiranje, DNSSEC, povezljivost, vedenje imenskih strežnikov in doslednost cone na vsakem avtoritativnem imenskem strežniku.",
 	},
 	"ja": {
 		titleGrade: "{domain} - 評価 {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "{domain} の結果", gradeClause: "評価 {grade}、スコア {score}/100。",
 		issues: "問題", tested: "テスト日時", more: "他 {n} 件",
-		homeDescription: "Gonemaster で DNS ゾーン設定をテストします。無料で使える DNS ヘルスチェックです。",
+		homeTitle:       "Gonemaster: 無料の DNS ヘルスチェックと DNSSEC テスト",
+		homeDescription: "あらゆるドメインに使える無料の DNS ヘルスチェック。すべての権威ネームサーバーで委任、DNSSEC、接続性、ネームサーバーの動作、ゾーンの一貫性をテストします。",
 	},
 }
 

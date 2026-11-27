@@ -166,7 +166,7 @@ func homePage(site Site, locale string) page {
 		locale = "en"
 	}
 	return page{
-		title:       "Gonemaster",
+		title:       textFor(locale).homeTitle,
 		description: textFor(locale).homeDescription,
 		lang:        locale,
 		url:         site.Locale(locale),

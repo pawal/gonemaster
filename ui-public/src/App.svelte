@@ -40,6 +40,8 @@
   let jobDomain = $state("");
   let jobFinishedAt = $state(null);
   let jobProgress = $state(0);
+  // The landing view: no result loaded or loading.
+  let isHome = $derived(phase === "idle" && !publicID);
 
   // ── Recent tests history ────────────────────────────────────────────────────
   let historyEntries = $state(loadEntries());
@@ -65,6 +67,8 @@
       document.title = resultGrade
         ? $t("pub.doc_title_grade", { domain: jobDomain, grade: resultGrade })
         : $t("pub.doc_title_result", { domain: jobDomain });
+    } else if (isHome) {
+      document.title = $t("pub.doc_title_home");
     } else {
       document.title = "Gonemaster";
     }
@@ -345,6 +349,13 @@
     </div>
   </header>
 
+  {#if isHome}
+    <details class="home-intro" data-testid="home-intro">
+      <summary class="home-intro-lead">{$t("pub.home_intro_lead")}</summary>
+      <p class="home-intro-detail">{$t("pub.home_intro_detail")}</p>
+    </details>
+  {/if}
+
   <TestForm disabled={phase === "running"} {focusSignal} {prefillDomain} {prefillSignal} onjobcreated={onJobCreated} />
 
   {#if phase === "idle" && historyEntries.length > 0}
@@ -397,3 +408,56 @@
 
   <a class="fork-ribbon right-bottom fixed" href="https://codeberg.org/pawal/gonemaster" data-ribbon="Fork me on Codeberg" title="Fork me on Codeberg">Fork me on Codeberg</a>
 </main>
+
+<style>
+  .home-intro {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-2);
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .home-intro-lead {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .home-intro-lead::-webkit-details-marker {
+    display: none;
+  }
+
+  /* Same chevron as the Options fold. */
+  .home-intro-lead::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid var(--muted);
+    border-bottom: 2px solid var(--muted);
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .home-intro-lead:hover {
+    color: var(--ink);
+  }
+
+  .home-intro-lead:hover::before {
+    border-color: var(--ink);
+  }
+
+  .home-intro[open] > .home-intro-lead::before {
+    transform: rotate(45deg);
+  }
+
+  .home-intro-detail {
+    margin: 0;
+    padding: 0 var(--space-3) var(--space-3) calc(var(--space-3) + var(--space-4));
+  }
+</style>

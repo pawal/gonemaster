@@ -81,6 +81,40 @@ describe("App", () => {
     });
   });
 
+  describe("home intro", () => {
+    const lead = "gonemaster is a free DNS health checker.";
+    const detail = "It runs more than 80 tests against every authoritative nameserver of a domain: delegation, DNSSEC, connectivity, nameserver behavior, zone consistency, and more. Findings are reported by severity.";
+
+    it("shows the intro folded to its lead above the test form", () => {
+      render(App);
+      const block = screen.getByTestId("home-intro");
+      expect(block.tagName).toBe("DETAILS");
+      expect(block.open).toBe(false);
+      expect(block.querySelector("summary").textContent).toBe(lead);
+      const after = block.compareDocumentPosition(screen.getByTestId("test-form")) & Node.DOCUMENT_POSITION_FOLLOWING;
+      expect(after).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
+    it("keeps the folded detail in the page", () => {
+      render(App);
+      expect(screen.getByTestId("home-intro").querySelector(".home-intro-detail").textContent).toBe(detail);
+    });
+
+    it("hides the intro on a result page and restores it on going home", async () => {
+      goTo("/public/result/abc12345");
+      fetchRouter([
+        ["/locales", localesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/", jobResp("succeeded", "example.com", 100)],
+      ]);
+      render(App);
+      await screen.findByTestId("results-view");
+      expect(screen.queryByTestId("home-intro")).toBeNull();
+      await clickHome();
+      expect((await screen.findByTestId("home-intro")).querySelector("summary").textContent).toBe(lead);
+    });
+  });
+
   // Path routing
 
   describe("routing", () => {
@@ -594,9 +628,9 @@ describe("App", () => {
     expect(document.title).toBe("Gonemaster");
   });
 
-  it("title is Gonemaster on initial idle state", () => {
+  it("titles the home view with the translated home title", () => {
     render(App);
-    expect(document.title).toBe("Gonemaster");
+    expect(document.title).toBe("Gonemaster: free DNS health check and DNSSEC test");
   });
 
   // Document language

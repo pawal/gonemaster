@@ -111,7 +111,8 @@ nix build git+https://codeberg.org/pawal/gonemaster#gonemaster-nogui
 ```
 
 The `gonemaster-nogui` output is the server without the embedded web UIs and
-builds without Node.js.
+builds without Node.js. On NixOS, the flake's `nixosModules.default` runs the
+server as a service; see [docs/server/install.md](docs/server/install.md#nixos).
 
 `make packages` builds Debian and RPM packages (building the embedded web UIs
 requires Node.js). `make help` lists the other targets.

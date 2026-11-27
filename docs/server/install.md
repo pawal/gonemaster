@@ -68,6 +68,45 @@ without it.
 The archive carries no systemd unit, env file, or man pages. Installing from a
 package is required for a service install.
 
+### NixOS
+
+The repository flake provides `nixosModules.default`. It runs
+`gonemaster-server` as a systemd service under a dynamic user, with its state
+in `/var/lib/gonemaster`:
+
+```nix
+{
+  inputs.gonemaster.url = "git+https://codeberg.org/pawal/gonemaster";
+
+  outputs = { nixpkgs, gonemaster, ... }: {
+    nixosConfigurations.host = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        gonemaster.nixosModules.default
+        {
+          services.gonemaster-server = {
+            enable = true;
+            settings.public_url = "https://gonemaster.example/";
+            environmentFile = "/run/secrets/gonemaster-server.env";
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+| Option | Default | Purpose |
+|---|---|---|
+| `enable` | `false` | Runs the service. |
+| `package` | the flake's `gonemaster` | Package that provides the server; `gonemaster-nogui` leaves out the web UIs. |
+| `settings` | listener on `127.0.0.1:8080`, SQLite in `/var/lib/gonemaster/gonemaster.db` | Keys of the [config file](configuration.md#config-file-example), passed with `--config`. |
+| `environmentFile` | none | `GONEMASTER_*` variables for secrets, such as `GONEMASTER_DB_DSN` or `GONEMASTER_ADMIN_TOKEN_HASHES`. They override `settings`. |
+
+Every local user can read `settings` in the Nix store. The module adds the
+package to `environment.systemPackages`, which puts
+`gonemaster-server auth add-token` and the man pages on the host.
+
 ### Verifying the install
 
     systemctl status gonemaster-server      # should be inactive after install

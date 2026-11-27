@@ -8,9 +8,11 @@ All notable changes to all gonemaster components will be documented in this file
 
 - basic01: `B01_SERVER_ZONE_ERROR` carries `reason` and `rcode`
 - ui-public: explanation for `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`
+- build: the Nix flake provides a NixOS module for `gonemaster-server`, with a NixOS VM test in `checks`
 
 ### Changed
 
+- build: the Nix package runs every Go test package, not only the five binaries
 - basic01: `B01_CHILD_NOT_EXIST` is removed; it was never emitted
 - basic01: `LOOP_PROTECTION` ends a walk past 2 × (labels of the child + 1) zone visits
 - basic01: the `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` message names the referral, not a parent delegation
@@ -26,6 +28,8 @@ All notable changes to all gonemaster components will be documented in this file
 - basic02: every NS name left without an address is reported with `B02_NS_NO_IP_ADDR`, also when other names resolve
 - basic02: the detail tags after `B02_NO_WORKING_NS` are sorted by nameserver name and address
 - engine: the root zone's delegation takes its addresses from the bundled root hints
+- build: the Nix flake builds, with real dependency hashes and a `flake.lock`; it drops x86_64-darwin, which nixpkgs 26.11 no longer supports
+- server: the tests build with the `nogui` tag
 
 ## [v1.7.29] - 2026-11-26
 

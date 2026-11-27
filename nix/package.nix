@@ -43,7 +43,7 @@ buildGo127Module (finalAttrs: {
   inherit version;
   src = source;
 
-  vendorHash = lib.fakeHash;
+  vendorHash = "sha256-nYKCr3jPQw2QIBSY2H014Zx8W/OXhzDe5+xpzKCYYjU=";
 
   subPackages = [
     "cmd/gonemaster"
@@ -63,6 +63,11 @@ buildGo127Module (finalAttrs: {
 
   # The sqlite driver is pure Go, so the binaries stay static.
   env.CGO_ENABLED = 0;
+
+  # Test every package, not only the binaries.
+  preCheck = ''
+    unset subPackages
+  '';
 
   # Replace the committed placeholders with the built assets.
   preBuild = lib.optionalString withUI ''

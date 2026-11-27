@@ -13,17 +13,17 @@ let
     admin = {
       dir = "ui";
       dist = "../server/ui/dist";
-      hash = lib.fakeHash;
+      hash = "sha256-+h+IQN68OU4lMzpb4So0LJjfMEJmLvpgeHNetV8y9L0=";
     };
     public = {
       dir = "ui-public";
       dist = "../server/public/dist";
-      hash = lib.fakeHash;
+      hash = "sha256-P9C8iYeB7mieHkxnZrC8TgDk9MdJ2cwEXxtveK44llc=";
     };
     analysis = {
       dir = "analysis-ui";
       dist = "../server/analysisui/dist";
-      hash = lib.fakeHash;
+      hash = "sha256-WNEeZ+f1Qbh1BA/T/UdWkWMJWKWXciqhVUqyOGRvPb8=";
     };
   };
 

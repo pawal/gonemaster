@@ -9,11 +9,12 @@
       systems = [
         "x86_64-linux"
         "aarch64-linux"
-        "x86_64-darwin"
         "aarch64-darwin"
       ];
 
       forAllSystems = fn: nixpkgs.lib.genAttrs systems (system: fn nixpkgs.legacyPackages.${system});
+
+      linuxSystems = builtins.filter (nixpkgs.lib.hasSuffix "-linux") systems;
 
       # The UI derivations read their lockfiles under a fixed root name.
       src = builtins.path {
@@ -30,6 +31,22 @@
         gonemaster = pkgs.callPackage ./nix/package.nix { inherit src; };
         gonemaster-nogui = gonemaster.override { withUI = false; };
         default = gonemaster;
+      });
+
+      nixosModules.default =
+        { lib, pkgs, ... }:
+        {
+          imports = [ ./nix/module.nix ];
+          services.gonemaster-server.package =
+            lib.mkDefault
+              self.packages.${pkgs.stdenv.hostPlatform.system}.gonemaster;
+        };
+
+      checks = nixpkgs.lib.genAttrs linuxSystems (system: {
+        nixos = nixpkgs.legacyPackages.${system}.testers.runNixOSTest {
+          imports = [ ./nix/test.nix ];
+          defaults.imports = [ self.nixosModules.default ];
+        };
       });
 
       devShells = forAllSystems (pkgs: {

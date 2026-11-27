@@ -48,3 +48,6 @@ func Handler(_ func() string) http.Handler {
 
 // ScriptHashes returns nil: the info page has no inline scripts.
 func ScriptHashes() []string { return nil }
+
+// IsBuilt reports false: this build embeds no analysis UI assets.
+func IsBuilt() bool { return false }

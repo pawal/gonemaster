@@ -44,3 +44,6 @@ func Handler(_ func() string, _ string, _ LookupResult) http.Handler {
 		http.Error(w, "ui not available", http.StatusNotFound)
 	})
 }
+
+// IsBuilt reports false: this build embeds no public UI assets.
+func IsBuilt() bool { return false }

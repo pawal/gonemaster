@@ -350,9 +350,9 @@
   </header>
 
   {#if isHome}
-    <details class="home-intro" data-testid="home-intro">
-      <summary class="home-intro-lead">{$t("pub.home_intro_lead")}</summary>
-      <p class="home-intro-detail">{$t("pub.home_intro_detail")}</p>
+    <details class="fold-box" data-testid="home-intro">
+      <summary class="fold-box-head">{$t("pub.home_intro_lead")}</summary>
+      <p class="fold-box-body home-intro-detail">{$t("pub.home_intro_detail")}</p>
     </details>
   {/if}
 
@@ -388,9 +388,9 @@
   {/if}
 
   <footer class="version-footer">
-    <details class="about-details">
-      <summary class="about-summary">{$t("pub.about_summary")}</summary>
-      <div class="about-body">
+    <details class="fold-box about-details">
+      <summary class="fold-box-head">{$t("pub.about_summary")}</summary>
+      <div class="fold-box-body about-body">
         <p>{$t("pub.about_intro")}</p>
         <p>{@html $t("pub.about_credit", { author: authorLink, repo: repoLink })}</p>
         <p>{@html $t("pub.about_why", { why: whyLink })}</p>
@@ -410,7 +410,7 @@
 </main>
 
 <style>
-  .home-intro {
+  .fold-box {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--bg-2);
@@ -419,7 +419,7 @@
     line-height: 1.5;
   }
 
-  .home-intro-lead {
+  .fold-box-head {
     list-style: none;
     cursor: pointer;
     display: flex;
@@ -428,12 +428,12 @@
     padding: var(--space-2) var(--space-3);
   }
 
-  .home-intro-lead::-webkit-details-marker {
+  .fold-box-head::-webkit-details-marker {
     display: none;
   }
 
   /* Same chevron as the Options fold. */
-  .home-intro-lead::before {
+  .fold-box-head::before {
     content: "";
     width: 7px;
     height: 7px;
@@ -444,20 +444,32 @@
     flex-shrink: 0;
   }
 
-  .home-intro-lead:hover {
+  .fold-box-head:hover {
     color: var(--ink);
   }
 
-  .home-intro-lead:hover::before {
+  .fold-box-head:hover::before {
     border-color: var(--ink);
   }
 
-  .home-intro[open] > .home-intro-lead::before {
+  .fold-box[open] > .fold-box-head::before {
     transform: rotate(45deg);
   }
 
-  .home-intro-detail {
+  .fold-box-body {
     margin: 0;
     padding: 0 var(--space-3) var(--space-3) calc(var(--space-3) + var(--space-4));
+  }
+
+  .fold-box-body p {
+    margin: 0;
+  }
+
+  .fold-box-body p + p {
+    margin-top: var(--space-2);
+  }
+
+  .about-details {
+    align-self: stretch;
   }
 </style>

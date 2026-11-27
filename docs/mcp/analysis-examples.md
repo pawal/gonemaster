@@ -49,7 +49,7 @@ below were run against Claude):
 > most recent run ids, then `run_diff` between them, and summarises the
 > added or severity-changed tags.
 
-Two caveats worth knowing:
+Two caveats:
 
 - Some questions need post-processing the agent does locally (for
   example "top 10 slowest TLDs" requires aggregating `duration_ms` from

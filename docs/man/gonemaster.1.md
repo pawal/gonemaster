@@ -10,7 +10,7 @@ gonemaster - DNS zone testing engine
 
 ## DESCRIPTION
 
-**gonemaster** runs a comprehensive suite of DNS tests against a domain zone,
+**gonemaster** runs a suite of DNS tests against a domain zone,
 checking delegation, DNSSEC, nameserver behavior, zone configuration, and more.
 Results are printed with severity levels and can be output in several formats.
 

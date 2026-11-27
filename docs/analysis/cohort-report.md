@@ -123,9 +123,9 @@ one operator, not nine independent events.
 never mixes improvement with regression. Two dimensions producing the same
 member set collapse into one cluster naming both.
 
-A cluster is a fact, not a cause. "Nine domains sharing version string X all
-moved +8 to +9" is what the report says. Deciding that an operator upgraded
-is the reader's.
+A cluster states what moved together and does not name a cause. The report
+says "nine domains sharing version string X all moved +8 to +9"; whether an
+operator upgraded is left to the reader.
 
 ## Reading It
 

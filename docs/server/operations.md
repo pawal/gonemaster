@@ -39,7 +39,7 @@ Every job created through `POST /api/v1/jobs`, `POST /api/v1/jobs/batch` or
 |---|---|
 | `client_ip` | The peer address, or the `X-Forwarded-For` hop selected under `trusted_proxy_cidrs`; the address the rate limiter keys on. |
 | `client_user_agent` | The `User-Agent` header, characters outside printable ASCII replaced by `?`, cut to 256 bytes. |
-| `client_via` | `ui` when the request carries an `Origin` of this server, as a browser on the admin or public UI sends; `api` otherwise. A client can forge `Origin`, so `ui` is evidence, not proof. |
+| `client_via` | `ui` when the request carries an `Origin` of this server, as a browser on the admin or public UI sends; `api` otherwise. A client can forge `Origin`, so `ui` does not prove a browser sent the request. |
 
 Scheduled batches record no client. The fields appear on the admin job and run
 routes and in the admin UI job inspector; no public route returns them.

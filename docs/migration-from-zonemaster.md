@@ -8,7 +8,7 @@ equivalents.
 For whether to migrate at all, see [Why gonemaster](why.md), in particular
 [when not to use gonemaster](why.md#when-not-to-use-gonemaster). If a workflow
 depends on the Zonemaster GUI or on the Backend JSON-RPC API as such, neither
-has a direct replacement here; this guide describes porting, not substitution.
+has a direct replacement here, and the integration has to be ported.
 
 Scope:
 
